@@ -33,22 +33,29 @@ const FALLBACK_SUPABASE_URL = "https://riufpjmiasquyslutkbp.supabase.co";
 const FALLBACK_SUPABASE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpdWZwam1pYXNxdXlzbHV0a2JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAwMDAwMDAwMH0.dummy-anon-key";
 
+function getEnvVar(key: string, viteKey?: string): string | undefined {
+  if (viteKey && typeof import.meta !== "undefined" && import.meta.env?.[viteKey]) {
+    return import.meta.env[viteKey];
+  }
+  if (typeof process !== "undefined" && process.env?.[key]) {
+    return process.env[key];
+  }
+  if (viteKey && typeof process !== "undefined" && process.env?.[viteKey]) {
+    return process.env[viteKey];
+  }
+  return undefined;
+}
+
 export function isSupabaseConfigured(): boolean {
-  const url = import.meta.env["VITE_SUPABASE_URL"] || process.env["SUPABASE_URL"];
-  const key =
-    import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || process.env["SUPABASE_PUBLISHABLE_KEY"];
+  const url = getEnvVar("SUPABASE_URL", "VITE_SUPABASE_URL");
+  const key = getEnvVar("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY");
   return Boolean(url && key && !key.includes("dummy-anon-key"));
 }
 
 function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL =
-    import.meta.env["VITE_SUPABASE_URL"] || process.env["SUPABASE_URL"] || FALLBACK_SUPABASE_URL;
+  const SUPABASE_URL = getEnvVar("SUPABASE_URL", "VITE_SUPABASE_URL") || FALLBACK_SUPABASE_URL;
   const SUPABASE_PUBLISHABLE_KEY =
-    import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
-    process.env["SUPABASE_PUBLISHABLE_KEY"] ||
-    FALLBACK_SUPABASE_KEY;
+    getEnvVar("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY") || FALLBACK_SUPABASE_KEY;
 
   if (!isSupabaseConfigured()) {
     console.warn(
