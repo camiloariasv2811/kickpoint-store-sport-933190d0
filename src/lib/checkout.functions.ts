@@ -1,6 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { createPublicClient } from "./supabase-public.server";
+import { createPublicClient, isSupabasePublicConfigured } from "./supabase-public.server";
+import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
+import {
+  addInMemoryOrder,
+  getInMemoryOrderByNumber,
+  getInMemoryProducts,
+  uploadInMemoryProof,
+  type InMemoryOrder,
+} from "./demo-data";
 
 export type PaymentMethod = {
   code: string;
@@ -54,6 +62,9 @@ const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [
 ];
 
 export const listPaymentMethods = createServerFn({ method: "GET" }).handler(async () => {
+  if (!isSupabasePublicConfigured()) {
+    return DEFAULT_PAYMENT_METHODS;
+  }
   try {
     const supabase = createPublicClient();
     const { data, error } = await supabase
@@ -102,6 +113,116 @@ export const createOrder = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data }) => {
+    const totalOrderUnits = data.lines.reduce(
+      (sum, l) => sum + Math.max(1, Math.floor(l.quantity)),
+      0,
+    );
+
+    const usdtRate = Number(data.exchangeRateUsed || 86.2);
+
+    if (!isSupabaseServerConfigured()) {
+      // In-memory demo flow
+      const products = getInMemoryProducts();
+      const items = data.lines.map((line) => {
+        let foundVariant: any = null;
+        let foundProduct: any = null;
+
+        for (const p of products) {
+          const v = p.variants?.find((va) => va.id === line.variantId);
+          if (v) {
+            foundVariant = v;
+            foundProduct = p;
+            break;
+          }
+        }
+
+        if (!foundVariant || !foundProduct || !foundVariant.active || !foundProduct.active) {
+          throw new Error("Un producto de tu carrito ya no está disponible");
+        }
+
+        const quantity = Math.max(1, Math.floor(line.quantity));
+        if (quantity > (foundVariant.stock ?? 0)) {
+          throw new Error(
+            `Stock insuficiente para ${foundProduct.name} talla ${foundVariant.size}`,
+          );
+        }
+
+        const wholesale = foundProduct.wholesale_price;
+        const minQty = foundProduct.wholesale_min_qty || 6;
+        const isItemWholesale = Boolean(wholesale && totalOrderUnits >= minQty);
+        const unit = isItemWholesale ? Number(wholesale) : Number(foundProduct.retail_price);
+
+        return {
+          id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          variant_id: foundVariant.id,
+          product_id: foundProduct.id,
+          product_name: foundProduct.name,
+          image_url: foundProduct.images?.[0] ?? null,
+          size: foundVariant.size,
+          color: foundVariant.color,
+          unit_price: unit,
+          unit_cost: Number(foundProduct.retail_price ? foundProduct.retail_price * 0.6 : 14),
+          quantity,
+          subtotal: Number((unit * quantity).toFixed(2)),
+          isWholesale: isItemWholesale,
+        };
+      });
+
+      const subtotal = Number(items.reduce((sum, i) => sum + i.subtotal, 0).toFixed(2));
+      const totalBs = Number((subtotal * usdtRate).toFixed(2));
+
+      const formattedNotes = [
+        `[Envío: ${data.shippingMethod}]`,
+        `[Cotización: Tasa USDT a Bs. ${usdtRate.toFixed(2)} / USD | Total Bs. ${totalBs.toLocaleString("es-VE", { minimumFractionDigits: 2 })}]`,
+        data.customer.notes?.trim() ? `Nota cliente: ${data.customer.notes.trim()}` : "",
+      ]
+        .filter(Boolean)
+        .join(" | ");
+
+      const randomDigits = Math.floor(100000 + Math.random() * 900000);
+      const orderNumber = `KP-2026-${randomDigits}`;
+
+      const newOrder: InMemoryOrder = {
+        id: `ord-${Date.now()}`,
+        order_number: orderNumber,
+        status: "pedido_recibido",
+        channel: "online",
+        payment_method_code: data.paymentMethod,
+        subtotal,
+        total: subtotal,
+        is_wholesale: items.some((i) => i.isWholesale),
+        inventory_applied: false,
+        notes: formattedNotes,
+        created_at: new Date().toISOString(),
+        customer: {
+          first_name: data.customer.firstName.trim().slice(0, 80),
+          last_name: data.customer.lastName.trim().slice(0, 80) || null,
+          whatsapp: data.customer.whatsapp.trim().slice(0, 40),
+          email: data.customer.email.trim().slice(0, 120) || null,
+          address: `${data.shippingMethod} - ${data.customer.address.trim().slice(0, 250)}`,
+          city: data.customer.city.trim().slice(0, 80),
+          state: data.customer.state.trim().slice(0, 80) || null,
+        },
+        items: items.map(({ isWholesale: _, ...it }) => it),
+        payments: [
+          {
+            id: `pay-${Date.now()}`,
+            status: "pendiente",
+            amount: subtotal,
+            method_code: data.paymentMethod,
+            reference: null,
+            proof_url: null,
+            proof_uploaded_at: null,
+            rejection_reason: null,
+            created_at: new Date().toISOString(),
+          },
+        ],
+      };
+
+      addInMemoryOrder(newOrder);
+      return { orderNumber: newOrder.order_number, total: newOrder.total };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const ids = [...new Set(data.lines.map((l) => l.variantId))];
@@ -112,11 +233,6 @@ export const createOrder = createServerFn({ method: "POST" })
       )
       .in("id", ids);
     if (variantError) throw new Error(variantError.message);
-
-    const totalOrderUnits = data.lines.reduce(
-      (sum, l) => sum + Math.max(1, Math.floor(l.quantity)),
-      0,
-    );
 
     const items = data.lines.map((line) => {
       const variant = (variants ?? []).find((v) => v.id === line.variantId) as
@@ -168,7 +284,7 @@ export const createOrder = createServerFn({ method: "POST" })
     const subtotal = Number(items.reduce((sum, i) => sum + i.subtotal, 0).toFixed(2));
 
     // Consult configured store settings for authoritative USDT rate
-    let usdtRate = Number(data.exchangeRateUsed || 86.2);
+    let effectiveUsdtRate = usdtRate;
     try {
       const { data: st } = await supabaseAdmin
         .from("store_settings")
@@ -176,18 +292,17 @@ export const createOrder = createServerFn({ method: "POST" })
         .limit(1)
         .maybeSingle();
       if (st?.exchange_rate_usdt) {
-        usdtRate = Number(st.exchange_rate_usdt);
+        effectiveUsdtRate = Number(st.exchange_rate_usdt);
       }
     } catch {
       /* fallback */
     }
 
-    const rateType = "USDT";
-    const totalBs = Number((subtotal * usdtRate).toFixed(2));
+    const totalBs = Number((subtotal * effectiveUsdtRate).toFixed(2));
 
     const formattedNotes = [
       `[Envío: ${data.shippingMethod}]`,
-      `[Cotización: Tasa USDT a Bs. ${usdtRate.toFixed(2)} / USD | Total Bs. ${totalBs.toLocaleString("es-VE", { minimumFractionDigits: 2 })}]`,
+      `[Cotización: Tasa USDT a Bs. ${effectiveUsdtRate.toFixed(2)} / USD | Total Bs. ${totalBs.toLocaleString("es-VE", { minimumFractionDigits: 2 })}]`,
       data.customer.notes?.trim() ? `Nota cliente: ${data.customer.notes.trim()}` : "",
     ]
       .filter(Boolean)
@@ -275,6 +390,34 @@ export const getOrderByNumber = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data }) => {
     if (!/^KP-\d{4}-\d{6}$/.test(data.orderNumber)) return null;
+
+    if (!isSupabaseServerConfigured()) {
+      const inMem = getInMemoryOrderByNumber(data.orderNumber);
+      if (!inMem) return null;
+      const payment = inMem.payments[inMem.payments.length - 1];
+
+      return {
+        order_number: inMem.order_number,
+        status: inMem.status,
+        total: Number(inMem.total),
+        created_at: inMem.created_at,
+        payment_method_code: inMem.payment_method_code,
+        payment_status: payment?.status ?? null,
+        proof_uploaded: Boolean(payment?.proof_url),
+        rejection_reason: payment?.rejection_reason ?? null,
+        notes: inMem.notes ?? null,
+        items: inMem.items.map((i) => ({
+          product_name: i.product_name,
+          size: i.size,
+          color: i.color,
+          quantity: i.quantity,
+          unit_price: Number(i.unit_price),
+          subtotal: Number(i.subtotal),
+          image_url: i.image_url,
+        })),
+      } satisfies PublicOrder;
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: order, error } = await supabaseAdmin
@@ -338,6 +481,13 @@ export const uploadPaymentProof = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data }) => {
+    if (!isSupabaseServerConfigured()) {
+      const simulatedUrl = `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&proof=${Date.now()}`;
+      const success = uploadInMemoryProof(data.orderNumber, data.reference, simulatedUrl);
+      if (!success) throw new Error("No encontramos ese número de pedido");
+      return { ok: true as const };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: order, error } = await supabaseAdmin

@@ -429,3 +429,310 @@ export function setInMemoryProductActive(id: string, active: boolean): boolean {
   _inMemoryProducts[index].active = active;
   return true;
 }
+
+export type InMemoryOrder = {
+  id: string;
+  order_number: string;
+  status: string;
+  channel: string;
+  payment_method_code: string | null;
+  subtotal: number;
+  total: number;
+  is_wholesale: boolean;
+  inventory_applied: boolean;
+  notes: string | null;
+  created_at: string;
+  customer: {
+    first_name: string;
+    last_name: string | null;
+    whatsapp: string | null;
+    email: string | null;
+    address: string | null;
+    city: string | null;
+    state: string | null;
+  } | null;
+  items: {
+    id: string;
+    product_name: string;
+    size: string | null;
+    color: string | null;
+    quantity: number;
+    unit_price: number;
+    unit_cost: number;
+    subtotal: number;
+    variant_id: string | null;
+    image_url: string | null;
+  }[];
+  payments: {
+    id: string;
+    status: string;
+    amount: number;
+    method_code: string | null;
+    reference: string | null;
+    proof_url: string | null;
+    proof_uploaded_at: string | null;
+    rejection_reason: string | null;
+    created_at: string;
+  }[];
+};
+
+export type InMemoryKardex = {
+  id: string;
+  productName: string;
+  size: string | null;
+  color: string | null;
+  sku: string | null;
+  type: string;
+  quantity: number;
+  stockAfter: number | null;
+  reference: string | null;
+  note: string | null;
+  createdAt: string;
+};
+
+let _inMemoryOrders: InMemoryOrder[] = [
+  {
+    id: "ord-demo-1",
+    order_number: "KP-2026-000124",
+    status: "pedido_recibido",
+    channel: "online",
+    payment_method_code: "pago_movil",
+    subtotal: 70.0,
+    total: 70.0,
+    is_wholesale: false,
+    inventory_applied: false,
+    notes: "[Envío: TEALCA] | [Cotización: Tasa USDT a Bs. 86.20 / USD | Total Bs. 6.034,00]",
+    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+    customer: {
+      first_name: "Carlos",
+      last_name: "Pérez",
+      whatsapp: "+58 412 1234567",
+      email: "carlos.perez@ejemplo.com",
+      address: "TEALCA - Calle Las Flores 12",
+      city: "Caracas",
+      state: "Distrito Capital",
+    },
+    items: [
+      {
+        id: "item-1",
+        product_name: "Camiseta Real Madrid Local 2025/2026 Versión Jugador",
+        size: "M",
+        color: "Blanco",
+        quantity: 2,
+        unit_price: 35.0,
+        unit_cost: 15.0,
+        subtotal: 70.0,
+        variant_id: "v-rm-m",
+        image_url: "/__l5e/assets-v1/fb5cafd4-50ef-4ab9-b830-5e5bf6619dad/p-jersey-1.jpg",
+      },
+    ],
+    payments: [
+      {
+        id: "pay-demo-1",
+        status: "pendiente",
+        amount: 70.0,
+        method_code: "pago_movil",
+        reference: "PM-982341",
+        proof_url: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600",
+        proof_uploaded_at: new Date(Date.now() - 3600000).toISOString(),
+        rejection_reason: null,
+        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+      },
+    ],
+  },
+  {
+    id: "ord-demo-2",
+    order_number: "KP-2026-000123",
+    status: "pago_verificado",
+    channel: "online",
+    payment_method_code: "binance_pay",
+    subtotal: 120.0,
+    total: 120.0,
+    is_wholesale: true,
+    inventory_applied: true,
+    notes: "[Envío: MRW] | [Cotización: Tasa USDT a Bs. 86.20 / USD]",
+    created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+    customer: {
+      first_name: "Mariana",
+      last_name: "Gómez",
+      whatsapp: "+58 424 9876543",
+      email: "mariana.g@ejemplo.com",
+      address: "MRW - Av. Bolívar Nte 44",
+      city: "Valencia",
+      state: "Carabobo",
+    },
+    items: [
+      {
+        id: "item-2",
+        product_name: "Camiseta FC Barcelona Visita 2025/2026 Black Edition",
+        size: "S",
+        color: "Negro",
+        quantity: 5,
+        unit_price: 24.0,
+        unit_cost: 14.0,
+        subtotal: 120.0,
+        variant_id: "v-fcb-s",
+        image_url: "/__l5e/assets-v1/a4816654-219d-4720-bc40-10928e4693a1/p-jersey-2.jpg",
+      },
+    ],
+    payments: [
+      {
+        id: "pay-demo-2",
+        status: "verificado",
+        amount: 120.0,
+        method_code: "binance_pay",
+        reference: "BIN-449102",
+        proof_url: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600",
+        proof_uploaded_at: new Date(Date.now() - 3600000 * 4).toISOString(),
+        rejection_reason: null,
+        created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
+      },
+    ],
+  },
+];
+
+let _inMemoryKardex: InMemoryKardex[] = [
+  {
+    id: "k-demo-1",
+    productName: "Camiseta FC Barcelona Visita 2025/2026 Black Edition",
+    size: "S",
+    color: "Negro",
+    sku: "KP-FCB-02-S",
+    type: "salida",
+    quantity: 5,
+    stockAfter: 9,
+    reference: "KP-2026-000123",
+    note: "Pago verificado - Pedido KP-2026-000123",
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
+  },
+];
+
+export function getInMemoryOrders(): InMemoryOrder[] {
+  return _inMemoryOrders;
+}
+
+export function getInMemoryOrderByNumber(orderNumber: string): InMemoryOrder | null {
+  return (
+    _inMemoryOrders.find(
+      (o) => o.order_number.toUpperCase() === orderNumber.trim().toUpperCase(),
+    ) ?? null
+  );
+}
+
+export function addInMemoryOrder(order: InMemoryOrder): InMemoryOrder {
+  _inMemoryOrders = [order, ..._inMemoryOrders];
+  return order;
+}
+
+export function updateInMemoryOrderStatus(orderId: string, status: string): boolean {
+  const order = _inMemoryOrders.find((o) => o.id === orderId);
+  if (!order) return false;
+  order.status = status;
+  return true;
+}
+
+export function uploadInMemoryProof(
+  orderNumber: string,
+  reference: string,
+  proofUrl: string,
+): boolean {
+  const order = getInMemoryOrderByNumber(orderNumber);
+  if (!order) return false;
+
+  const payment = order.payments[0] ?? {
+    id: `pay-${Date.now()}`,
+    status: "pendiente",
+    amount: order.total,
+    method_code: order.payment_method_code,
+    reference,
+    proof_url: proofUrl,
+    proof_uploaded_at: new Date().toISOString(),
+    rejection_reason: null,
+    created_at: new Date().toISOString(),
+  };
+
+  payment.proof_url = proofUrl;
+  payment.reference = reference;
+  payment.proof_uploaded_at = new Date().toISOString();
+  payment.status = "pendiente";
+  payment.rejection_reason = null;
+
+  order.payments = [payment];
+  order.status = "pago_pendiente";
+  return true;
+}
+
+export function reviewInMemoryPayment(
+  paymentId: string,
+  approve: boolean,
+  reason?: string,
+): { ok: boolean; approved: boolean } {
+  for (const order of _inMemoryOrders) {
+    const payment = order.payments.find((p) => p.id === paymentId);
+    if (!payment) continue;
+
+    if (!approve) {
+      payment.status = "rechazado";
+      payment.rejection_reason = reason || "Comprobante no válido";
+      order.status = "pago_pendiente";
+      return { ok: true, approved: false };
+    }
+
+    payment.status = "verificado";
+    payment.rejection_reason = null;
+    order.status = "pago_verificado";
+
+    // Deduct stock idempotently
+    if (!order.inventory_applied) {
+      for (const item of order.items) {
+        if (!item.variant_id) continue;
+        for (const prod of _inMemoryProducts) {
+          const variant = prod.variants?.find((v) => v.id === item.variant_id);
+          if (variant) {
+            const current = variant.stock ?? 0;
+            const newStock = Math.max(0, current - item.quantity);
+            variant.stock = newStock;
+
+            _inMemoryKardex = [
+              {
+                id: `k-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                productName: item.product_name,
+                size: item.size,
+                color: item.color,
+                sku: variant.sku ?? prod.base_sku,
+                type: "salida",
+                quantity: item.quantity,
+                stockAfter: newStock,
+                reference: order.order_number,
+                note: `Pago verificado - Pedido ${order.order_number}`,
+                createdAt: new Date().toISOString(),
+              },
+              ..._inMemoryKardex,
+            ];
+          }
+        }
+      }
+      order.inventory_applied = true;
+    }
+
+    return { ok: true, approved: true };
+  }
+  return { ok: false, approved: false };
+}
+
+export function getInMemoryKardex(): InMemoryKardex[] {
+  return _inMemoryKardex;
+}
+
+export function getInMemoryBadges(): { pendingOrders: number; pendingPayments: number } {
+  const pendingOrders = _inMemoryOrders.filter((o) =>
+    ["pedido_recibido", "pago_pendiente", "pago_subido"].includes(o.status),
+  ).length;
+
+  const pendingPayments = _inMemoryOrders.reduce(
+    (sum, o) => sum + o.payments.filter((p) => p.status === "pendiente").length,
+    0,
+  );
+
+  return { pendingOrders, pendingPayments };
+}

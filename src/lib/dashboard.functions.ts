@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
-import { getInMemoryProducts } from "./demo-data";
+import { getInMemoryKardex, getInMemoryOrders, getInMemoryProducts } from "./demo-data";
 
 export type DashboardMetrics = {
   sales: {
@@ -162,17 +162,74 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
     value,
   }));
 
+  const orders = getInMemoryOrders();
+  const kardex = getInMemoryKardex();
+
+  let totalGenerated = 0;
+  let totalCollected = 0;
+  let pendingPaymentsCount = 0;
+  let pendingPaymentsAmount = 0;
+  let pendingOrdersCount = 0;
+
+  for (const o of orders) {
+    totalGenerated += o.total;
+    const isCollected = o.payments.some((p) => p.status === "verificado");
+    if (isCollected) {
+      totalCollected += o.total;
+    }
+    const hasPendingPayment = o.payments.some((p) => p.status === "pendiente");
+    if (hasPendingPayment) {
+      pendingPaymentsCount++;
+      pendingPaymentsAmount += o.total;
+    }
+    if (["pedido_recibido", "pago_pendiente", "pago_subido"].includes(o.status)) {
+      pendingOrdersCount++;
+    }
+  }
+
+  const recentOrders = orders.slice(0, 10).map((o) => {
+    const payment = o.payments[o.payments.length - 1];
+    return {
+      id: o.id,
+      orderNumber: o.order_number,
+      customerName: o.customer
+        ? `${o.customer.first_name} ${o.customer.last_name || ""}`.trim()
+        : "Cliente",
+      customerPhone: o.customer?.whatsapp ?? null,
+      channel: o.channel || "online",
+      total: Number(o.total),
+      status: o.status,
+      paymentStatus: payment?.status ?? "pendiente",
+      paymentMethod: o.payment_method_code,
+      createdAt: o.created_at,
+    };
+  });
+
+  const recentMovements = kardex.slice(0, 10).map((k) => ({
+    id: k.id,
+    productName: k.productName,
+    size: k.size,
+    color: k.color,
+    sku: k.sku,
+    type: k.type,
+    quantity: k.quantity,
+    stockAfter: k.stockAfter,
+    reference: k.reference,
+    note: k.note,
+    createdAt: k.createdAt,
+  }));
+
   return {
     sales: {
-      todayTotal: 185.5,
-      todayCount: 4,
-      monthTotal: 4320.0,
-      monthCount: 88,
-      totalGenerated: 4505.5,
-      totalCollected: 4120.0,
-      pendingPaymentsCount: 2,
-      pendingPaymentsAmount: 145.0,
-      pendingOrdersCount: 3,
+      todayTotal: Number((totalCollected * 0.4).toFixed(2)),
+      todayCount: Math.max(1, Math.floor(orders.length / 2)),
+      monthTotal: Number(totalCollected.toFixed(2)),
+      monthCount: orders.filter((o) => o.payments.some((p) => p.status === "verificado")).length,
+      totalGenerated: Number(totalGenerated.toFixed(2)),
+      totalCollected: Number(totalCollected.toFixed(2)),
+      pendingPaymentsCount,
+      pendingPaymentsAmount: Number(pendingPaymentsAmount.toFixed(2)),
+      pendingOrdersCount,
     },
     inventory: {
       totalUnits,
@@ -186,79 +243,19 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
     charts: {
       salesEvolution: daysEvolution,
       salesByChannel: [
-        { name: "Web / Online", value: 2850, count: 54 },
-        { name: "Tienda / POS", value: 1250, count: 28 },
-        { name: "WhatsApp", value: 405.5, count: 10 },
+        {
+          name: "Web / Online",
+          value: Number((totalGenerated * 0.7).toFixed(2)),
+          count: orders.length,
+        },
+        { name: "Tienda / POS", value: Number((totalGenerated * 0.2).toFixed(2)), count: 2 },
+        { name: "WhatsApp", value: Number((totalGenerated * 0.1).toFixed(2)), count: 1 },
       ],
       inventoryByCategory,
     },
-    recentOrders: [
-      {
-        id: "ord-demo-1",
-        orderNumber: "KP-2026-000124",
-        customerName: "Carlos Pérez",
-        customerPhone: "+58 412 1234567",
-        channel: "online",
-        total: 70.0,
-        status: "pago_subido",
-        paymentStatus: "pendiente",
-        paymentMethod: "pago_movil",
-        createdAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-      },
-      {
-        id: "ord-demo-2",
-        orderNumber: "KP-2026-000123",
-        customerName: "María Rodríguez",
-        customerPhone: "+58 414 9876543",
-        channel: "online",
-        total: 105.0,
-        status: "pago_verificado",
-        paymentStatus: "verificado",
-        paymentMethod: "zelle",
-        createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-      },
-      {
-        id: "ord-demo-3",
-        orderNumber: "KP-2026-000122",
-        customerName: "Andrés Silva",
-        customerPhone: "+58 424 5551122",
-        channel: "whatsapp",
-        total: 45.0,
-        status: "preparando_pedido",
-        paymentStatus: "verificado",
-        paymentMethod: "pago_movil",
-        createdAt: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
-      },
-    ],
+    recentOrders,
     lowStockItems: lowStockItems.slice(0, 10),
-    recentMovements: [
-      {
-        id: "mov-demo-1",
-        productName: "Camiseta Real Madrid Local",
-        size: "M",
-        color: "Blanco",
-        sku: "KP-RMA-01-M",
-        type: "venta",
-        quantity: 1,
-        stockAfter: 15,
-        reference: "KP-2026-000123",
-        note: "Venta online completada",
-        createdAt: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-      },
-      {
-        id: "mov-demo-2",
-        productName: "Licra Alo Yoga High-Waist",
-        size: "S",
-        color: "Negro",
-        sku: "KP-ALO-01-S",
-        type: "entrada",
-        quantity: 20,
-        stockAfter: 20,
-        reference: "FAC-8842",
-        note: "Reposición de stock",
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      },
-    ],
+    recentMovements,
   };
 }
 

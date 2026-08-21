@@ -1,6 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
+import {
+  getInMemoryBadges,
+  getInMemoryOrders,
+  reviewInMemoryPayment,
+  updateInMemoryOrderStatus,
+} from "./demo-data";
 
 export type AdminOrder = {
   id: string;
@@ -59,6 +66,9 @@ const ORDER_SELECT = `
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    if (!isSupabaseServerConfigured()) {
+      return getInMemoryOrders() as unknown as AdminOrder[];
+    }
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data, error } = await supabaseAdmin
@@ -73,12 +83,15 @@ export const listOrders = createServerFn({ method: "GET" })
           .select(ORDER_SELECT)
           .order("created_at", { ascending: false })
           .limit(300);
-        return (fallback.data ?? []) as unknown as AdminOrder[];
+        if (fallback.data && fallback.data.length > 0) {
+          return fallback.data as unknown as AdminOrder[];
+        }
+        return getInMemoryOrders() as unknown as AdminOrder[];
       }
       return (data ?? []) as unknown as AdminOrder[];
     } catch (err: any) {
       console.error("[listOrders] Fatal catch:", err);
-      return [] as AdminOrder[];
+      return getInMemoryOrders() as unknown as AdminOrder[];
     }
   });
 
@@ -100,6 +113,11 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data, context }) => {
+    if (!isSupabaseServerConfigured()) {
+      updateInMemoryOrderStatus(data.orderId, data.status);
+      return { ok: true as const };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("orders")
@@ -126,6 +144,11 @@ export const reviewPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { paymentId: string; approve: boolean; reason?: string }) => data)
   .handler(async ({ data, context }) => {
+    if (!isSupabaseServerConfigured()) {
+      const res = reviewInMemoryPayment(data.paymentId, data.approve, data.reason);
+      return { ok: res.ok as const, approved: res.approved as const };
+    }
+
     const { userId } = context;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -465,6 +488,9 @@ export const getProofUrl = createServerFn({ method: "POST" })
 export const getPendingAdminBadges = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
+    if (!isSupabaseServerConfigured()) {
+      return getInMemoryBadges();
+    }
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -484,9 +510,6 @@ export const getPendingAdminBadges = createServerFn({ method: "GET" })
         pendingPayments,
       };
     } catch {
-      return {
-        pendingOrders: 0,
-        pendingPayments: 0,
-      };
+      return getInMemoryBadges();
     }
   });

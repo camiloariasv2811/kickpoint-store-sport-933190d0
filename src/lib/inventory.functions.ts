@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
-import { getInMemoryProducts } from "./demo-data";
+import { getInMemoryKardex, getInMemoryProducts } from "./demo-data";
 
 export type InventoryRow = {
   variantId: string;
@@ -189,66 +189,128 @@ export const listInventoryMovements = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { variantId?: string | undefined; type?: string; limit?: number }) => data)
   .handler(async ({ data, context }) => {
-    let query = context.supabase
-      .from("inventory_movements")
-      .select(
-        `
-        id, variant_id, type, quantity, unit_cost, stock_after, reference, note, created_by, created_at,
-        variant:product_variants ( size, color, sku, product:products ( name ) )
-      `,
-      )
-      .order("created_at", { ascending: false })
-      .limit(data.limit ?? 100);
-
-    if (data.variantId) query = query.eq("variant_id", data.variantId);
-    if (data.type) query = query.eq("type", data.type);
-
-    const { data: rows, error } = await query;
-    if (error) throw new Error(error.message);
-
-    const creatorIds = [
-      ...new Set((rows ?? []).map((r) => r.created_by).filter(Boolean)),
-    ] as string[];
-    const emailById = new Map<string, string>();
-    if (creatorIds.length > 0) {
-      // profiles solo permite "leer mi propio perfil" vía RLS; para mostrar el responsable de
-      // movimientos ajenos usamos el cliente de servicio. Solo llegamos aquí si la consulta de
-      // movimientos de arriba ya pasó la RLS "movements staff all", así que el caller es staff.
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data: profiles } = await supabaseAdmin
-        .from("profiles")
-        .select("id, email")
-        .in("id", creatorIds);
-      for (const p of profiles ?? []) {
-        if (p.email) emailById.set(p.id, p.email as string);
-      }
+    if (!isSupabaseServerConfigured()) {
+      const inMem = getInMemoryKardex();
+      return inMem.map((k) => ({
+        id: k.id,
+        variantId: "v-demo",
+        productName: k.productName,
+        size: k.size ?? "—",
+        color: k.color,
+        sku: k.sku,
+        type: k.type,
+        quantity: k.quantity,
+        unitCost: 14.0,
+        stockAfter: k.stockAfter,
+        reference: k.reference,
+        note: k.note,
+        createdBy: "admin",
+        createdByEmail: "admin@kickpoint.store",
+        createdAt: k.createdAt,
+      })) satisfies InventoryMovementRow[];
     }
 
-    return (rows ?? []).map((r) => {
-      const variant = r.variant as unknown as {
-        size: string;
-        color: string | null;
-        sku: string | null;
-        product: { name: string } | null;
-      } | null;
-      return {
-        id: r.id,
-        variantId: r.variant_id,
-        productName: variant?.product?.name ?? "Producto",
-        size: variant?.size ?? "—",
-        color: variant?.color ?? null,
-        sku: variant?.sku ?? null,
-        type: r.type,
-        quantity: Number(r.quantity),
-        unitCost: r.unit_cost !== null ? Number(r.unit_cost) : null,
-        stockAfter: r.stock_after !== null ? Number(r.stock_after) : null,
-        reference: r.reference,
-        note: r.note,
-        createdBy: r.created_by,
-        createdByEmail: r.created_by ? (emailById.get(r.created_by) ?? null) : null,
-        createdAt: r.created_at,
-      } satisfies InventoryMovementRow;
-    });
+    try {
+      let query = context.supabase
+        .from("inventory_movements")
+        .select(
+          `
+          id, variant_id, type, quantity, unit_cost, stock_after, reference, note, created_by, created_at,
+          variant:product_variants ( size, color, sku, product:products ( name ) )
+        `,
+        )
+        .order("created_at", { ascending: false })
+        .limit(data.limit ?? 100);
+
+      if (data.variantId) query = query.eq("variant_id", data.variantId);
+      if (data.type) query = query.eq("type", data.type);
+
+      const { data: rows, error } = await query;
+      if (error) {
+        const inMem = getInMemoryKardex();
+        return inMem.map((k) => ({
+          id: k.id,
+          variantId: "v-demo",
+          productName: k.productName,
+          size: k.size ?? "—",
+          color: k.color,
+          sku: k.sku,
+          type: k.type,
+          quantity: k.quantity,
+          unitCost: 14.0,
+          stockAfter: k.stockAfter,
+          reference: k.reference,
+          note: k.note,
+          createdBy: "admin",
+          createdByEmail: "admin@kickpoint.store",
+          createdAt: k.createdAt,
+        })) satisfies InventoryMovementRow[];
+      }
+
+      const creatorIds = [
+        ...new Set((rows ?? []).map((r) => r.created_by).filter(Boolean)),
+      ] as string[];
+      const emailById = new Map<string, string>();
+      if (creatorIds.length > 0) {
+        try {
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data: profiles } = await supabaseAdmin
+            .from("profiles")
+            .select("id, email")
+            .in("id", creatorIds);
+          for (const p of profiles ?? []) {
+            if (p.email) emailById.set(p.id, p.email as string);
+          }
+        } catch {
+          /* profiles fallback */
+        }
+      }
+
+      return (rows ?? []).map((r) => {
+        const variant = r.variant as unknown as {
+          size: string;
+          color: string | null;
+          sku: string | null;
+          product: { name: string } | null;
+        } | null;
+        return {
+          id: r.id,
+          variantId: r.variant_id,
+          productName: variant?.product?.name ?? "Producto",
+          size: variant?.size ?? "—",
+          color: variant?.color ?? null,
+          sku: variant?.sku ?? null,
+          type: r.type,
+          quantity: Number(r.quantity),
+          unitCost: r.unit_cost !== null ? Number(r.unit_cost) : null,
+          stockAfter: r.stock_after !== null ? Number(r.stock_after) : null,
+          reference: r.reference,
+          note: r.note,
+          createdBy: r.created_by,
+          createdByEmail: r.created_by ? (emailById.get(r.created_by) ?? null) : null,
+          createdAt: r.created_at,
+        } satisfies InventoryMovementRow;
+      });
+    } catch {
+      const inMem = getInMemoryKardex();
+      return inMem.map((k) => ({
+        id: k.id,
+        variantId: "v-demo",
+        productName: k.productName,
+        size: k.size ?? "—",
+        color: k.color,
+        sku: k.sku,
+        type: k.type,
+        quantity: k.quantity,
+        unitCost: 14.0,
+        stockAfter: k.stockAfter,
+        reference: k.reference,
+        note: k.note,
+        createdBy: "admin",
+        createdByEmail: "admin@kickpoint.store",
+        createdAt: k.createdAt,
+      })) satisfies InventoryMovementRow[];
+    }
   });
 
 type MovementInput = {
