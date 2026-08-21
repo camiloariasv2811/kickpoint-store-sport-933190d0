@@ -27,6 +27,21 @@ export type PaymentMethodRow = {
   sort_order: number;
 };
 
+function normalizeStoreWhatsapp(whatsapp?: string | null): string {
+  if (!whatsapp) return "+58 412 1546698";
+  const clean = whatsapp.trim();
+  if (
+    clean === "584121234567" ||
+    clean === "0412 123 4567" ||
+    clean === "0412-1234567" ||
+    clean === "+58 412 1234567" ||
+    clean === "04121234567"
+  ) {
+    return "+58 412 1546698";
+  }
+  return clean;
+}
+
 export const getPublicStoreSettings = createServerFn({ method: "GET" }).handler(async () => {
   if (!isSupabaseServerConfigured()) {
     return getInMemorySettings() as StoreSettings;
@@ -43,7 +58,7 @@ export const getPublicStoreSettings = createServerFn({ method: "GET" }).handler(
     }
     const val = (data?.value ?? {}) as StoreSettings;
     return {
-      whatsapp: val.whatsapp ?? "+58 412 1546698",
+      whatsapp: normalizeStoreWhatsapp(val.whatsapp),
       shipping_flat: val.shipping_flat ?? 0,
       exchange_rate_bcv: Number(val.exchange_rate_bcv || val.exchange_rate_bs || 78.5),
       exchange_rate_usdt: Number(val.exchange_rate_usdt || 86.2),
@@ -70,7 +85,11 @@ export const getStoreSettings = createServerFn({ method: "GET" })
       if (error || !data) {
         return getInMemorySettings() as StoreSettings;
       }
-      return (data?.value ?? {}) as StoreSettings;
+      const val = (data?.value ?? {}) as StoreSettings;
+      return {
+        ...val,
+        whatsapp: normalizeStoreWhatsapp(val.whatsapp),
+      } as StoreSettings;
     } catch {
       return getInMemorySettings() as StoreSettings;
     }
