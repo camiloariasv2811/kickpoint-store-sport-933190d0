@@ -582,88 +582,151 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
           </div>
 
           {/* Generador de Tallas y Colores */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border p-3">
-              <div className="flex items-center justify-between">
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+              <div>
                 <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Tallas
+                  Configuración de Tallas y Colores
                 </Label>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  type="button"
-                  onClick={addSize}
-                  className="h-7 text-xs"
-                >
-                  <Plus className="size-3.5" /> Agregar
-                </Button>
+                <p className="text-[11px] text-muted-foreground">
+                  Agrega las tallas y colores para generar las combinaciones de variantes y asignar
+                  stock/SKU.
+                </p>
               </div>
-              <div className="mt-2 space-y-1.5">
-                {sizes.map((s, i) => (
-                  <div key={i} className="flex items-center gap-1.5">
-                    <Input
-                      className="h-8 text-xs font-semibold"
-                      placeholder="S, M, L, 38, 40..."
-                      value={s}
-                      onChange={(e) => updateSize(i, e.target.value)}
-                      onBlur={handleSizeBlur}
-                    />
+              <Button
+                size="sm"
+                variant="outline"
+                type="button"
+                className="h-8 text-xs font-medium"
+                onClick={() => syncCombinations(sizes, colors)}
+              >
+                Generar combinaciones Talla × Color
+              </Button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-foreground">Tallas</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = ["S", "M", "L", "XL"];
+                        setSizes(next);
+                        syncCombinations(next, colors);
+                      }}
+                      className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+                    >
+                      Ropa (S-XL)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = ["38", "39", "40", "41", "42", "43"];
+                        setSizes(next);
+                        syncCombinations(next, colors);
+                      }}
+                      className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+                    >
+                      Calzado (38-43)
+                    </button>
                     <Button
                       size="sm"
                       variant="ghost"
                       type="button"
-                      className="size-8 p-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => removeSize(i)}
+                      onClick={addSize}
+                      className="h-6 px-1.5 text-xs"
                     >
-                      <Trash className="size-3.5" />
+                      <Plus className="size-3" /> Añadir
                     </Button>
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
 
-            <div className="rounded-lg border border-border p-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Colores (Opcional)
-                </Label>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  type="button"
-                  onClick={addColor}
-                  className="h-7 text-xs"
-                >
-                  <Plus className="size-3.5" /> Agregar
-                </Button>
-              </div>
-              <div className="mt-2 space-y-1.5">
-                {colors.length === 0 ? (
-                  <p className="py-2 text-center text-xs text-muted-foreground">
-                    Sin colores específicos (solo tallas).
-                  </p>
-                ) : (
-                  colors.map((c, i) => (
+                <div className="space-y-1.5">
+                  {sizes.map((s, i) => (
                     <div key={i} className="flex items-center gap-1.5">
                       <Input
-                        className="h-8 text-xs"
-                        placeholder="Negro, Blanco, Rojo..."
-                        value={c}
-                        onChange={(e) => updateColor(i, e.target.value)}
-                        onBlur={handleColorBlur}
+                        className="h-8 text-xs font-semibold"
+                        placeholder="S, M, L, 38, 40..."
+                        value={s}
+                        onChange={(e) => updateSize(i, e.target.value)}
+                        onBlur={handleSizeBlur}
                       />
                       <Button
                         size="sm"
                         variant="ghost"
                         type="button"
                         className="size-8 p-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => removeColor(i)}
+                        onClick={() => removeSize(i)}
                       >
                         <Trash className="size-3.5" />
                       </Button>
                     </div>
-                  ))
-                )}
+                  ))}
+                  {sizes.length === 0 && (
+                    <p className="py-1 text-xs text-muted-foreground italic">
+                      Agrega al menos una talla.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-foreground">Colores (Opcional)</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = ["Negro", "Blanco", "Azul"];
+                        setColors(next);
+                        syncCombinations(sizes, next);
+                      }}
+                      className="rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-surface-3 hover:text-foreground"
+                    >
+                      Básicos
+                    </button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      type="button"
+                      onClick={addColor}
+                      className="h-6 px-1.5 text-xs"
+                    >
+                      <Plus className="size-3" /> Añadir
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  {colors.length === 0 ? (
+                    <p className="py-2 text-xs text-muted-foreground">
+                      Sin colores específicos (las variantes se basarán solo en tallas).
+                    </p>
+                  ) : (
+                    colors.map((c, i) => (
+                      <div key={i} className="flex items-center gap-1.5">
+                        <Input
+                          className="h-8 text-xs"
+                          placeholder="Negro, Blanco, Rojo..."
+                          value={c}
+                          onChange={(e) => updateColor(i, e.target.value)}
+                          onBlur={handleColorBlur}
+                        />
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          type="button"
+                          className="size-8 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => removeColor(i)}
+                        >
+                          <Trash className="size-3.5" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
             </div>
           </div>

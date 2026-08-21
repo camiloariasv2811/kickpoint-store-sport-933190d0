@@ -9,15 +9,65 @@ export type PaymentMethod = {
   details: Record<string, string>;
 };
 
+const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [
+  {
+    code: "pago_movil",
+    name: "Pago Móvil (Bancos Nacionales)",
+    instructions:
+      "Realiza el pago móvil a nuestra cuenta oficial KICKPOINT y sube tu comprobante o referencia.",
+    details: {
+      banco: "0102 - Banco de Venezuela",
+      telefono: "0412-1234567",
+      cedula: "V-28.123.456",
+    },
+  },
+  {
+    code: "zelle",
+    name: "Zelle (USD)",
+    instructions:
+      "Envía tu pago vía Zelle a pagos@kickpoint.store. En el memo, pon tu nombre y número de orden.",
+    details: {
+      email: "pagos@kickpoint.store",
+      titular: "KICKPOINT STORE LLC",
+    },
+  },
+  {
+    code: "binance_pay",
+    name: "Binance Pay / USDT",
+    instructions: "Transfiere por Pay ID de Binance a nuestra cuenta verificada sin comisiones.",
+    details: {
+      pay_id: "892347102",
+      moneda: "USDT",
+    },
+  },
+  {
+    code: "transferencia",
+    name: "Transferencia Bancaria Banesco / Mercantil",
+    instructions: "Transferencia directa a cuenta corriente empresarial.",
+    details: {
+      banco: "Banesco Banco Universal",
+      cuenta: "0134-0000-00-0000000000",
+      titular: "KICKPOINT C.A.",
+      rif: "J-50123456-7",
+    },
+  },
+];
+
 export const listPaymentMethods = createServerFn({ method: "GET" }).handler(async () => {
-  const supabase = createPublicClient();
-  const { data, error } = await supabase
-    .from("payment_methods")
-    .select("code, name, instructions, details")
-    .eq("active", true)
-    .order("sort_order");
-  if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as PaymentMethod[];
+  try {
+    const supabase = createPublicClient();
+    const { data, error } = await supabase
+      .from("payment_methods")
+      .select("code, name, instructions, details")
+      .eq("active", true)
+      .order("sort_order");
+    if (error || !data || data.length === 0) {
+      return DEFAULT_PAYMENT_METHODS;
+    }
+    return data as unknown as PaymentMethod[];
+  } catch {
+    return DEFAULT_PAYMENT_METHODS;
+  }
 });
 
 export type CheckoutInput = {

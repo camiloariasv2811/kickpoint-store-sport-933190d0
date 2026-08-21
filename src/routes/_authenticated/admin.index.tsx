@@ -224,38 +224,38 @@ function Dashboard() {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
               <StatCard
                 label="Ventas de hoy"
-                value={moneyExact(metrics.sales.todayTotal)}
-                hint={`${metrics.sales.todayCount} venta(s) registradas`}
+                value={moneyExact(metrics.sales?.todayTotal ?? 0)}
+                hint={`${metrics.sales?.todayCount ?? 0} venta(s) registradas`}
                 icon={DollarSign}
                 tone="primary"
               />
               <StatCard
                 label="Ventas del mes"
-                value={moneyExact(metrics.sales.monthTotal)}
-                hint={`${metrics.sales.monthCount} transacciones en el mes`}
+                value={moneyExact(metrics.sales?.monthTotal ?? 0)}
+                hint={`${metrics.sales?.monthCount ?? 0} transacciones en el mes`}
                 icon={TrendingUp}
                 tone="primary"
               />
               <StatCard
                 label="Dinero cobrado"
-                value={moneyExact(metrics.sales.totalCollected)}
-                hint={`Total generado: ${moneyExact(metrics.sales.totalGenerated)}`}
+                value={moneyExact(metrics.sales?.totalCollected ?? 0)}
+                hint={`Total generado: ${moneyExact(metrics.sales?.totalGenerated ?? 0)}`}
                 icon={CheckCircle2}
                 tone="default"
               />
               <StatCard
                 label="Pagos por verificar"
-                value={String(metrics.sales.pendingPaymentsCount)}
-                hint={`${moneyExact(metrics.sales.pendingPaymentsAmount)} por confirmar`}
+                value={String(metrics.sales?.pendingPaymentsCount ?? 0)}
+                hint={`${moneyExact(metrics.sales?.pendingPaymentsAmount ?? 0)} por confirmar`}
                 icon={Clock}
-                tone={metrics.sales.pendingPaymentsCount > 0 ? "warning" : "default"}
+                tone={(metrics.sales?.pendingPaymentsCount ?? 0) > 0 ? "warning" : "default"}
               />
               <StatCard
                 label="Pedidos pendientes"
-                value={String(metrics.sales.pendingOrdersCount)}
+                value={String(metrics.sales?.pendingOrdersCount ?? 0)}
                 hint="En cola operativa"
                 icon={Truck}
-                tone={metrics.sales.pendingOrdersCount > 0 ? "warning" : "default"}
+                tone={(metrics.sales?.pendingOrdersCount ?? 0) > 0 ? "warning" : "default"}
               />
             </div>
           </div>
@@ -268,38 +268,38 @@ function Dashboard() {
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
               <StatCard
                 label="Unidades en stock"
-                value={metrics.inventory.totalUnits.toLocaleString()}
-                hint={`${metrics.inventory.activeProductsCount} productos activos`}
+                value={(metrics.inventory?.totalUnits ?? 0).toLocaleString()}
+                hint={`${metrics.inventory?.activeProductsCount ?? 0} productos activos`}
                 icon={Boxes}
                 tone="primary"
               />
               <StatCard
                 label="Valor a costo"
-                value={moneyExact(metrics.inventory.totalCostValue)}
+                value={moneyExact(metrics.inventory?.totalCostValue ?? 0)}
                 hint="Inversión total en almacén"
                 icon={ShoppingBag}
                 tone="default"
               />
               <StatCard
                 label="Valor a detal"
-                value={moneyExact(metrics.inventory.totalRetailValue)}
+                value={moneyExact(metrics.inventory?.totalRetailValue ?? 0)}
                 hint="Potencial de venta total"
                 icon={DollarSign}
                 tone="default"
               />
               <StatCard
                 label="Agotados"
-                value={String(metrics.inventory.outOfStockCount)}
+                value={String(metrics.inventory?.outOfStockCount ?? 0)}
                 hint="Sin stock disponible"
                 icon={AlertOctagon}
-                tone={metrics.inventory.outOfStockCount > 0 ? "warning" : "default"}
+                tone={(metrics.inventory?.outOfStockCount ?? 0) > 0 ? "warning" : "default"}
               />
               <StatCard
                 label="Stock bajo"
-                value={String(metrics.inventory.lowStockCount)}
+                value={String(metrics.inventory?.lowStockCount ?? 0)}
                 hint="Bajo umbral mínimo"
                 icon={AlertTriangle}
-                tone={metrics.inventory.lowStockCount > 0 ? "warning" : "default"}
+                tone={(metrics.inventory?.lowStockCount ?? 0) > 0 ? "warning" : "default"}
               />
             </div>
           </div>
@@ -319,7 +319,7 @@ function Dashboard() {
               <CardContent>
                 <div className="h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={metrics.charts.salesEvolution}>
+                    <AreaChart data={metrics.charts?.salesEvolution ?? []}>
                       <defs>
                         <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
@@ -378,7 +378,7 @@ function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="h-64 w-full">
-                  {metrics.charts.salesByChannel.length === 0 ? (
+                  {(metrics.charts?.salesByChannel ?? []).length === 0 ? (
                     <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
                       No hay transacciones registradas aún
                     </div>
@@ -386,7 +386,7 @@ function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={metrics.charts.salesByChannel}
+                          data={metrics.charts?.salesByChannel ?? []}
                           dataKey="value"
                           nameKey="name"
                           cx="50%"
@@ -395,7 +395,7 @@ function Dashboard() {
                           outerRadius={80}
                           paddingAngle={3}
                         >
-                          {metrics.charts.salesByChannel.map((_, i) => (
+                          {(metrics.charts?.salesByChannel ?? []).map((_, i) => (
                             <Cell key={`cell-${i}`} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                           ))}
                         </Pie>
@@ -414,7 +414,7 @@ function Dashboard() {
                 </div>
                 {/* Leyenda de Canales */}
                 <div className="mt-2 flex flex-wrap justify-center gap-3 text-xs">
-                  {metrics.charts.salesByChannel.map((c, i) => (
+                  {(metrics.charts?.salesByChannel ?? []).map((c, i) => (
                     <div key={c.name} className="flex items-center gap-1.5">
                       <span
                         className="size-2.5 rounded-full"
@@ -454,7 +454,7 @@ function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {metrics.recentOrders.length === 0 ? (
+                    {(metrics.recentOrders ?? []).length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={5}
@@ -464,7 +464,7 @@ function Dashboard() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      metrics.recentOrders.map((o) => {
+                      (metrics.recentOrders ?? []).map((o) => {
                         const statusBadge = STATUS_LABELS[o.status] || {
                           label: o.status,
                           className: "bg-muted text-foreground",
@@ -532,7 +532,7 @@ function Dashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {metrics.lowStockItems.length === 0 ? (
+                    {(metrics.lowStockItems ?? []).length === 0 ? (
                       <TableRow>
                         <TableCell
                           colSpan={5}
@@ -542,7 +542,7 @@ function Dashboard() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      metrics.lowStockItems.map((item) => (
+                      (metrics.lowStockItems ?? []).map((item) => (
                         <TableRow key={item.variantId} className="border-border text-xs">
                           <TableCell className="font-medium">
                             <span className="truncate block max-w-[150px]">{item.productName}</span>
@@ -610,7 +610,7 @@ function Dashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {metrics.recentMovements.length === 0 ? (
+                  {(metrics.recentMovements ?? []).length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={6}
@@ -620,7 +620,7 @@ function Dashboard() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    metrics.recentMovements.map((m) => {
+                    (metrics.recentMovements ?? []).map((m) => {
                       const typeBadge = MOVEMENT_TYPE_LABELS[m.type] || {
                         label: m.type,
                         className: "bg-muted text-foreground",

@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/auth")({
-  ssr: false,
   head: () => ({
     meta: [
       { title: "Acceso del equipo | KICKPOINT" },
@@ -164,8 +163,26 @@ function AuthPage() {
             <span className="h-px flex-1 bg-border" /> o <span className="h-px flex-1 bg-border" />
           </div>
 
-          <Button variant="dark" size="lg" className="w-full" onClick={handleGoogle}>
+          <Button
+            variant="dark"
+            size="lg"
+            className="w-full"
+            onClick={handleGoogle}
+            disabled={loading}
+          >
             Continuar con Google
+          </Button>
+
+          <Button
+            variant="outline"
+            size="lg"
+            className="mt-2.5 w-full border-dashed border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
+            onClick={() => {
+              localStorage.setItem("kp_demo_auth", "true");
+              navigate({ to: "/admin", replace: true });
+            }}
+          >
+            Acceso Directo Administrador (Demo / Preview)
           </Button>
 
           <button

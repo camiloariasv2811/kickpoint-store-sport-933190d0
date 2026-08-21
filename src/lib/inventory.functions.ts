@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
+import { getInMemoryProducts } from "./demo-data";
 
 export type InventoryRow = {
   variantId: string;
@@ -27,49 +28,142 @@ const INVENTORY_SELECT = `
 export const listInventory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase.from("products").select(INVENTORY_SELECT);
-    if (error) throw new Error(error.message);
-
-    const rows: InventoryRow[] = [];
-    for (const p of (data ?? []) as unknown as {
-      id: string;
-      name: string;
-      base_sku: string | null;
-      low_stock_threshold: number | null;
-      category: { name: string } | null;
-      variants: {
-        id: string;
-        size: string;
-        color: string | null;
-        sku: string | null;
-        stock: number;
-        active: boolean;
-      }[];
-    }[]) {
-      const threshold = p.low_stock_threshold ?? 5;
-      for (const v of p.variants ?? []) {
-        if (!v.active) continue;
-        const status: InventoryRow["status"] =
-          v.stock <= 0 ? "agotado" : v.stock <= threshold ? "bajo" : "ok";
-        rows.push({
-          variantId: v.id,
-          productId: p.id,
-          productName: p.name,
-          baseSku: p.base_sku,
-          size: v.size,
-          color: v.color,
-          sku: v.sku,
-          stock: v.stock,
-          active: v.active,
-          lowStockThreshold: threshold,
-          categoryName: p.category?.name ?? null,
-          status,
-        });
+    if (!isSupabaseServerConfigured()) {
+      const products = getInMemoryProducts();
+      const rows: InventoryRow[] = [];
+      for (const p of products) {
+        const threshold = p.low_stock_threshold ?? 5;
+        for (const v of p.variants ?? []) {
+          if (!v.active) continue;
+          const status: InventoryRow["status"] =
+            v.stock <= 0 ? "agotado" : v.stock <= threshold ? "bajo" : "ok";
+          rows.push({
+            variantId: v.id,
+            productId: p.id,
+            productName: p.name,
+            baseSku: p.base_sku,
+            size: v.size,
+            color: v.color,
+            sku: v.sku,
+            stock: v.stock,
+            active: v.active,
+            lowStockThreshold: threshold,
+            categoryName: p.category?.name ?? null,
+            status,
+          });
+        }
       }
+      rows.sort(
+        (a, b) => a.productName.localeCompare(b.productName) || a.size.localeCompare(b.size),
+      );
+      return rows;
     }
 
-    rows.sort((a, b) => a.productName.localeCompare(b.productName) || a.size.localeCompare(b.size));
-    return rows;
+    try {
+      const { data, error } = await context.supabase.from("products").select(INVENTORY_SELECT);
+      if (error || !data) {
+        const products = getInMemoryProducts();
+        const rows: InventoryRow[] = [];
+        for (const p of products) {
+          const threshold = p.low_stock_threshold ?? 5;
+          for (const v of p.variants ?? []) {
+            if (!v.active) continue;
+            const status: InventoryRow["status"] =
+              v.stock <= 0 ? "agotado" : v.stock <= threshold ? "bajo" : "ok";
+            rows.push({
+              variantId: v.id,
+              productId: p.id,
+              productName: p.name,
+              baseSku: p.base_sku,
+              size: v.size,
+              color: v.color,
+              sku: v.sku,
+              stock: v.stock,
+              active: v.active,
+              lowStockThreshold: threshold,
+              categoryName: p.category?.name ?? null,
+              status,
+            });
+          }
+        }
+        rows.sort(
+          (a, b) => a.productName.localeCompare(b.productName) || a.size.localeCompare(b.size),
+        );
+        return rows;
+      }
+
+      const rows: InventoryRow[] = [];
+      for (const p of (data ?? []) as unknown as {
+        id: string;
+        name: string;
+        base_sku: string | null;
+        low_stock_threshold: number | null;
+        category: { name: string } | null;
+        variants: {
+          id: string;
+          size: string;
+          color: string | null;
+          sku: string | null;
+          stock: number;
+          active: boolean;
+        }[];
+      }[]) {
+        const threshold = p.low_stock_threshold ?? 5;
+        for (const v of p.variants ?? []) {
+          if (!v.active) continue;
+          const status: InventoryRow["status"] =
+            v.stock <= 0 ? "agotado" : v.stock <= threshold ? "bajo" : "ok";
+          rows.push({
+            variantId: v.id,
+            productId: p.id,
+            productName: p.name,
+            baseSku: p.base_sku,
+            size: v.size,
+            color: v.color,
+            sku: v.sku,
+            stock: v.stock,
+            active: v.active,
+            lowStockThreshold: threshold,
+            categoryName: p.category?.name ?? null,
+            status,
+          });
+        }
+      }
+
+      rows.sort(
+        (a, b) => a.productName.localeCompare(b.productName) || a.size.localeCompare(b.size),
+      );
+      return rows;
+    } catch {
+      const products = getInMemoryProducts();
+      const rows: InventoryRow[] = [];
+      for (const p of products) {
+        const threshold = p.low_stock_threshold ?? 5;
+        for (const v of p.variants ?? []) {
+          if (!v.active) continue;
+          const status: InventoryRow["status"] =
+            v.stock <= 0 ? "agotado" : v.stock <= threshold ? "bajo" : "ok";
+          rows.push({
+            variantId: v.id,
+            productId: p.id,
+            productName: p.name,
+            baseSku: p.base_sku,
+            size: v.size,
+            color: v.color,
+            sku: v.sku,
+            stock: v.stock,
+            active: v.active,
+            lowStockThreshold: threshold,
+            categoryName: p.category?.name ?? null,
+            status,
+          });
+        }
+      }
+      rows.sort(
+        (a, b) => a.productName.localeCompare(b.productName) || a.size.localeCompare(b.size),
+      );
+      return rows;
+    }
   });
 
 export type InventoryMovementRow = {

@@ -59,13 +59,17 @@ const ORDER_SELECT = `
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
-      .from("orders")
-      .select(ORDER_SELECT)
-      .order("created_at", { ascending: false })
-      .limit(300);
-    if (error) throw new Error(error.message);
-    return (data ?? []) as unknown as AdminOrder[];
+    try {
+      const { data, error } = await context.supabase
+        .from("orders")
+        .select(ORDER_SELECT)
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      return (data ?? []) as unknown as AdminOrder[];
+    } catch {
+      return [] as AdminOrder[];
+    }
   });
 
 const ALLOWED_STATUSES = [

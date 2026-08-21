@@ -73,6 +73,9 @@ export function AdminShell({
   const [open, setOpen] = useState(false);
 
   async function signOut() {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("kp_demo_auth");
+    }
     await queryClient.cancelQueries();
     queryClient.clear();
     await supabase.auth.signOut();
