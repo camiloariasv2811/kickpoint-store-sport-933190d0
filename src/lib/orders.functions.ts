@@ -198,16 +198,24 @@ export const getProofUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { path: string }) => data)
   .handler(async ({ data, context }) => {
-    const { data: isStaff, error } = await context.supabase.rpc("is_staff", {
-      _user_id: context.userId,
-    });
-    if (error) throw new Error(error.message);
-    if (!isStaff) throw new Error("Forbidden");
+    if (
+      data.path.startsWith("http://") ||
+      data.path.startsWith("https://") ||
+      data.path.startsWith("data:")
+    ) {
+      return { url: data.path };
+    }
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: signed, error: signError } = await supabaseAdmin.storage
-      .from("comprobantes")
-      .createSignedUrl(data.path, 300);
-    if (signError) throw new Error(signError.message);
-    return { url: signed.signedUrl };
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: signed, error: signError } = await supabaseAdmin.storage
+        .from("comprobantes")
+        .createSignedUrl(data.path, 3600);
+      if (signError || !signed?.signedUrl) {
+        return { url: data.path };
+      }
+      return { url: signed.signedUrl };
+    } catch {
+      return { url: data.path };
+    }
   });

@@ -10,8 +10,10 @@ import {
   Loader2,
   Package,
   MessageCircle,
+  Copy,
+  CreditCard,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -23,6 +25,9 @@ import { getOrderByNumber, uploadPaymentProof, type PublicOrder } from "@/lib/ch
 import { moneyExact, whatsappLink } from "@/lib/format";
 
 export const Route = createFileRoute("/pedido")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    code: typeof search.code === "string" ? search.code : "",
+  }),
   head: () => ({
     meta: [
       { title: "Consultar mi pedido | KICKPOINT" },
@@ -37,7 +42,8 @@ export const Route = createFileRoute("/pedido")({
 });
 
 function PedidoPage() {
-  const [code, setCode] = useState("");
+  const searchParams = Route.useSearch();
+  const [code, setCode] = useState(searchParams.code || "");
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [searched, setSearched] = useState(false);
@@ -47,9 +53,8 @@ function PedidoPage() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  async function handleSearch(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    const clean = code.trim().toUpperCase();
+  async function performSearch(orderNum: string) {
+    const clean = orderNum.trim().toUpperCase();
     if (!clean) return;
 
     setLoading(true);
@@ -66,6 +71,23 @@ function PedidoPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  useEffect(() => {
+    if (searchParams.code) {
+      setCode(searchParams.code);
+      performSearch(searchParams.code);
+    }
+  }, [searchParams.code]);
+
+  async function handleSearch(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    performSearch(code);
+  }
+
+  function copyText(text: string, label: string) {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado al portapapeles`);
   }
 
   async function handleUploadProof(e: React.FormEvent) {
