@@ -202,6 +202,16 @@ function PedidoPage() {
                 </div>
               </div>
 
+              {/* Shipping & Rate Notes */}
+              {order.notes && (
+                <div className="mt-4 rounded-lg bg-surface-2/80 p-3 text-xs border border-border">
+                  <span className="font-semibold text-foreground">
+                    Detalles de Entrega y Cotización:
+                  </span>
+                  <p className="mt-1 text-muted-foreground">{order.notes}</p>
+                </div>
+              )}
+
               {/* Status Timeline */}
               <div className="mt-6">
                 <p className="text-xs font-semibold uppercase text-muted-foreground mb-4">

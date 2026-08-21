@@ -50,7 +50,8 @@ function AdminConfiguracion() {
   // Store General Settings
   const [whatsapp, setWhatsapp] = useState("");
   const [shippingFlat, setShippingFlat] = useState("0");
-  const [exchangeRate, setExchangeRate] = useState("0");
+  const [exchangeRateBcv, setExchangeRateBcv] = useState("78.50");
+  const [exchangeRateUsdt, setExchangeRateUsdt] = useState("86.20");
   const [lowStockThreshold, setLowStockThreshold] = useState("5");
 
   // Payment Method Modal
@@ -80,7 +81,8 @@ function AdminConfiguracion() {
     if (settings) {
       setWhatsapp(settings.whatsapp ?? "+58 412 0000000");
       setShippingFlat(String(settings.shipping_flat ?? 0));
-      setExchangeRate(String(settings.exchange_rate_bs ?? 40));
+      setExchangeRateBcv(String(settings.exchange_rate_bcv ?? settings.exchange_rate_bs ?? 78.5));
+      setExchangeRateUsdt(String(settings.exchange_rate_usdt ?? 86.2));
       setLowStockThreshold(String(settings.low_stock_threshold ?? 5));
     }
   }, [settings]);
@@ -93,12 +95,15 @@ function AdminConfiguracion() {
         data: {
           whatsapp: whatsapp.trim(),
           shipping_flat: parseFloat(shippingFlat) || 0,
-          exchange_rate_bs: parseFloat(exchangeRate) || 0,
+          exchange_rate_bcv: parseFloat(exchangeRateBcv) || 78.5,
+          exchange_rate_usdt: parseFloat(exchangeRateUsdt) || 86.2,
+          exchange_rate_bs: parseFloat(exchangeRateBcv) || 78.5,
           low_stock_threshold: parseInt(lowStockThreshold, 10) || 5,
         },
       });
       toast.success("Configuración general guardada exitosamente");
       await queryClient.invalidateQueries({ queryKey: ["admin", "settings", "store"] });
+      await queryClient.invalidateQueries({ queryKey: ["public", "store-settings"] });
     } catch (err: any) {
       console.error(err);
       toast.error(`Error al guardar: ${err.message || "Error desconocido"}`);
@@ -269,18 +274,39 @@ function AdminConfiguracion() {
                 </div>
 
                 <div>
-                  <Label htmlFor="s-rate" className="flex items-center gap-1.5 font-semibold">
+                  <Label htmlFor="s-rate-bcv" className="flex items-center gap-1.5 font-semibold">
                     <DollarSign className="size-3.5 text-muted-foreground" />
-                    Tasa de Cambio Referencial (Bs/USD)
+                    Tasa Oficial BCV (Bs/USD)
                   </Label>
                   <Input
-                    id="s-rate"
+                    id="s-rate-bcv"
                     type="number"
                     step="0.01"
-                    value={exchangeRate}
-                    onChange={(e) => setExchangeRate(e.target.value)}
+                    value={exchangeRateBcv}
+                    onChange={(e) => setExchangeRateBcv(e.target.value)}
                     className="mt-1.5"
                   />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Utilizada para pagos en bolívares (Pago Móvil / Transferencias).
+                  </p>
+                </div>
+
+                <div>
+                  <Label htmlFor="s-rate-usdt" className="flex items-center gap-1.5 font-semibold">
+                    <DollarSign className="size-3.5 text-muted-foreground" />
+                    Tasa Paralela / USDT (Bs/USD)
+                  </Label>
+                  <Input
+                    id="s-rate-usdt"
+                    type="number"
+                    step="0.01"
+                    value={exchangeRateUsdt}
+                    onChange={(e) => setExchangeRateUsdt(e.target.value)}
+                    className="mt-1.5"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Utilizada si el cliente elige cotización en tasa USDT en checkout.
+                  </p>
                 </div>
 
                 <div>

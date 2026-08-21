@@ -158,3 +158,62 @@ export const createSale = createServerFn({ method: "POST" })
 
     return { id: sale.id, sale_number: sale.sale_number, total };
   });
+
+/** Safely deletes a POS sale and can optionally restore stock. */
+export const deleteSale = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { saleId: string; restoreStock?: boolean }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: sale, error } = await supabase
+      .from("sales")
+      .select("id, sale_number, items:sale_items(variant_id, quantity, unit_cost)")
+      .eq("id", data.saleId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!sale) throw new Error("Venta no encontrada");
+
+    // Optional stock restoration
+    if (data.restoreStock) {
+      for (const item of sale.items ?? []) {
+        if (!item.variant_id) continue;
+        const { data: variant } = await supabase
+          .from("product_variants")
+          .select("id, stock")
+          .eq("id", item.variant_id)
+          .single();
+        if (variant) {
+          const stockAfter = variant.stock + item.quantity;
+          await supabase
+            .from("product_variants")
+            .update({ stock: stockAfter })
+            .eq("id", variant.id);
+          await supabase.from("inventory_movements").insert({
+            variant_id: variant.id,
+            type: "entrada",
+            quantity: item.quantity,
+            unit_cost: item.unit_cost,
+            stock_after: stockAfter,
+            reference: sale.sale_number,
+            note: "Eliminación de venta presencial / Reversión de stock",
+            created_by: userId,
+          });
+        }
+      }
+    }
+
+    // Delete sale items then sale record
+    await supabase.from("sale_items").delete().eq("sale_id", sale.id);
+    const { error: delErr } = await supabase.from("sales").delete().eq("id", sale.id);
+    if (delErr) throw new Error(delErr.message);
+
+    await supabase.from("audit_log").insert({
+      user_id: userId,
+      action: `Eliminó la venta ${sale.sale_number}`,
+      entity: "sales",
+      entity_id: sale.id,
+    });
+
+    return { ok: true as const };
+  });

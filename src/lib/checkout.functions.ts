@@ -81,7 +81,10 @@ export type CheckoutInput = {
     state: string;
     notes: string;
   };
+  shippingMethod: "TEALCA" | "MRW";
   paymentMethod: string;
+  rateType?: "BCV" | "USDT";
+  exchangeRateUsed?: number;
   lines: { variantId: string; quantity: number }[];
 };
 
@@ -90,7 +93,9 @@ export const createOrder = createServerFn({ method: "POST" })
     if (!data?.customer?.firstName?.trim()) throw new Error("Falta el nombre");
     if (!data.customer.whatsapp?.trim()) throw new Error("Falta el WhatsApp");
     if (!data.customer.city?.trim() || !data.customer.address?.trim())
-      throw new Error("Falta la dirección de entrega");
+      throw new Error("Falta la dirección de entrega o agencia de envío");
+    if (!data.shippingMethod || !["TEALCA", "MRW"].includes(data.shippingMethod))
+      throw new Error("Selecciona una empresa de envío (TEALCA o MRW)");
     if (!Array.isArray(data.lines) || data.lines.length === 0) throw new Error("Carrito vacío");
     if (data.lines.length > 60) throw new Error("Demasiados productos");
     if (!data.paymentMethod) throw new Error("Selecciona un método de pago");
@@ -158,6 +163,18 @@ export const createOrder = createServerFn({ method: "POST" })
 
     const subtotal = Number(items.reduce((sum, i) => sum + i.subtotal, 0).toFixed(2));
 
+    const rateType = data.rateType || "BCV";
+    const exchangeRate = Number(data.exchangeRateUsed || 78.5);
+    const totalBs = Number((subtotal * exchangeRate).toFixed(2));
+
+    const formattedNotes = [
+      `[Envío: ${data.shippingMethod}]`,
+      `[Cotización: Tasa ${rateType} a Bs. ${exchangeRate.toFixed(2)} / USD | Total Bs. ${totalBs.toLocaleString("es-VE", { minimumFractionDigits: 2 })}]`,
+      data.customer.notes?.trim() ? `Nota cliente: ${data.customer.notes.trim()}` : "",
+    ]
+      .filter(Boolean)
+      .join(" | ");
+
     const { data: customer, error: customerError } = await supabaseAdmin
       .from("customers")
       .insert({
@@ -166,10 +183,10 @@ export const createOrder = createServerFn({ method: "POST" })
         whatsapp: data.customer.whatsapp.trim().slice(0, 40),
         phone: data.customer.whatsapp.trim().slice(0, 40),
         email: data.customer.email.trim().slice(0, 120) || null,
-        address: data.customer.address.trim().slice(0, 300),
+        address: `${data.shippingMethod} - ${data.customer.address.trim().slice(0, 250)}`,
         city: data.customer.city.trim().slice(0, 80),
         state: data.customer.state.trim().slice(0, 80) || null,
-        notes: data.customer.notes.trim().slice(0, 500) || null,
+        notes: formattedNotes.slice(0, 500),
       })
       .select("id")
       .single();
@@ -185,7 +202,7 @@ export const createOrder = createServerFn({ method: "POST" })
         subtotal,
         total: subtotal,
         is_wholesale: items.some((i) => i.isWholesale),
-        notes: data.customer.notes.trim().slice(0, 500) || null,
+        notes: formattedNotes.slice(0, 500),
       })
       .select("id, order_number, total")
       .single();
@@ -219,6 +236,7 @@ export type PublicOrder = {
   payment_status: string | null;
   proof_uploaded: boolean;
   rejection_reason: string | null;
+  notes: string | null;
   items: {
     product_name: string;
     size: string | null;
@@ -244,7 +262,7 @@ export const getOrderByNumber = createServerFn({ method: "GET" })
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_number, status, total, created_at, payment_method_code, items:order_items(product_name, size, color, quantity, unit_price, subtotal, image_url), payments(status, proof_url, rejection_reason, created_at)",
+        "id, order_number, status, total, notes, created_at, payment_method_code, items:order_items(product_name, size, color, quantity, unit_price, subtotal, image_url), payments(status, proof_url, rejection_reason, created_at)",
       )
       .eq("order_number", data.orderNumber)
       .maybeSingle();
@@ -267,6 +285,7 @@ export const getOrderByNumber = createServerFn({ method: "GET" })
       payment_status: payment?.status ?? null,
       proof_uploaded: Boolean(payment?.proof_url),
       rejection_reason: payment?.rejection_reason ?? null,
+      notes: order.notes ?? null,
       items: (order.items ?? []).map((i) => ({
         product_name: i.product_name,
         size: i.size,

@@ -193,6 +193,127 @@ export const reviewPayment = createServerFn({ method: "POST" })
     return { ok: true as const, approved: true as const };
   });
 
+/** Cancels an order, setting status to cancelado and restoring stock if inventory was applied. */
+export const cancelOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string; reason?: string }) => data)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: order, error } = await supabase
+      .from("orders")
+      .select("id, order_number, inventory_applied, items:order_items(variant_id, quantity)")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!order) throw new Error("Orden no encontrada");
+
+    // If inventory was deducted, return items back to stock
+    if (order.inventory_applied) {
+      for (const item of order.items ?? []) {
+        if (!item.variant_id) continue;
+        const { data: variant } = await supabase
+          .from("product_variants")
+          .select("id, stock")
+          .eq("id", item.variant_id)
+          .single();
+        if (variant) {
+          const stockAfter = variant.stock + item.quantity;
+          await supabase
+            .from("product_variants")
+            .update({ stock: stockAfter })
+            .eq("id", variant.id);
+          await supabase.from("inventory_movements").insert({
+            variant_id: variant.id,
+            type: "entrada",
+            quantity: item.quantity,
+            stock_after: stockAfter,
+            reference: order.order_number,
+            note: `Pedido cancelado: ${data.reason || "Cancelación administrativa"}`,
+            created_by: userId,
+          });
+        }
+      }
+    }
+
+    const { error: updateError } = await supabase
+      .from("orders")
+      .update({
+        status: "cancelado",
+        inventory_applied: false,
+      })
+      .eq("id", order.id);
+    if (updateError) throw new Error(updateError.message);
+
+    await supabase.from("audit_log").insert({
+      user_id: userId,
+      action: `Canceló el pedido ${order.order_number}`,
+      entity: "orders",
+      entity_id: order.id,
+    });
+
+    return { ok: true as const };
+  });
+
+/** Safely deletes an order and its associated records with integrity checks. */
+export const deleteOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { orderId: string; restoreStock?: boolean }) => data)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+
+    const { data: order, error } = await supabase
+      .from("orders")
+      .select("id, order_number, inventory_applied, items:order_items(variant_id, quantity)")
+      .eq("id", data.orderId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!order) throw new Error("Orden no encontrada");
+
+    // Optional stock restoration if inventory had been deducted
+    if (order.inventory_applied && data.restoreStock) {
+      for (const item of order.items ?? []) {
+        if (!item.variant_id) continue;
+        const { data: variant } = await supabase
+          .from("product_variants")
+          .select("id, stock")
+          .eq("id", item.variant_id)
+          .single();
+        if (variant) {
+          const stockAfter = variant.stock + item.quantity;
+          await supabase
+            .from("product_variants")
+            .update({ stock: stockAfter })
+            .eq("id", variant.id);
+          await supabase.from("inventory_movements").insert({
+            variant_id: variant.id,
+            type: "entrada",
+            quantity: item.quantity,
+            stock_after: stockAfter,
+            reference: order.order_number,
+            note: "Eliminación de orden con reposición de inventario",
+            created_by: userId,
+          });
+        }
+      }
+    }
+
+    // Delete dependent records cleanly in sequence
+    await supabase.from("payments").delete().eq("order_id", order.id);
+    await supabase.from("order_items").delete().eq("order_id", order.id);
+    const { error: delError } = await supabase.from("orders").delete().eq("id", order.id);
+    if (delError) throw new Error(`Error al eliminar pedido: ${delError.message}`);
+
+    await supabase.from("audit_log").insert({
+      user_id: userId,
+      action: `Eliminó físicamente el pedido ${order.order_number}`,
+      entity: "orders",
+      entity_id: order.id,
+    });
+
+    return { ok: true as const };
+  });
+
 /** Returns a short-lived signed URL for a payment proof stored in the private bucket. */
 export const getProofUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

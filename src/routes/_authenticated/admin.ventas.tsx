@@ -32,7 +32,13 @@ import {
 } from "@/components/ui/dialog";
 import { listAdminProducts } from "@/lib/products.functions";
 import { listCustomers } from "@/lib/customers.functions";
-import { listSales, createSale, type AdminSale, type SaleItemInput } from "@/lib/sales.functions";
+import {
+  listSales,
+  createSale,
+  deleteSale,
+  type AdminSale,
+  type SaleItemInput,
+} from "@/lib/sales.functions";
 import { moneyExact } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/admin/ventas")({
@@ -76,6 +82,7 @@ function AdminVentas() {
   // History Detail
   const [selectedHistorySale, setSelectedHistorySale] = useState<AdminSale | null>(null);
   const [historySearch, setHistorySearch] = useState("");
+  const [deletingSale, setDeletingSale] = useState(false);
 
   const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ["admin", "products"],
@@ -91,6 +98,28 @@ function AdminVentas() {
     queryKey: ["admin", "sales"],
     queryFn: () => listSales(),
   });
+
+  async function handleDeleteSale(sale: AdminSale) {
+    if (
+      !window.confirm(
+        `¿Deseas eliminar permanentemente la venta ${sale.sale_number}? El inventario de los productos vendidos será devuelto automáticamente al stock.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingSale(true);
+    try {
+      await deleteSale({ data: { saleId: sale.id, restoreStock: true } });
+      toast.success(`Venta ${sale.sale_number} eliminada y stock restituido`);
+      await queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
+      await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+      setSelectedHistorySale(null);
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setDeletingSale(false);
+    }
+  }
 
   // Filter available active products
   const filteredProducts = products.filter((p: any) => {
@@ -730,6 +759,20 @@ function AdminVentas() {
                     <span>Total:</span>
                     <span className="text-primary">{moneyExact(selectedHistorySale.total)}</span>
                   </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border pt-3">
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    className="w-full gap-1.5 text-xs"
+                    onClick={() => handleDeleteSale(selectedHistorySale)}
+                    disabled={deletingSale}
+                  >
+                    <Trash2 className="size-4" />
+                    {deletingSale ? "Eliminando..." : "Eliminar Venta (Reintegrar Stock)"}
+                  </Button>
                 </div>
               </div>
             </>

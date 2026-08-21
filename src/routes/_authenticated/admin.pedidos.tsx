@@ -12,6 +12,8 @@ import {
   FileText,
   Loader2,
   ExternalLink,
+  Trash2,
+  XCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -37,6 +39,8 @@ import {
 import {
   listOrders,
   updateOrderStatus,
+  cancelOrder,
+  deleteOrder,
   getProofUrl,
   type AdminOrder,
 } from "@/lib/orders.functions";
@@ -53,6 +57,8 @@ function AdminPedidos() {
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [selectedOrder, setSelectedOrder] = useState<AdminOrder | null>(null);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [canceling, setCanceling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [loadingProof, setLoadingProof] = useState(false);
 
@@ -70,6 +76,14 @@ function AdminPedidos() {
     const matchesStatus = statusFilter === "todos" || o.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const counts = {
+    todos: orders.length,
+    pago_pendiente: orders.filter((o) => o.status === "pago_pendiente").length,
+    pago_verificado: orders.filter((o) => o.status === "pago_verificado").length,
+    preparando_pedido: orders.filter((o) => o.status === "preparando_pedido").length,
+    pedido_enviado: orders.filter((o) => o.status === "pedido_enviado").length,
+  };
 
   async function handleStatusChange(orderId: string, newStatus: string) {
     setChangingStatus(true);
@@ -90,26 +104,47 @@ function AdminPedidos() {
     }
   }
 
-  async function viewProof(path: string) {
-    setLoadingProof(true);
+  async function handleCancelOrder(order: AdminOrder) {
+    if (
+      !window.confirm(
+        `¿Estás seguro de cancelar el pedido ${order.order_number}? El inventario será reintegrado si ya había sido descontado.`,
+      )
+    ) {
+      return;
+    }
+    setCanceling(true);
     try {
-      const res = await getProofUrl({ data: { path } });
-      setProofUrl(res.url);
+      await cancelOrder({ data: { orderId: order.id, reason: "Cancelación desde panel admin" } });
+      toast.success(`Pedido ${order.order_number} cancelado`);
+      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      setSelectedOrder(null);
     } catch (err: any) {
-      console.error(err);
-      toast.error(`Error al cargar comprobante: ${err.message || "No encontrado"}`);
+      toast.error(`Error: ${err.message}`);
     } finally {
-      setLoadingProof(false);
+      setCanceling(false);
     }
   }
 
-  const counts = {
-    todos: orders.length,
-    pago_pendiente: orders.filter((o) => o.status === "pago_pendiente").length,
-    pago_verificado: orders.filter((o) => o.status === "pago_verificado").length,
-    preparando_pedido: orders.filter((o) => o.status === "preparando_pedido").length,
-    pedido_enviado: orders.filter((o) => o.status === "pedido_enviado").length,
-  };
+  async function handleDeleteOrder(order: AdminOrder) {
+    if (
+      !window.confirm(
+        `¡Atención! ¿Deseas eliminar permanentemente el pedido ${order.order_number}? Esta acción borrará sus pagos y detalles asociados.`,
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await deleteOrder({ data: { orderId: order.id, restoreStock: true } });
+      toast.success(`Pedido ${order.order_number} eliminado correctamente`);
+      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      setSelectedOrder(null);
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <AdminShell
@@ -506,6 +541,39 @@ function AdminPedidos() {
                   </div>
                 </div>
               )}
+
+              {/* Botones de Acción Crítica: Cancelar / Eliminar Orden */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
+                {selectedOrder.status !== "cancelado" ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="border-amber-500/30 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400 gap-1 text-xs"
+                    onClick={() => handleCancelOrder(selectedOrder)}
+                    disabled={canceling || deleting}
+                  >
+                    <XCircle className="size-4" />
+                    {canceling ? "Cancelando..." : "Cancelar Pedido (Reintegrar Stock)"}
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground italic">
+                    Este pedido se encuentra cancelado.
+                  </span>
+                )}
+
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="gap-1 text-xs"
+                  onClick={() => handleDeleteOrder(selectedOrder)}
+                  disabled={canceling || deleting}
+                >
+                  <Trash2 className="size-4" />
+                  {deleting ? "Eliminando..." : "Eliminar Definitivamente"}
+                </Button>
+              </div>
             </>
           )}
         </DialogContent>

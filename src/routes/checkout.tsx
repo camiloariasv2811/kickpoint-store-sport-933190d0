@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Loader2, ShoppingBag } from "lucide-react";
+import { ArrowRight, CheckCircle2, Loader2, ShoppingBag, Truck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -8,6 +8,7 @@ import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createOrder, listPaymentMethods } from "@/lib/checkout.functions";
+import { getPublicStoreSettings } from "@/lib/settings.functions";
 import { unitPrice, useCart } from "@/lib/cart";
 import { moneyExact } from "@/lib/format";
 
@@ -18,7 +19,7 @@ export const Route = createFileRoute("/checkout")({
       {
         name: "description",
         content:
-          "Completa tus datos de entrega, elige Pago Móvil, USDT o CEL y confirma tu pedido KICKPOINT.",
+          "Completa tus datos de entrega, elige Pago Móvil, USDT o Zelle, selecciona tu agencia (TEALCA / MRW) y confirma tu pedido KICKPOINT.",
       },
       { property: "og:title", content: "Finalizar compra | KICKPOINT" },
       {
@@ -43,16 +44,22 @@ const FIELDS: readonly {
   { key: "lastName", label: "Apellido", placeholder: "Pérez", required: false },
   { key: "whatsapp", label: "WhatsApp", placeholder: "0412 123 4567", required: true },
   { key: "email", label: "Correo (opcional)", placeholder: "maria@correo.com", required: false },
-  { key: "city", label: "Ciudad", placeholder: "Caracas", required: true },
+  { key: "city", label: "Ciudad / Municipio", placeholder: "Caracas", required: true },
   { key: "state", label: "Estado", placeholder: "Distrito Capital", required: false },
 ] as const;
 
 function CheckoutPage() {
   const navigate = useNavigate();
   const { lines, subtotal, savings, clear } = useCart();
+
   const { data: methods } = useQuery({
     queryKey: ["payment-methods"],
     queryFn: () => listPaymentMethods(),
+  });
+
+  const { data: storeSettings } = useQuery({
+    queryKey: ["public", "store-settings"],
+    queryFn: () => getPublicStoreSettings(),
   });
 
   const [form, setForm] = useState({
@@ -65,19 +72,35 @@ function CheckoutPage() {
     state: "",
     notes: "",
   });
+  const [shippingMethod, setShippingMethod] = useState<"TEALCA" | "MRW">("MRW");
+  const [rateType, setRateType] = useState<"BCV" | "USDT">("BCV");
   const [method, setMethod] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   const selected = method || methods?.[0]?.code || "";
   const activeMethod = methods?.find((m) => m.code === selected);
 
+  const bcvRate = Number(
+    storeSettings?.exchange_rate_bcv || storeSettings?.exchange_rate_bs || 78.5,
+  );
+  const usdtRate = Number(storeSettings?.exchange_rate_usdt || 86.2);
+  const currentRate = rateType === "BCV" ? bcvRate : usdtRate;
+  const totalBs = subtotal * currentRate;
+
   async function submit() {
+    if (!shippingMethod) {
+      toast.error("Por favor selecciona una empresa de envío (TEALCA o MRW)");
+      return;
+    }
     setSaving(true);
     try {
       const result = await createOrder({
         data: {
           customer: form,
+          shippingMethod,
           paymentMethod: selected,
+          rateType,
+          exchangeRateUsed: currentRate,
           lines: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
         },
       });
@@ -110,16 +133,73 @@ function CheckoutPage() {
   }
 
   const ready =
-    form.firstName.trim() && form.whatsapp.trim() && form.city.trim() && form.address.trim();
+    form.firstName.trim() &&
+    form.whatsapp.trim() &&
+    form.city.trim() &&
+    form.address.trim() &&
+    Boolean(shippingMethod);
 
   return (
     <SiteLayout>
       <div className="mx-auto max-w-6xl px-4 py-8">
         <p className="text-eyebrow text-primary">Paso 2 de 4</p>
-        <h1 className="text-display text-3xl sm:text-4xl">Datos y método de pago</h1>
+        <h1 className="text-display text-3xl sm:text-4xl">Datos, envío y método de pago</h1>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-6">
+            {/* Método de Envío */}
+            <section className="surface-card p-5">
+              <div className="flex items-center gap-2">
+                <Truck className="size-5 text-primary" />
+                <h2 className="text-display text-lg font-bold">Empresa de Envío Nacional</h2>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Selecciona la empresa de encomienda de tu preferencia para recibir tu pedido a nivel
+                nacional.
+              </p>
+
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShippingMethod("MRW")}
+                  className={`flex flex-col items-center justify-center rounded-xl border p-4 text-center transition-all ${
+                    shippingMethod === "MRW"
+                      ? "border-primary bg-accent ring-2 ring-primary"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-bold text-base">
+                    <span>MRW</span>
+                    {shippingMethod === "MRW" && <CheckCircle2 className="size-4 text-primary" />}
+                  </div>
+                  <span className="mt-1 text-[11px] text-muted-foreground">
+                    Envíos a agencias y a domicilio
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShippingMethod("TEALCA")}
+                  className={`flex flex-col items-center justify-center rounded-xl border p-4 text-center transition-all ${
+                    shippingMethod === "TEALCA"
+                      ? "border-primary bg-accent ring-2 ring-primary"
+                      : "border-border hover:border-primary/40"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-bold text-base">
+                    <span>TEALCA</span>
+                    {shippingMethod === "TEALCA" && (
+                      <CheckCircle2 className="size-4 text-primary" />
+                    )}
+                  </div>
+                  <span className="mt-1 text-[11px] text-muted-foreground">
+                    Cobertura nacional con tracking express
+                  </span>
+                </button>
+              </div>
+            </section>
+
+            {/* Datos de Entrega */}
             <section className="surface-card p-5">
               <h2 className="text-display text-lg">Datos de entrega</h2>
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -139,29 +219,30 @@ function CheckoutPage() {
                 ))}
                 <label className="block sm:col-span-2">
                   <span className="text-xs font-semibold text-muted-foreground">
-                    Dirección de entrega *
+                    Dirección exacta o Código/Nombre de Agencia ({shippingMethod}) *
                   </span>
                   <Input
                     className="mt-1.5 h-11"
                     value={form.address}
-                    placeholder="Av. principal, edificio, piso, punto de referencia"
+                    placeholder={`Ej: Agencia ${shippingMethod} Centro, Av. Principal, C.C. Los Samanes`}
                     onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
                   />
                 </label>
                 <label className="block sm:col-span-2">
                   <span className="text-xs font-semibold text-muted-foreground">
-                    Nota para el equipo (opcional)
+                    Nota o indicaciones adicionales (opcional)
                   </span>
                   <textarea
                     className="mt-1.5 min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-primary"
                     value={form.notes}
-                    placeholder="Ej: entregar en la tarde"
+                    placeholder="Ej: titular que retira en agencia, número de cédula para el paquete, etc."
                     onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
                   />
                 </label>
               </div>
             </section>
 
+            {/* Método de Pago */}
             <section className="surface-card p-5">
               <h2 className="text-display text-lg">Método de pago</h2>
               <div className="mt-4 space-y-3">
@@ -200,8 +281,9 @@ function CheckoutPage() {
             </section>
           </div>
 
+          {/* Resumen Lateral */}
           <aside className="surface-card h-fit p-5 lg:sticky lg:top-24">
-            <h2 className="text-display text-lg">Resumen</h2>
+            <h2 className="text-display text-lg">Resumen del Pedido</h2>
             <ul className="mt-4 space-y-3 text-sm">
               {lines.map((l) => (
                 <li key={l.variantId} className="flex justify-between gap-3">
@@ -220,10 +302,64 @@ function CheckoutPage() {
                 Ahorro al mayor {moneyExact(savings)}
               </p>
             )}
+
+            {/* Total USD */}
             <div className="mt-4 flex items-baseline justify-between border-t border-border pt-4">
-              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="text-sm text-muted-foreground">Total USD</span>
               <span className="text-display text-2xl text-primary">{moneyExact(subtotal)}</span>
             </div>
+
+            {/* Selector de Tasa y Cálculo en Bolívares */}
+            <div className="mt-4 rounded-xl border border-border bg-surface-2/60 p-3.5 text-xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground">Conversión a Bolívares (Bs.)</span>
+                <span className="text-[10px] text-muted-foreground">Selecciona tasa</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5 bg-background/80 p-1 rounded-lg border border-border">
+                <button
+                  type="button"
+                  onClick={() => setRateType("BCV")}
+                  className={`rounded py-1 font-semibold text-center transition-all ${
+                    rateType === "BCV"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Tasa BCV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRateType("USDT")}
+                  className={`rounded py-1 font-semibold text-center transition-all ${
+                    rateType === "USDT"
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Tasa USDT
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center text-muted-foreground pt-1">
+                <span>Tasa seleccionada:</span>
+                <span className="font-medium text-foreground">
+                  {rateType} (Bs. {currentRate.toFixed(2)})
+                </span>
+              </div>
+
+              <div className="flex justify-between items-center border-t border-border/80 pt-2 text-sm font-bold text-foreground">
+                <span>Total en Bs.:</span>
+                <span className="text-primary font-mono text-base">
+                  Bs.{" "}
+                  {totalBs.toLocaleString("es-VE", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              </div>
+            </div>
+
             <Button
               variant="hero"
               size="lg"
@@ -235,7 +371,8 @@ function CheckoutPage() {
               Confirmar pedido <ArrowRight className="size-5" />
             </Button>
             <p className="mt-2 text-center text-[0.7rem] text-muted-foreground">
-              Luego podrás subir tu comprobante y seguir el estado del pedido.
+              Al confirmar, tu pedido queda registrado de inmediato en el sistema y podrás subir tu
+              comprobante de pago.
             </p>
           </aside>
         </div>
