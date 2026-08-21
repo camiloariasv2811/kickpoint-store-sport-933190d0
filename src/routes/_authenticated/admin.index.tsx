@@ -4,7 +4,9 @@ import {
   AlertOctagon,
   AlertTriangle,
   ArrowRight,
+  ArrowRightLeft,
   Boxes,
+  Calculator,
   CheckCircle2,
   Clock,
   DollarSign,
@@ -216,6 +218,166 @@ function Dashboard() {
         </div>
       ) : metrics ? (
         <div className="space-y-6">
+          {/* SECCIÓN 0: CONTROL DE INVENTARIO Y VENTAS REALES */}
+          <div className="rounded-xl border border-primary/20 bg-card/60 p-4 shadow-sm backdrop-blur-sm">
+            <div className="mb-4 flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
+                  <Boxes className="size-4 text-primary" />
+                  Control de Inventario y Ventas Reales
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Balance en tiempo real de existencias, unidades despachadas e ingresos verificados
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="text-[0.7rem] bg-primary/10 text-primary border-primary/30"
+                >
+                  Fuente de verdad: Kárdex & Pagos
+                </Badge>
+              </div>
+            </div>
+
+            {/* 4 Métricas Clave Solicitadas */}
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {/* 1. INVENTARIO TOTAL */}
+              <div className="surface-card p-4 transition-colors hover:border-primary/40 border-l-4 border-l-primary">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">Inventario total</p>
+                  <Boxes className="size-4 text-primary" />
+                </div>
+                <p className="mt-2 text-2xl font-bold text-foreground">
+                  {(
+                    metrics.inventoryFlow?.currentStockUnits ??
+                    metrics.inventory?.totalUnits ??
+                    0
+                  ).toLocaleString()}{" "}
+                  unidades
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {metrics.inventory?.activeProductsCount ?? 0} productos activos con stock
+                </p>
+              </div>
+
+              {/* 2. PRODUCTOS VENDIDOS */}
+              <div className="surface-card p-4 transition-colors hover:border-emerald-500/40 border-l-4 border-l-emerald-500">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">Productos vendidos</p>
+                  <ShoppingBag className="size-4 text-emerald-500" />
+                </div>
+                <p className="mt-2 text-2xl font-bold text-foreground">
+                  {(
+                    metrics.inventoryFlow?.totalSoldUnits ??
+                    metrics.sales?.totalUnitsSold ??
+                    0
+                  ).toLocaleString()}{" "}
+                  unidades
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {(metrics.inventoryFlow?.totalSoldUnits ?? 0) === 0
+                    ? "Sin ventas reales registradas"
+                    : "Ventas reales confirmadas"}
+                </p>
+              </div>
+
+              {/* 3. INVENTARIO VENDIDO / SALIDAS */}
+              <div className="surface-card p-4 transition-colors hover:border-sky-500/40 border-l-4 border-l-sky-500">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Inventario vendido / Salidas
+                  </p>
+                  <ArrowRightLeft className="size-4 text-sky-500" />
+                </div>
+                <p className="mt-2 text-2xl font-bold text-foreground">
+                  {(
+                    metrics.inventoryFlow?.totalExitsUnits ??
+                    metrics.inventoryFlow?.totalSoldUnits ??
+                    0
+                  ).toLocaleString()}{" "}
+                  salidas
+                </p>
+                <p
+                  className="mt-1 text-xs text-muted-foreground truncate"
+                  title={metrics.inventoryFlow?.flowDescription}
+                >
+                  {metrics.inventoryFlow?.flowDescription ?? "0 inicial → 0 vendidos"}
+                </p>
+              </div>
+
+              {/* 4. DINERO COBRADO */}
+              <div className="surface-card p-4 transition-colors hover:border-amber-500/40 border-l-4 border-l-amber-500">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-medium text-muted-foreground">Dinero cobrado</p>
+                  <CheckCircle2 className="size-4 text-amber-500" />
+                </div>
+                <p className="mt-2 text-2xl font-bold text-foreground">
+                  {moneyExact(
+                    metrics.inventoryFlow?.totalCollectedMoney ??
+                      metrics.sales?.totalCollected ??
+                      0,
+                  )}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Exclusivo pagos verificados y POS
+                </p>
+              </div>
+            </div>
+
+            {/* 5. BALANCE Y CONTROL DE INVENTARIO */}
+            <div className="mt-4 rounded-lg bg-muted/40 p-3.5 border border-border">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-2">
+                  <Calculator className="size-4 text-primary shrink-0" />
+                  <span className="text-xs font-bold text-foreground uppercase tracking-wide">
+                    Ecuación de Balance de Inventario:
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+                  <span className="bg-background px-2 py-1 rounded border border-border">
+                    Inicial:{" "}
+                    <strong className="text-foreground">
+                      {(metrics.inventoryFlow?.initialUnits ?? 0).toLocaleString()}
+                    </strong>
+                  </span>
+                  <span className="text-muted-foreground font-bold">+</span>
+                  <span className="bg-emerald-500/10 text-emerald-500 px-2 py-1 rounded border border-emerald-500/20">
+                    Entradas:{" "}
+                    <strong>
+                      +{(metrics.inventoryFlow?.totalEntriesUnits ?? 0).toLocaleString()}
+                    </strong>
+                  </span>
+                  <span className="text-muted-foreground font-bold">-</span>
+                  <span className="bg-rose-500/10 text-rose-500 px-2 py-1 rounded border border-rose-500/20">
+                    Ventas / Salidas:{" "}
+                    <strong>
+                      -{(metrics.inventoryFlow?.totalSoldUnits ?? 0).toLocaleString()}
+                    </strong>
+                  </span>
+                  {(metrics.inventoryFlow?.totalAdjustmentsUnits ?? 0) !== 0 && (
+                    <>
+                      <span className="text-muted-foreground font-bold">±</span>
+                      <span className="bg-amber-500/10 text-amber-500 px-2 py-1 rounded border border-amber-500/20">
+                        Ajustes:{" "}
+                        <strong>
+                          {(metrics.inventoryFlow?.totalAdjustmentsUnits ?? 0) > 0
+                            ? `+${metrics.inventoryFlow?.totalAdjustmentsUnits}`
+                            : metrics.inventoryFlow?.totalAdjustmentsUnits}
+                        </strong>
+                      </span>
+                    </>
+                  )}
+                  <span className="text-muted-foreground font-bold">=</span>
+                  <span className="bg-primary/10 text-primary px-2.5 py-1 rounded font-bold border border-primary/30">
+                    Stock Actual:{" "}
+                    {`${(metrics.inventoryFlow?.currentStockUnits ?? 0).toLocaleString()} unid.`}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* SECCIÓN 1: FINANZAS Y VENTAS */}
           <div>
             <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">

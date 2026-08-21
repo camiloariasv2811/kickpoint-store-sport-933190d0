@@ -8,6 +8,18 @@ import {
   getInMemorySales,
 } from "./demo-data";
 
+export type InventoryMovementFlow = {
+  currentStockUnits: number;
+  totalSoldUnits: number;
+  totalCollectedMoney: number;
+  totalEntriesUnits: number;
+  totalExitsUnits: number;
+  totalAdjustmentsUnits: number;
+  initialUnits: number;
+  hasHistoricalMovements: boolean;
+  flowDescription: string;
+};
+
 export type DashboardMetrics = {
   sales: {
     todayTotal: number;
@@ -30,6 +42,7 @@ export type DashboardMetrics = {
     outOfStockCount: number;
     lowStockCount: number;
   };
+  inventoryFlow: InventoryMovementFlow;
   charts: {
     salesEvolution: {
       date: string;
@@ -306,6 +319,17 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
     createdAt: k.createdAt,
   }));
 
+  const totalEntriesUnits = kardex
+    .filter((k) => k.type === "entrada" || k.type === "inicial")
+    .reduce((sum, k) => sum + Number(k.quantity || 0), 0);
+  const totalExitsUnits = kardex
+    .filter((k) => k.type === "salida" || k.type === "venta")
+    .reduce((sum, k) => sum + Number(k.quantity || 0), 0);
+  const initialUnits =
+    kardex.length > 0
+      ? Math.max(0, totalUnits + totalExitsUnits - totalEntriesUnits)
+      : totalUnits + totalUnitsSold;
+
   return {
     sales: {
       todayTotal: Number(todayTotal.toFixed(2)),
@@ -327,6 +351,17 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
       activeProductsCount,
       outOfStockCount,
       lowStockCount,
+    },
+    inventoryFlow: {
+      currentStockUnits: totalUnits,
+      totalSoldUnits: totalUnitsSold,
+      totalCollectedMoney: Number(totalCollected.toFixed(2)),
+      totalEntriesUnits,
+      totalExitsUnits,
+      totalAdjustmentsUnits: 0,
+      initialUnits,
+      hasHistoricalMovements: kardex.length > 0,
+      flowDescription: `${initialUnits.toLocaleString()} iniciales → ${totalUnitsSold.toLocaleString()} vendidas → ${totalUnits.toLocaleString()} disponibles`,
     },
     charts: {
       salesEvolution: daysEvolution,
@@ -384,8 +419,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
             product_variants(id, size, color, sku, products(name))
           `,
           )
-          .order("created_at", { ascending: false })
-          .limit(15),
+          .order("created_at", { ascending: false }),
         supabaseAdmin.from("payments").select(`
             id, order_id, method_code, amount, status, reference, proof_url, proof_uploaded_at, verified_at, created_at
           `),
@@ -644,30 +678,32 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         };
       });
 
-      // Movimientos recientes
-      const recentMovements: DashboardMetrics["recentMovements"] = rawMovements.map((m) => {
-        const variant = m.product_variants as {
-          id?: string;
-          size?: string | null;
-          color?: string | null;
-          sku?: string | null;
-          products?: { name?: string } | null;
-        } | null;
+      // Movimientos recientes (últimos 15)
+      const recentMovements: DashboardMetrics["recentMovements"] = rawMovements
+        .slice(0, 15)
+        .map((m) => {
+          const variant = m.product_variants as {
+            id?: string;
+            size?: string | null;
+            color?: string | null;
+            sku?: string | null;
+            products?: { name?: string } | null;
+          } | null;
 
-        return {
-          id: m.id,
-          productName: variant?.products?.name ?? "Producto",
-          size: variant?.size ?? null,
-          color: variant?.color ?? null,
-          sku: variant?.sku ?? null,
-          type: m.type,
-          quantity: Number(m.quantity ?? 0),
-          stockAfter: m.stock_after !== null ? Number(m.stock_after) : null,
-          reference: m.reference ?? null,
-          note: m.note ?? null,
-          createdAt: m.created_at,
-        };
-      });
+          return {
+            id: m.id,
+            productName: variant?.products?.name ?? "Producto",
+            size: variant?.size ?? null,
+            color: variant?.color ?? null,
+            sku: variant?.sku ?? null,
+            type: m.type,
+            quantity: Number(m.quantity ?? 0),
+            stockAfter: m.stock_after !== null ? Number(m.stock_after) : null,
+            reference: m.reference ?? null,
+            note: m.note ?? null,
+            createdAt: m.created_at,
+          };
+        });
 
       // Total de unidades vendidas (únicamente de pedidos con pago verificado y ventas directas POS)
       const verifiedOrders = rawOrders.filter(
@@ -701,6 +737,22 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
 
       const totalUnitsSold = onlineUnitsSold + posUnitsSold;
 
+      // Balance y control del inventario
+      const totalEntriesUnits = rawMovements
+        .filter((m) => m.type === "entrada" || m.type === "inicial")
+        .reduce((sum, m) => sum + Number(m.quantity || 0), 0);
+      const totalExitsUnits = rawMovements
+        .filter((m) => m.type === "salida" || m.type === "venta")
+        .reduce((sum, m) => sum + Number(m.quantity || 0), 0);
+      const totalAdjustmentsUnits = rawMovements
+        .filter((m) => m.type === "ajuste")
+        .reduce((sum, m) => sum + Number(m.quantity || 0), 0);
+
+      const hasHistoricalMovements = rawMovements.length > 0;
+      const initialUnits = hasHistoricalMovements
+        ? Math.max(0, totalUnits + totalExitsUnits - totalEntriesUnits)
+        : totalUnits + totalUnitsSold;
+
       return {
         sales: {
           todayTotal: Number(todayTotal.toFixed(2)),
@@ -722,6 +774,17 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
           activeProductsCount,
           outOfStockCount,
           lowStockCount,
+        },
+        inventoryFlow: {
+          currentStockUnits: totalUnits,
+          totalSoldUnits: totalUnitsSold,
+          totalCollectedMoney: Number(totalCollected.toFixed(2)),
+          totalEntriesUnits,
+          totalExitsUnits,
+          totalAdjustmentsUnits,
+          initialUnits,
+          hasHistoricalMovements,
+          flowDescription: `${initialUnits.toLocaleString()} iniciales → ${totalUnitsSold.toLocaleString()} vendidas → ${totalUnits.toLocaleString()} disponibles`,
         },
         charts: {
           salesEvolution,
