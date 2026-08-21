@@ -261,7 +261,7 @@ export const deleteSale = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { saleId: string; restoreStock?: boolean }) => d)
   .handler(async ({ data, context }) => {
-    deleteInMemorySale(data.saleId);
+    deleteInMemorySale(data.saleId, data.restoreStock ?? true);
 
     if (!isSupabaseServerConfigured()) {
       return { ok: true as const };

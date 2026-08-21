@@ -335,6 +335,29 @@ export const cancelOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { userId } = context;
     const safeUserId = toSafeUuid(userId);
+
+    if (!isSupabaseServerConfigured()) {
+      const order = getInMemoryOrders().find((o) => o.id === data.orderId);
+      if (!order) throw new Error("Orden no encontrada");
+      if (order.inventory_applied) {
+        for (const item of order.items ?? []) {
+          if (item.variant_id) {
+            recordInMemoryMovement(
+              item.variant_id,
+              "entrada",
+              item.quantity,
+              item.unit_cost,
+              order.order_number,
+              `Pedido cancelado: ${data.reason || "Cancelación administrativa"}`,
+            );
+          }
+        }
+        order.inventory_applied = false;
+      }
+      order.status = "cancelado";
+      return { ok: true as const };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: order, error } = await supabaseAdmin
@@ -406,6 +429,21 @@ export const deleteOrder = createServerFn({ method: "POST" })
   .inputValidator((data: { orderId: string; restoreStock?: boolean }) => data)
   .handler(async ({ data, context }) => {
     if (!isSupabaseServerConfigured()) {
+      const order = getInMemoryOrders().find((o) => o.id === data.orderId);
+      if (order && order.inventory_applied && data.restoreStock) {
+        for (const item of order.items ?? []) {
+          if (item.variant_id) {
+            recordInMemoryMovement(
+              item.variant_id,
+              "entrada",
+              item.quantity,
+              item.unit_cost,
+              order.order_number,
+              "Eliminación de orden / Reversión de stock",
+            );
+          }
+        }
+      }
       deleteInMemoryOrder(data.orderId);
       return { ok: true as const };
     }

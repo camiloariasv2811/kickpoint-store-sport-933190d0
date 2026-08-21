@@ -775,7 +775,23 @@ export function addInMemorySale(sale: any): any {
   return newSale;
 }
 
-export function deleteInMemorySale(saleId: string): boolean {
+export function deleteInMemorySale(saleId: string, restoreStock: boolean = true): boolean {
+  const sale = _inMemorySales.find((s) => s.id === saleId);
+  if (!sale) return false;
+  if (restoreStock && Array.isArray(sale.items)) {
+    for (const item of sale.items) {
+      if (item.variant_id) {
+        recordInMemoryMovement(
+          item.variant_id,
+          "entrada",
+          item.quantity,
+          item.unit_cost,
+          sale.sale_number,
+          "Anulación de venta presencial / Reversión de stock",
+        );
+      }
+    }
+  }
   const len = _inMemorySales.length;
   _inMemorySales = _inMemorySales.filter((s) => s.id !== saleId);
   return _inMemorySales.length < len;

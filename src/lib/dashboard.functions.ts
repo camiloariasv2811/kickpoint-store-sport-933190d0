@@ -103,6 +103,7 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
   let totalUnits = 0;
   let totalCostValue = 0;
   let totalRetailValue = 0;
+  let totalWholesaleValue = 0;
   let activeProductsCount = 0;
   let outOfStockCount = 0;
   let lowStockCount = 0;
@@ -120,9 +121,10 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
       const vStock = v.stock ?? 0;
       productStock += vStock;
       totalUnits += vStock;
-      const cost = p.retail_price ? p.retail_price * 0.6 : 15;
+      const cost = p.cost ?? (p.retail_price ? p.retail_price * 0.6 : 15);
       totalCostValue += vStock * cost;
       totalRetailValue += vStock * (p.retail_price ?? 0);
+      totalWholesaleValue += vStock * (p.wholesale_price ?? p.retail_price ?? 0);
       categoryStockMap[catName] = (categoryStockMap[catName] ?? 0) + vStock;
 
       if (vStock <= 0) {
@@ -347,7 +349,7 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
       totalUnits,
       totalCostValue: Number(totalCostValue.toFixed(2)),
       totalRetailValue: Number(totalRetailValue.toFixed(2)),
-      totalWholesaleValue: Number(totalRetailValue.toFixed(2)),
+      totalWholesaleValue: Number(totalWholesaleValue.toFixed(2)),
       activeProductsCount,
       outOfStockCount,
       lowStockCount,
