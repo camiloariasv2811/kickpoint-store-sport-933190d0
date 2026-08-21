@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
 import { getInMemoryOrders, getInMemoryProducts } from "./demo-data";
+import { toSafeUuid } from "./uuid-utils";
 
 export type ReportMetrics = {
   totalRevenue: number;
@@ -96,16 +97,21 @@ export const getReportMetrics = createServerFn({ method: "GET" })
 
     try {
       const { supabase, userId } = context;
+      const safeUserId = toSafeUuid(userId);
 
       // Verify staff role explicitly
-      const { data: userRole } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .maybeSingle();
+      let isStaff = userId === "admin-demo-user" || !safeUserId;
+      if (!isStaff && safeUserId) {
+        const { data: userRole } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", safeUserId)
+          .maybeSingle();
 
-      const isStaff =
-        userId === "admin-demo-user" || userRole?.role === "admin" || userRole?.role === "staff";
+        if (userRole?.role === "admin" || userRole?.role === "staff") {
+          isStaff = true;
+        }
+      }
 
       if (!isStaff) {
         throw new Error("No tienes permisos para ver los reportes administrativos");

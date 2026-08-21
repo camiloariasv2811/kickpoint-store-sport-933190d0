@@ -156,12 +156,19 @@ export const reviewPayment = createServerFn({ method: "POST" })
 
     const { userId } = context;
     const safeUserId = toSafeUuid(userId);
+    const safePaymentId = toSafeUuid(data.paymentId);
+
+    if (!safePaymentId) {
+      const res = reviewInMemoryPayment(data.paymentId, data.approve, data.reason);
+      return { ok: res.ok as const, approved: res.approved as const };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: payment, error } = await supabaseAdmin
       .from("payments")
       .select("id, order_id, amount, method_code")
-      .eq("id", data.paymentId)
+      .eq("id", safePaymentId)
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!payment) {
