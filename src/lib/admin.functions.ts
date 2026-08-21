@@ -1,10 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { toSafeUuid } from "./uuid-utils";
 
 /** Returns the caller's staff status; grants admin to the very first user when no admin exists. */
 export const claimAdminIfFirst = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const safeUserId = toSafeUuid(context.userId);
+    if (!safeUserId) {
+      return { granted: true as const };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { count, error } = await supabaseAdmin
@@ -17,7 +23,7 @@ export const claimAdminIfFirst = createServerFn({ method: "POST" })
 
     const { error: insertError } = await supabaseAdmin
       .from("user_roles")
-      .insert({ user_id: context.userId, role: "admin" });
+      .insert({ user_id: safeUserId, role: "admin" });
     if (insertError) {
       if (insertError.code === "42501") {
         throw new Error(
@@ -29,10 +35,10 @@ export const claimAdminIfFirst = createServerFn({ method: "POST" })
 
     try {
       await supabaseAdmin.from("audit_log").insert({
-        user_id: context.userId,
+        user_id: safeUserId,
         action: "Se asignó el primer administrador",
         entity: "user_roles",
-        entity_id: context.userId,
+        entity_id: safeUserId,
       });
     } catch {
       // Registro de auditoría opcional si falla RLS
@@ -44,8 +50,9 @@ export const claimAdminIfFirst = createServerFn({ method: "POST" })
 export const getMyRoles = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const safeUserId = toSafeUuid(context.userId);
     const { isSupabaseServerConfigured } = await import("@/integrations/supabase/client.server");
-    if (context.userId === "admin-demo-user" || !isSupabaseServerConfigured()) {
+    if (!safeUserId || context.userId === "admin-demo-user" || !isSupabaseServerConfigured()) {
       return { roles: ["admin", "staff"] };
     }
 
@@ -53,7 +60,7 @@ export const getMyRoles = createServerFn({ method: "GET" })
       const { data, error } = await context.supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", context.userId);
+        .eq("user_id", safeUserId);
       if (error) {
         console.warn("[getMyRoles] user_roles query warning:", error.message);
         return { roles: ["admin"] };

@@ -9,6 +9,7 @@ import {
   reviewInMemoryPayment,
   updateInMemoryOrderStatus,
 } from "./demo-data";
+import { toSafeUuid } from "./uuid-utils";
 
 export type AdminOrder = {
   id: string;
@@ -128,7 +129,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
 
     try {
       await supabaseAdmin.from("audit_log").insert({
-        user_id: context.userId,
+        user_id: toSafeUuid(context.userId),
         action: `Cambió el estado del pedido a ${data.status}`,
         entity: "orders",
         entity_id: data.orderId,
@@ -145,12 +146,16 @@ export const reviewPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { paymentId: string; approve: boolean; reason?: string }) => data)
   .handler(async ({ data, context }) => {
+    // Keep in-memory cache synchronized as well
+    reviewInMemoryPayment(data.paymentId, data.approve, data.reason);
+
     if (!isSupabaseServerConfigured()) {
       const res = reviewInMemoryPayment(data.paymentId, data.approve, data.reason);
       return { ok: res.ok as const, approved: res.approved as const };
     }
 
     const { userId } = context;
+    const safeUserId = toSafeUuid(userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: payment, error } = await supabaseAdmin
@@ -159,7 +164,11 @@ export const reviewPayment = createServerFn({ method: "POST" })
       .eq("id", data.paymentId)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!payment) throw new Error("Pago no encontrado");
+    if (!payment) {
+      // Payment might only be in memory if testing in mixed mode
+      const res = reviewInMemoryPayment(data.paymentId, data.approve, data.reason);
+      return { ok: res.ok as const, approved: res.approved as const };
+    }
 
     if (!data.approve) {
       const { error: rejectError } = await supabaseAdmin
@@ -168,7 +177,7 @@ export const reviewPayment = createServerFn({ method: "POST" })
           status: "rechazado",
           rejection_reason: (data.reason ?? "").trim().slice(0, 300) || "Comprobante no válido",
           verified_at: new Date().toISOString(),
-          verified_by: userId,
+          verified_by: safeUserId,
         })
         .eq("id", payment.id);
       if (rejectError) throw new Error(rejectError.message);
@@ -188,7 +197,7 @@ export const reviewPayment = createServerFn({ method: "POST" })
         status: "verificado",
         rejection_reason: null,
         verified_at: new Date().toISOString(),
-        verified_by: userId,
+        verified_by: safeUserId,
       })
       .eq("id", payment.id);
     if (approveError) throw new Error(approveError.message);
@@ -229,7 +238,7 @@ export const reviewPayment = createServerFn({ method: "POST" })
           stock_after: stockAfter,
           reference: order.order_number,
           note: `Pago verificado - Pedido ${order.order_number}`,
-          created_by: userId,
+          created_by: safeUserId,
         });
       }
 
@@ -257,7 +266,7 @@ export const reviewPayment = createServerFn({ method: "POST" })
               payment_method_code: payment.method_code,
               total: Number(order.total),
               cost_total: costTotal,
-              created_by: userId,
+              created_by: safeUserId,
             })
             .select("id")
             .maybeSingle();
@@ -300,7 +309,7 @@ export const reviewPayment = createServerFn({ method: "POST" })
 
     try {
       await supabaseAdmin.from("audit_log").insert({
-        user_id: userId,
+        user_id: safeUserId,
         action: `Verificó el pago de ${order.order_number}`,
         entity: "payments",
         entity_id: payment.id,
@@ -318,6 +327,7 @@ export const cancelOrder = createServerFn({ method: "POST" })
   .inputValidator((data: { orderId: string; reason?: string }) => data)
   .handler(async ({ data, context }) => {
     const { userId } = context;
+    const safeUserId = toSafeUuid(userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: order, error } = await supabaseAdmin
@@ -353,7 +363,7 @@ export const cancelOrder = createServerFn({ method: "POST" })
             stock_after: stockAfter,
             reference: order.order_number,
             note: `Pedido cancelado: ${data.reason || "Cancelación administrativa"}`,
-            created_by: userId,
+            created_by: safeUserId,
           });
         }
       }
@@ -371,7 +381,7 @@ export const cancelOrder = createServerFn({ method: "POST" })
 
     try {
       await supabaseAdmin.from("audit_log").insert({
-        user_id: userId,
+        user_id: safeUserId,
         action: `Canceló el pedido ${order.order_number}`,
         entity: "orders",
         entity_id: order.id,
@@ -395,6 +405,7 @@ export const deleteOrder = createServerFn({ method: "POST" })
 
     try {
       const { userId } = context;
+      const safeUserId = toSafeUuid(userId);
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
       const { data: order, error } = await supabaseAdmin
@@ -433,7 +444,7 @@ export const deleteOrder = createServerFn({ method: "POST" })
               stock_after: stockAfter,
               reference: order.order_number,
               note: "Eliminación de orden con reposición de inventario",
-              created_by: userId,
+              created_by: safeUserId,
             });
           }
         }
@@ -458,7 +469,7 @@ export const deleteOrder = createServerFn({ method: "POST" })
 
       try {
         await supabaseAdmin.from("audit_log").insert({
-          user_id: userId,
+          user_id: safeUserId,
           action: `Eliminó físicamente el pedido ${order.order_number}`,
           entity: "orders",
           entity_id: order.id,

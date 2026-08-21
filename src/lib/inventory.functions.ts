@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
 import { getInMemoryKardex, getInMemoryProducts } from "./demo-data";
+import { toSafeUuid } from "./uuid-utils";
 
 export type InventoryRow = {
   variantId: string;
@@ -391,7 +392,7 @@ export const recordInventoryMovement = createServerFn({ method: "POST" })
       stock_after: stockAfter,
       reference: data.reference?.trim() || null,
       note: data.note?.trim() || null,
-      created_by: context.userId,
+      created_by: toSafeUuid(context.userId),
     });
     if (insertError) throw new Error(insertError.message);
 

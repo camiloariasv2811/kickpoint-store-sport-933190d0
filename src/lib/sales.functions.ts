@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { toSafeUuid } from "./uuid-utils";
 
 export type SaleItemInput = {
   product_id?: string | null;
@@ -81,6 +82,7 @@ export const createSale = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const safeUserId = toSafeUuid(userId);
 
     let customerId = data.customer_id || null;
     if (!customerId && data.customer_name?.trim()) {
@@ -108,7 +110,7 @@ export const createSale = createServerFn({ method: "POST" })
         payment_method_code: data.payment_method_code,
         total,
         cost_total: costTotal,
-        created_by: userId,
+        created_by: safeUserId,
       })
       .select("id, sale_number")
       .single();
@@ -151,7 +153,7 @@ export const createSale = createServerFn({ method: "POST" })
           stock_after: stockAfter,
           reference: sale.sale_number,
           note: "Venta presencial / POS",
-          created_by: userId,
+          created_by: safeUserId,
         });
       }
     }
@@ -165,6 +167,7 @@ export const deleteSale = createServerFn({ method: "POST" })
   .inputValidator((d: { saleId: string; restoreStock?: boolean }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const safeUserId = toSafeUuid(userId);
 
     const { data: sale, error } = await supabase
       .from("sales")
@@ -197,7 +200,7 @@ export const deleteSale = createServerFn({ method: "POST" })
             stock_after: stockAfter,
             reference: sale.sale_number,
             note: "Eliminación de venta presencial / Reversión de stock",
-            created_by: userId,
+            created_by: safeUserId,
           });
         }
       }
@@ -209,7 +212,7 @@ export const deleteSale = createServerFn({ method: "POST" })
     if (delErr) throw new Error(delErr.message);
 
     await supabase.from("audit_log").insert({
-      user_id: userId,
+      user_id: safeUserId,
       action: `Eliminó la venta ${sale.sale_number}`,
       entity: "sales",
       entity_id: sale.id,
