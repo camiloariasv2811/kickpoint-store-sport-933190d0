@@ -106,8 +106,8 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" })
     });
 
     try {
-      const { data, error } = await supabase.auth.getClaims(token);
-      if (error || !data?.claims || !data.claims.sub) {
+      const { data, error } = await supabase.auth.getUser(token);
+      if (error || !data?.user?.id) {
         return next({
           context: {
             supabase,
@@ -120,8 +120,12 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" })
       return next({
         context: {
           supabase,
-          userId: data.claims.sub,
-          claims: data.claims,
+          userId: data.user.id,
+          claims: {
+            sub: data.user.id,
+            role: (data.user.app_metadata?.role as string) || "admin",
+            email: data.user.email || "",
+          },
         },
       });
     } catch {

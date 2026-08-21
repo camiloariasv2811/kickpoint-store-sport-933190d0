@@ -43,6 +43,9 @@ function AuthCallbackPage() {
           if (exchangeError) {
             console.warn("[AuthCallback] Exchange code error:", exchangeError);
           } else if (data?.session && mounted) {
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("kp_demo_auth");
+            }
             navigate({ to: "/admin", replace: true });
             return;
           }
@@ -52,6 +55,9 @@ function AuthCallbackPage() {
         if (sessionError) throw sessionError;
 
         if (data?.session) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("kp_demo_auth");
+          }
           if (mounted) navigate({ to: "/admin", replace: true });
           return;
         }
@@ -60,6 +66,9 @@ function AuthCallbackPage() {
           data: { subscription },
         } = supabase.auth.onAuthStateChange((_event, session) => {
           if (session && mounted) {
+            if (typeof window !== "undefined") {
+              localStorage.removeItem("kp_demo_auth");
+            }
             subscription.unsubscribe();
             navigate({ to: "/admin", replace: true });
           }

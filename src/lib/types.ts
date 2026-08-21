@@ -64,3 +64,5 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
 export function totalStock(p: Pick<Product, "variants">) {
   return p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
 }
+
+export { toSafeUuid, isUuid } from "./uuid-utils";

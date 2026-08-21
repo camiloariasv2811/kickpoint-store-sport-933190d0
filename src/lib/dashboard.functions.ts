@@ -11,6 +11,7 @@ export type DashboardMetrics = {
     monthCount: number;
     totalGenerated: number;
     totalCollected: number;
+    totalUnitsSold: number;
     pendingPaymentsCount: number;
     pendingPaymentsAmount: number;
     pendingOrdersCount: number;
@@ -219,6 +220,10 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
     createdAt: k.createdAt,
   }));
 
+  const inMemoryUnitsSold = kardex
+    .filter((k) => k.type === "salida" || k.type === "venta")
+    .reduce((sum, k) => sum + Math.abs(k.quantity), 0);
+
   return {
     sales: {
       todayTotal: Number((totalCollected * 0.4).toFixed(2)),
@@ -227,6 +232,7 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
       monthCount: orders.filter((o) => o.payments.some((p) => p.status === "verificado")).length,
       totalGenerated: Number(totalGenerated.toFixed(2)),
       totalCollected: Number(totalCollected.toFixed(2)),
+      totalUnitsSold: inMemoryUnitsSold,
       pendingPaymentsCount,
       pendingPaymentsAmount: Number(pendingPaymentsAmount.toFixed(2)),
       pendingOrdersCount,
@@ -587,6 +593,11 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         };
       });
 
+      // Total de unidades vendidas (productos vendidos)
+      const totalUnitsSold = rawMovements
+        .filter((m) => m.type === "salida" || m.type === "venta")
+        .reduce((sum, m) => sum + Math.abs(Number(m.quantity ?? 0)), 0);
+
       return {
         sales: {
           todayTotal: Number(todayTotal.toFixed(2)),
@@ -595,6 +606,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
           monthCount,
           totalGenerated: Number(totalGenerated.toFixed(2)),
           totalCollected: Number(totalCollected.toFixed(2)),
+          totalUnitsSold,
           pendingPaymentsCount,
           pendingPaymentsAmount: Number(pendingPaymentsAmount.toFixed(2)),
           pendingOrdersCount,

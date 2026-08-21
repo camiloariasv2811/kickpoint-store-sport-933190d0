@@ -12,8 +12,9 @@ import {
   MessageCircle,
   Copy,
   CreditCard,
+  Radio,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { toast } from "sonner";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -23,6 +24,7 @@ import { Label } from "@/components/ui/label";
 import { ORDER_STATUS_LABELS, ORDER_STATUSES } from "@/lib/types";
 import { getOrderByNumber, uploadPaymentProof, type PublicOrder } from "@/lib/checkout.functions";
 import { moneyExact, whatsappLink } from "@/lib/format";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/pedido")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -47,29 +49,39 @@ function PedidoPage() {
   const [loading, setLoading] = useState(false);
   const [order, setOrder] = useState<PublicOrder | null>(null);
   const [searched, setSearched] = useState(false);
+  const orderRef = useRef<PublicOrder | null>(null);
+  orderRef.current = order;
 
   // Proof Upload Form
   const [reference, setReference] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  async function performSearch(orderNum: string) {
+  async function performSearch(orderNum: string, silent = false) {
     const clean = orderNum.trim().toUpperCase();
     if (!clean) return;
 
-    setLoading(true);
-    setSearched(true);
+    if (!silent) {
+      setLoading(true);
+      setSearched(true);
+    }
     try {
       const res = await getOrderByNumber({ data: { orderNumber: clean } });
-      setOrder(res);
-      if (!res) {
+      if (res) {
+        setOrder(res);
+      } else if (!silent) {
+        setOrder(null);
         toast.error("No encontramos ningún pedido con ese número.");
       }
     } catch (err: any) {
-      console.error(err);
-      toast.error("Error al buscar el pedido");
+      if (!silent) {
+        console.error(err);
+        toast.error("Error al buscar el pedido");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }
 
@@ -79,6 +91,47 @@ function PedidoPage() {
       performSearch(searchParams.code);
     }
   }, [searchParams.code]);
+
+  // Realtime subscription + intelligent active polling
+  useEffect(() => {
+    if (!order?.order_number) return;
+
+    const currentOrderNumber = order.order_number;
+
+    // 1. Setup polling fallback every 4 seconds for instant responsiveness
+    const pollTimer = setInterval(() => {
+      performSearch(currentOrderNumber, true);
+    }, 4000);
+
+    // 2. Setup Supabase Realtime channel
+    let channel: any;
+    try {
+      channel = supabase
+        .channel(`order_tracking_${currentOrderNumber}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "orders",
+            filter: `order_number=eq.${currentOrderNumber}`,
+          },
+          () => {
+            performSearch(currentOrderNumber, true);
+          },
+        )
+        .subscribe();
+    } catch {
+      // Realtime graceful fallback
+    }
+
+    return () => {
+      clearInterval(pollTimer);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [order?.order_number]);
 
   async function handleSearch(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -185,9 +238,15 @@ function PedidoPage() {
             <div className="surface-card p-6">
               <div className="flex flex-col justify-between gap-3 border-b border-border pb-4 sm:flex-row sm:items-center">
                 <div>
-                  <span className="text-xs font-semibold uppercase text-muted-foreground">
-                    Estado del Pedido
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold uppercase text-muted-foreground">
+                      Estado del Pedido
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                      <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      En vivo
+                    </span>
+                  </div>
                   <h2 className="text-display text-2xl font-bold text-foreground">
                     {ORDER_STATUS_LABELS[order.status] ?? order.status}
                   </h2>

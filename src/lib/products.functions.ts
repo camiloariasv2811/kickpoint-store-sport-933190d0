@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
+import { toSafeUuid } from "./types";
 import {
   DEMO_BRANDS,
   DEMO_CATEGORIES,
@@ -79,12 +80,13 @@ function generateSlug(name: string) {
 }
 
 async function assertIsStaff(context: any) {
-  if (!isSupabaseServerConfigured() || context?.userId === "admin-demo-user") {
+  const safeUserId = toSafeUuid(context?.userId);
+  if (!isSupabaseServerConfigured() || !safeUserId || context?.userId === "admin-demo-user") {
     return;
   }
   try {
     const { data: isStaff, error } = await context.supabase.rpc("is_staff", {
-      _user_id: context.userId,
+      _user_id: safeUserId,
     });
     if (error) {
       console.warn("[assertIsStaff] RPC warning:", error.message);

@@ -45,6 +45,9 @@ function AuthPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("kp_demo_auth");
+      }
       if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -79,6 +82,9 @@ function AuthPage() {
   async function handleGoogle() {
     setLoading(true);
     try {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("kp_demo_auth");
+      }
       const redirectTo = `${window.location.origin}/auth/callback`;
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",

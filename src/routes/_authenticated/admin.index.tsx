@@ -221,7 +221,7 @@ function Dashboard() {
             <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Ventas y Cobranza
             </h2>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
               <StatCard
                 label="Ventas de hoy"
                 value={moneyExact(metrics.sales?.todayTotal ?? 0)}
@@ -241,6 +241,13 @@ function Dashboard() {
                 value={moneyExact(metrics.sales?.totalCollected ?? 0)}
                 hint={`Total generado: ${moneyExact(metrics.sales?.totalGenerated ?? 0)}`}
                 icon={CheckCircle2}
+                tone="default"
+              />
+              <StatCard
+                label="Productos vendidos"
+                value={String(metrics.sales?.totalUnitsSold ?? 0)}
+                hint="Unidades totales despachadas"
+                icon={ShoppingBag}
                 tone="default"
               />
               <StatCard
