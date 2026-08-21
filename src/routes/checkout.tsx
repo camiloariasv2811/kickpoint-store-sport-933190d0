@@ -5,10 +5,13 @@ import {
   Check,
   CheckCircle2,
   Copy,
+  FileText,
   Loader2,
   Package,
   ShoppingBag,
   Truck,
+  Upload,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -86,6 +89,12 @@ function CheckoutPage() {
   const [saving, setSaving] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
+  // Proof and Reference State
+  const [reference, setReference] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+
   const [successOrder, setSuccessOrder] = useState<{
     orderNumber: string;
     total: number;
@@ -98,13 +107,84 @@ function CheckoutPage() {
   const usdtRate = Number(storeSettings?.exchange_rate_usdt || 86.2);
   const totalBs = subtotal * usdtRate;
 
+  function handleFileSelect(selectedFile: File | null) {
+    if (!selectedFile) {
+      setProofFile(null);
+      setProofPreview(null);
+      return;
+    }
+
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      toast.error("El archivo supera el límite de 5 MB. Por favor elige una imagen más ligera.");
+      return;
+    }
+
+    const isValidType =
+      selectedFile.type.startsWith("image/") || selectedFile.type === "application/pdf";
+
+    if (!isValidType) {
+      toast.error("Formato no permitido. Por favor usa JPG, PNG, WEBP o PDF.");
+      return;
+    }
+
+    setProofFile(selectedFile);
+
+    if (selectedFile.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setProofPreview(reader.result as string);
+      };
+      reader.readAsDataURL(selectedFile);
+    } else {
+      setProofPreview(null);
+    }
+  }
+
   async function submit() {
     if (!shippingMethod) {
       toast.error("Por favor selecciona una empresa de envío (TEALCA o MRW)");
       return;
     }
+
+    if (!form.firstName.trim()) {
+      toast.error("Por favor ingresa tu nombre");
+      return;
+    }
+
+    if (!form.whatsapp.trim()) {
+      toast.error("Por favor ingresa tu número de WhatsApp");
+      return;
+    }
+
+    if (!form.city.trim() || !form.address.trim()) {
+      toast.error("Por favor ingresa la ciudad y dirección o agencia de entrega");
+      return;
+    }
+
+    if (!selected) {
+      toast.error("Por favor selecciona un método de pago");
+      return;
+    }
+
+    if (!proofFile) {
+      toast.error("Por favor adjunta la captura o recibo de tu comprobante de pago");
+      return;
+    }
+
     setSaving(true);
     try {
+      // Convert file to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const res = reader.result as string;
+          const cleanBase64 = res.includes(",") ? res.split(",")[1] : res;
+          resolve(cleanBase64);
+        };
+        reader.onerror = (err) => reject(err);
+        reader.readAsDataURL(proofFile);
+      });
+
       const result = await createOrder({
         data: {
           customer: form,
@@ -113,18 +193,28 @@ function CheckoutPage() {
           rateType: "USDT",
           exchangeRateUsed: usdtRate,
           lines: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
+          paymentProof: {
+            reference: reference.trim(),
+            fileName: proofFile.name,
+            contentType: proofFile.type || "image/jpeg",
+            dataBase64: base64,
+          },
         },
       });
+
       clear();
       setSuccessOrder({
         orderNumber: result.orderNumber,
         total: Number(result.total || subtotal),
         shippingMethod,
       });
-      toast.success("¡Pedido registrado exitosamente!", { description: result.orderNumber });
+      toast.success("¡Pedido y comprobante registrados con éxito!", {
+        description: `Orden ${result.orderNumber}`,
+      });
     } catch (error) {
+      console.error("Error al crear el pedido:", error);
       toast.error("No pudimos crear el pedido", {
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : "Intenta nuevamente.",
       });
     } finally {
       setSaving(false);
@@ -159,8 +249,7 @@ function CheckoutPage() {
               </h1>
 
               <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-                Tu orden ha sido registrada en nuestro sistema. A continuación puedes consultar el
-                seguimiento en tiempo real y subir tu comprobante de pago.
+                Tu orden ha sido registrada en nuestro sistema.
               </p>
             </div>
 
@@ -275,7 +364,9 @@ function CheckoutPage() {
     form.whatsapp.trim() &&
     form.city.trim() &&
     form.address.trim() &&
-    Boolean(shippingMethod);
+    Boolean(shippingMethod) &&
+    Boolean(selected) &&
+    Boolean(proofFile);
 
   return (
     <SiteLayout>
@@ -417,6 +508,150 @@ function CheckoutPage() {
                 </dl>
               )}
             </section>
+
+            {/* Carga Obligatoria de Comprobante de Pago y Referencia */}
+            <section className="surface-card p-5 border-2 border-primary/30">
+              <div className="flex items-center gap-2">
+                <Upload className="size-5 text-primary" />
+                <h2 className="text-display text-lg font-bold">Comprobante y Referencia de Pago</h2>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Realiza tu pago usando los datos indicados y adjunta la captura o recibo junto al
+                número de referencia para procesar tu orden.
+              </p>
+
+              <div className="mt-4 space-y-4">
+                {/* Campo Referencia */}
+                <label className="block">
+                  <span className="text-xs font-semibold text-muted-foreground">
+                    Número de Referencia Bancaria / Hash de Operación (opcional o según aplique)
+                  </span>
+                  <Input
+                    className="mt-1.5 h-11 font-mono text-sm"
+                    value={reference}
+                    placeholder="Ej: 12345678 o 00987654"
+                    onChange={(e) => setReference(e.target.value)}
+                  />
+                </label>
+
+                {/* Campo Archivo Comprobante */}
+                <div>
+                  <span className="text-xs font-semibold text-muted-foreground block mb-1.5">
+                    Captura o Recibo de Pago (JPG, PNG, WEBP o PDF) *
+                  </span>
+
+                  {!proofFile ? (
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setIsDragOver(true);
+                      }}
+                      onDragLeave={() => setIsDragOver(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setIsDragOver(false);
+                        const droppedFile = e.dataTransfer.files?.[0];
+                        if (droppedFile) handleFileSelect(droppedFile);
+                      }}
+                      className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${
+                        isDragOver
+                          ? "border-primary bg-primary/5"
+                          : "border-border hover:border-primary/50 hover:bg-surface-2/40"
+                      }`}
+                      onClick={() => {
+                        const input = document.getElementById(
+                          "checkout-proof-file",
+                        ) as HTMLInputElement;
+                        if (input) input.click();
+                      }}
+                    >
+                      <input
+                        id="checkout-proof-file"
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          handleFileSelect(file);
+                        }}
+                      />
+                      <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-2">
+                        <Upload className="size-6" />
+                      </div>
+                      <p className="text-xs font-bold text-foreground">
+                        Haz clic aquí o arrastra tu comprobante de pago
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Formatos soportados: JPG, PNG, WEBP o PDF (Máximo 5 MB)
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-border bg-surface-2/60 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {proofPreview ? (
+                            <div className="relative size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-background">
+                              <img
+                                src={proofPreview}
+                                alt="Previsualización del comprobante"
+                                className="size-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-border bg-primary/10 text-primary">
+                              <FileText className="size-8" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                              <CheckCircle2 className="size-4 shrink-0" />
+                              <span>Comprobante cargado</span>
+                            </div>
+                            <p
+                              className="truncate text-xs font-medium text-foreground mt-0.5"
+                              title={proofFile.name}
+                            >
+                              {proofFile.name}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {(proofFile.size / 1024).toFixed(0)} KB ·{" "}
+                              {proofFile.type || "Documento"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 px-2 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
+                          onClick={() => {
+                            setProofFile(null);
+                            setProofPreview(null);
+                          }}
+                        >
+                          <X className="size-4 mr-1" />
+                          Quitar
+                        </Button>
+                      </div>
+
+                      {proofPreview && (
+                        <div className="mt-3 overflow-hidden rounded-lg border border-border bg-black/5 dark:bg-black/20 p-2">
+                          <p className="text-[10px] uppercase font-semibold text-muted-foreground mb-1">
+                            Previsualización
+                          </p>
+                          <img
+                            src={proofPreview}
+                            alt="Vista previa completa"
+                            className="max-h-60 w-auto rounded object-contain mx-auto"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
           </div>
 
           {/* Resumen Lateral */}
@@ -484,12 +719,21 @@ function CheckoutPage() {
               disabled={!ready || !selected || saving}
               onClick={submit}
             >
-              {saving ? <Loader2 className="size-5 animate-spin" /> : null}
-              Confirmar pedido <ArrowRight className="size-5" />
+              {saving ? (
+                <>
+                  <Loader2 className="size-5 animate-spin mr-2" />
+                  Procesando pedido y comprobante...
+                </>
+              ) : (
+                <>
+                  Confirmar pedido <ArrowRight className="size-5 ml-1" />
+                </>
+              )}
             </Button>
             <p className="mt-2 text-center text-[0.7rem] text-muted-foreground">
-              Al confirmar, tu pedido queda registrado de inmediato en el sistema y podrás subir tu
-              comprobante de pago.
+              {!proofFile
+                ? "Adjunta tu comprobante de pago arriba para habilitar la confirmación."
+                : "Al confirmar, tu orden y comprobante quedan registrados y asociados en el sistema."}
             </p>
           </aside>
         </div>

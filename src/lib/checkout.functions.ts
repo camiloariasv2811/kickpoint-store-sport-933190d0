@@ -97,6 +97,12 @@ export type CheckoutInput = {
   rateType?: "BCV" | "USDT";
   exchangeRateUsed?: number;
   lines: { variantId: string; quantity: number }[];
+  paymentProof?: {
+    reference?: string;
+    fileName: string;
+    contentType: string;
+    dataBase64: string;
+  };
 };
 
 export const createOrder = createServerFn({ method: "POST" })
@@ -110,6 +116,18 @@ export const createOrder = createServerFn({ method: "POST" })
     if (!Array.isArray(data.lines) || data.lines.length === 0) throw new Error("Carrito vacío");
     if (data.lines.length > 60) throw new Error("Demasiados productos");
     if (!data.paymentMethod) throw new Error("Selecciona un método de pago");
+    if (data.paymentProof) {
+      if (!data.paymentProof.dataBase64) throw new Error("Falta el comprobante de pago");
+      if (data.paymentProof.dataBase64.length > 8_000_000) {
+        throw new Error("La imagen del comprobante supera 5 MB");
+      }
+      if (
+        !/^image\/(png|jpe?g|webp)$/.test(data.paymentProof.contentType) &&
+        data.paymentProof.contentType !== "application/pdf"
+      ) {
+        throw new Error("Formato de comprobante no permitido (usa JPG, PNG, WEBP o PDF)");
+      }
+    }
     return data;
   })
   .handler(async ({ data }) => {
@@ -181,11 +199,14 @@ export const createOrder = createServerFn({ method: "POST" })
 
       const randomDigits = Math.floor(100000 + Math.random() * 900000);
       const orderNumber = `KP-2026-${randomDigits}`;
+      const simulatedProofUrl = data.paymentProof
+        ? `https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600&proof=${Date.now()}`
+        : null;
 
       const newOrder: InMemoryOrder = {
         id: `ord-${Date.now()}`,
         order_number: orderNumber,
-        status: "pedido_recibido",
+        status: data.paymentProof ? "pago_pendiente" : "pedido_recibido",
         channel: "online",
         payment_method_code: data.paymentMethod,
         subtotal,
@@ -210,9 +231,9 @@ export const createOrder = createServerFn({ method: "POST" })
             status: "pendiente",
             amount: subtotal,
             method_code: data.paymentMethod,
-            reference: null,
-            proof_url: null,
-            proof_uploaded_at: null,
+            reference: data.paymentProof?.reference?.trim() || null,
+            proof_url: simulatedProofUrl,
+            proof_uploaded_at: data.paymentProof ? new Date().toISOString() : null,
             rejection_reason: null,
             created_at: new Date().toISOString(),
           },
@@ -325,11 +346,13 @@ export const createOrder = createServerFn({ method: "POST" })
       .single();
     if (customerError) throw new Error(customerError.message);
 
+    const initialStatus = data.paymentProof ? "pago_pendiente" : "pedido_recibido";
+
     const { data: order, error: orderError } = await supabaseAdmin
       .from("orders")
       .insert({
         customer_id: customer.id,
-        status: "pedido_recibido",
+        status: initialStatus,
         channel: "online",
         payment_method_code: data.paymentMethod,
         subtotal,
@@ -349,11 +372,37 @@ export const createOrder = createServerFn({ method: "POST" })
     );
     if (itemsError) throw new Error(itemsError.message);
 
+    let proofStoragePath: string | null = null;
+    if (data.paymentProof) {
+      const bytes = Buffer.from(data.paymentProof.dataBase64, "base64");
+      const ext =
+        data.paymentProof.contentType === "application/pdf"
+          ? "pdf"
+          : data.paymentProof.contentType.split("/")[1] || "jpg";
+      proofStoragePath = `${order.order_number}/${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from("comprobantes")
+        .upload(proofStoragePath, bytes, {
+          contentType: data.paymentProof.contentType,
+          upsert: false,
+        });
+
+      if (uploadError) {
+        // Rollback created order if proof upload fails
+        await supabaseAdmin.from("orders").delete().eq("id", order.id);
+        throw new Error(`Error al almacenar el comprobante de pago: ${uploadError.message}`);
+      }
+    }
+
     const { error: paymentError } = await supabaseAdmin.from("payments").insert({
       order_id: order.id,
       method_code: data.paymentMethod,
       amount: subtotal,
       status: "pendiente",
+      reference: data.paymentProof?.reference?.trim().slice(0, 120) || null,
+      proof_url: proofStoragePath,
+      proof_uploaded_at: proofStoragePath ? new Date().toISOString() : null,
     });
     if (paymentError) throw new Error(paymentError.message);
 
