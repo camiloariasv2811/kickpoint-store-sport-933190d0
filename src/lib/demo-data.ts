@@ -736,3 +736,98 @@ export function getInMemoryBadges(): { pendingOrders: number; pendingPayments: n
 
   return { pendingOrders, pendingPayments };
 }
+
+let _inMemorySettings: any = {
+  whatsapp: "+58 412 1234567",
+  shipping_flat: 0,
+  exchange_rate_bcv: 78.5,
+  exchange_rate_usdt: 86.2,
+  exchange_rate_bs: 78.5,
+  low_stock_threshold: 5,
+};
+
+let _inMemoryPaymentMethods: any[] = [
+  {
+    id: "pm-1",
+    code: "pago_movil",
+    name: "Pago Móvil (BDV / Banesco)",
+    active: true,
+    sort_order: 1,
+    instructions:
+      "Banco: Banesco (0134) | Teléfono: 0412-1234567 | Cédula: V-12345678 | Titular: KICKPOINT C.A.",
+    details: {
+      banco: "Banesco (0134)",
+      telefono: "0412-1234567",
+      cedula: "V-12345678",
+      titular: "KICKPOINT C.A.",
+    },
+  },
+  {
+    id: "pm-2",
+    code: "zelle",
+    name: "Zelle",
+    active: true,
+    sort_order: 2,
+    instructions: "Correo: pagos@kickpointstore.com | Titular: Kickpoint Sports LLC",
+    details: {
+      email: "pagos@kickpointstore.com",
+      titular: "Kickpoint Sports LLC",
+    },
+  },
+  {
+    id: "pm-3",
+    code: "usdt",
+    name: "USDT / Binance Pay",
+    active: true,
+    sort_order: 3,
+    instructions:
+      "Red: TRC-20 | Wallet: TYDzmE2z5UaXzH89Bq2nK19481 | Memo: Binance Pay ID: 58910293",
+    details: {
+      red: "TRON (TRC-20)",
+      direccion: "TYDzmE2z5UaXzH89Bq2nK19481",
+      memo: "Binance Pay ID: 58910293",
+    },
+  },
+  {
+    id: "pm-4",
+    code: "transferencia",
+    name: "Transferencia Bancaria Nacional",
+    active: true,
+    sort_order: 4,
+    instructions:
+      "Banco: Banesco | Cuenta: 0134-0000-00-0000000000 | Titular: KICKPOINT C.A. | RIF: J-12345678-0",
+    details: {
+      banco: "Banesco Banco Universal",
+      tipo: "Corriente",
+      numero_cuenta: "0134-0000-00-0000000000",
+      titular: "KICKPOINT C.A.",
+      cedula: "J-12345678-0",
+    },
+  },
+];
+
+export function getInMemorySettings() {
+  return _inMemorySettings;
+}
+
+export function updateInMemorySettings(patch: any) {
+  _inMemorySettings = { ..._inMemorySettings, ...patch };
+  return _inMemorySettings;
+}
+
+export function getInMemoryPaymentMethods() {
+  return _inMemoryPaymentMethods;
+}
+
+export function updateInMemoryPaymentMethod(id: string, patch: any) {
+  _inMemoryPaymentMethods = _inMemoryPaymentMethods.map((m) =>
+    m.id === id ? { ...m, ...patch } : m,
+  );
+  return true;
+}
+
+export function deleteInMemoryOrder(orderId: string): boolean {
+  const initialLength = _inMemoryOrders.length;
+  _inMemoryOrders = _inMemoryOrders.filter((o) => o.id !== orderId);
+  return _inMemoryOrders.length < initialLength;
+}

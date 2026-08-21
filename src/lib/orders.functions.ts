@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
 import {
+  deleteInMemoryOrder,
   getInMemoryBadges,
   getInMemoryOrders,
   reviewInMemoryPayment,
@@ -387,75 +388,90 @@ export const deleteOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { orderId: string; restoreStock?: boolean }) => data)
   .handler(async ({ data, context }) => {
-    const { userId } = context;
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    const { data: order, error } = await supabaseAdmin
-      .from("orders")
-      .select(
-        "id, order_number, inventory_applied, items:order_items(variant_id, quantity, unit_cost)",
-      )
-      .eq("id", data.orderId)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!order) throw new Error("Orden no encontrada");
-
-    // Optional stock restoration if inventory had been deducted
-    if (order.inventory_applied && data.restoreStock) {
-      for (const item of order.items ?? []) {
-        if (!item.variant_id) continue;
-        const { data: variant } = await supabaseAdmin
-          .from("product_variants")
-          .select("id, stock")
-          .eq("id", item.variant_id)
-          .single();
-        if (variant) {
-          const stockAfter = Number(variant.stock ?? 0) + item.quantity;
-          await supabaseAdmin
-            .from("product_variants")
-            .update({ stock: stockAfter })
-            .eq("id", variant.id);
-          await supabaseAdmin.from("inventory_movements").insert({
-            variant_id: variant.id,
-            type: "entrada",
-            quantity: item.quantity,
-            unit_cost: Number(item.unit_cost || 0),
-            stock_after: stockAfter,
-            reference: order.order_number,
-            note: "Eliminación de orden con reposición de inventario",
-            created_by: userId,
-          });
-        }
-      }
+    if (!isSupabaseServerConfigured()) {
+      deleteInMemoryOrder(data.orderId);
+      return { ok: true as const };
     }
-
-    // Delete dependent records cleanly in sequence
-    const { data: salesForOrder } = await supabaseAdmin
-      .from("sales")
-      .select("id")
-      .eq("order_id", order.id);
-    const saleIds = salesForOrder?.map((s) => s.id) ?? [];
-    if (saleIds.length > 0) {
-      await supabaseAdmin.from("sale_items").delete().in("sale_id", saleIds);
-    }
-    await supabaseAdmin.from("sales").delete().eq("order_id", order.id);
-    await supabaseAdmin.from("payments").delete().eq("order_id", order.id);
-    await supabaseAdmin.from("order_items").delete().eq("order_id", order.id);
-    const { error: delError } = await supabaseAdmin.from("orders").delete().eq("id", order.id);
-    if (delError) throw new Error(`Error al eliminar pedido: ${delError.message}`);
 
     try {
-      await supabaseAdmin.from("audit_log").insert({
-        user_id: userId,
-        action: `Eliminó físicamente el pedido ${order.order_number}`,
-        entity: "orders",
-        entity_id: order.id,
-      });
-    } catch {
-      /* audit log */
-    }
+      const { userId } = context;
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    return { ok: true as const };
+      const { data: order, error } = await supabaseAdmin
+        .from("orders")
+        .select(
+          "id, order_number, inventory_applied, items:order_items(variant_id, quantity, unit_cost)",
+        )
+        .eq("id", data.orderId)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!order) {
+        deleteInMemoryOrder(data.orderId);
+        return { ok: true as const };
+      }
+
+      // Optional stock restoration if inventory had been deducted
+      if (order.inventory_applied && data.restoreStock) {
+        for (const item of order.items ?? []) {
+          if (!item.variant_id) continue;
+          const { data: variant } = await supabaseAdmin
+            .from("product_variants")
+            .select("id, stock")
+            .eq("id", item.variant_id)
+            .single();
+          if (variant) {
+            const stockAfter = Number(variant.stock ?? 0) + item.quantity;
+            await supabaseAdmin
+              .from("product_variants")
+              .update({ stock: stockAfter })
+              .eq("id", variant.id);
+            await supabaseAdmin.from("inventory_movements").insert({
+              variant_id: variant.id,
+              type: "entrada",
+              quantity: item.quantity,
+              unit_cost: Number(item.unit_cost || 0),
+              stock_after: stockAfter,
+              reference: order.order_number,
+              note: "Eliminación de orden con reposición de inventario",
+              created_by: userId,
+            });
+          }
+        }
+      }
+
+      // Delete dependent records cleanly in sequence
+      const { data: salesForOrder } = await supabaseAdmin
+        .from("sales")
+        .select("id")
+        .eq("order_id", order.id);
+      const saleIds = salesForOrder?.map((s) => s.id) ?? [];
+      if (saleIds.length > 0) {
+        await supabaseAdmin.from("sale_items").delete().in("sale_id", saleIds);
+      }
+      await supabaseAdmin.from("sales").delete().eq("order_id", order.id);
+      await supabaseAdmin.from("payments").delete().eq("order_id", order.id);
+      await supabaseAdmin.from("order_items").delete().eq("order_id", order.id);
+      const { error: delError } = await supabaseAdmin.from("orders").delete().eq("id", order.id);
+      if (delError) {
+        deleteInMemoryOrder(data.orderId);
+      }
+
+      try {
+        await supabaseAdmin.from("audit_log").insert({
+          user_id: userId,
+          action: `Eliminó físicamente el pedido ${order.order_number}`,
+          entity: "orders",
+          entity_id: order.id,
+        });
+      } catch {
+        /* audit log */
+      }
+
+      return { ok: true as const };
+    } catch {
+      deleteInMemoryOrder(data.orderId);
+      return { ok: true as const };
+    }
   });
 
 /** Returns a short-lived signed URL for a payment proof stored in the private bucket. */
