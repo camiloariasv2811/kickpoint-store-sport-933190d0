@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
   Boxes,
@@ -21,38 +21,57 @@ import { Logo } from "@/components/site/Logo";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { supabase } from "@/integrations/supabase/client";
+import { getPendingAdminBadges } from "@/lib/orders.functions";
 
 const NAV = [
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { to: "/admin/pedidos", label: "Pedidos", icon: ClipboardList },
-  { to: "/admin/ventas", label: "Ventas", icon: BarChart3 },
-  { to: "/admin/inventario", label: "Inventario", icon: Boxes },
-  { to: "/admin/productos", label: "Productos", icon: ShoppingBag },
-  { to: "/admin/categorias", label: "Categorías", icon: Tags },
-  { to: "/admin/clientes", label: "Clientes", icon: Users },
-  { to: "/admin/pagos", label: "Pagos", icon: CreditCard },
-  { to: "/admin/reportes", label: "Reportes", icon: FileBarChart },
-  { to: "/admin/configuracion", label: "Configuración", icon: Settings },
+  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true, badgeKey: null },
+  { to: "/admin/pedidos", label: "Pedidos", icon: ClipboardList, badgeKey: "pendingOrders" },
+  { to: "/admin/ventas", label: "Ventas", icon: BarChart3, badgeKey: null },
+  { to: "/admin/inventario", label: "Inventario", icon: Boxes, badgeKey: null },
+  { to: "/admin/productos", label: "Productos", icon: ShoppingBag, badgeKey: null },
+  { to: "/admin/categorias", label: "Categorías", icon: Tags, badgeKey: null },
+  { to: "/admin/clientes", label: "Clientes", icon: Users, badgeKey: null },
+  { to: "/admin/pagos", label: "Pagos", icon: CreditCard, badgeKey: "pendingPayments" },
+  { to: "/admin/reportes", label: "Reportes", icon: FileBarChart, badgeKey: null },
+  { to: "/admin/configuracion", label: "Configuración", icon: Settings, badgeKey: null },
 ] as const;
 
-function NavList({ onNavigate }: { onNavigate?: () => void }) {
+function NavList({
+  onNavigate,
+  badges,
+}: {
+  onNavigate?: () => void;
+  badges?: { pendingOrders: number; pendingPayments: number };
+}) {
   return (
     <nav className="flex flex-col gap-1 p-3">
-      {NAV.map((item) => (
-        <Link
-          key={item.to}
-          to={item.to}
-          onClick={onNavigate}
-          activeOptions={{ exact: Boolean((item as { exact?: boolean }).exact) }}
-          activeProps={{
-            className: "bg-sidebar-accent text-primary border-primary/40",
-          }}
-          className="flex items-center gap-3 rounded-lg border border-transparent px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-primary"
-        >
-          <item.icon className="size-4.5 shrink-0" />
-          {item.label}
-        </Link>
-      ))}
+      {NAV.map((item) => {
+        const badgeCount =
+          item.badgeKey && badges ? badges[item.badgeKey as keyof typeof badges] : 0;
+
+        return (
+          <Link
+            key={item.to}
+            to={item.to}
+            onClick={onNavigate}
+            activeOptions={{ exact: Boolean((item as { exact?: boolean }).exact) }}
+            activeProps={{
+              className: "bg-sidebar-accent text-primary border-primary/40",
+            }}
+            className="flex items-center justify-between gap-3 rounded-lg border border-transparent px-3 py-2.5 text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-sidebar-accent hover:text-primary"
+          >
+            <div className="flex items-center gap-3">
+              <item.icon className="size-4.5 shrink-0" />
+              <span>{item.label}</span>
+            </div>
+            {badgeCount > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[11px] font-bold text-white shadow-sm animate-pulse">
+                {badgeCount}
+              </span>
+            )}
+          </Link>
+        );
+      })}
     </nav>
   );
 }
@@ -72,6 +91,12 @@ export function AdminShell({
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
 
+  const { data: badges } = useQuery({
+    queryKey: ["admin", "pending-badges"],
+    queryFn: () => getPendingAdminBadges(),
+    refetchInterval: 15000,
+  });
+
   async function signOut() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("kp_demo_auth");
@@ -90,7 +115,7 @@ export function AdminShell({
           <p className="text-eyebrow mt-1 text-[0.6rem] text-primary">Portal del vendedor</p>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <NavList />
+          <NavList badges={badges} />
         </div>
         <div className="border-t border-sidebar-border p-3">
           <Button variant="ghost" className="w-full justify-start" onClick={signOut}>
@@ -117,7 +142,7 @@ export function AdminShell({
               <div className="border-b border-sidebar-border px-5 py-5">
                 <Logo />
               </div>
-              <NavList onNavigate={() => setOpen(false)} />
+              <NavList onNavigate={() => setOpen(false)} badges={badges} />
               <div className="border-t border-sidebar-border p-3">
                 <Button variant="ghost" className="w-full justify-start" onClick={signOut}>
                   <LogOut className="size-4" /> Cerrar sesión

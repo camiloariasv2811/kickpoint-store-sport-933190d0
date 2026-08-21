@@ -265,7 +265,7 @@ function Dashboard() {
             <h2 className="mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
               Estado de Inventario
             </h2>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
               <StatCard
                 label="Unidades en stock"
                 value={(metrics.inventory?.totalUnits ?? 0).toLocaleString()}
@@ -281,9 +281,16 @@ function Dashboard() {
                 tone="default"
               />
               <StatCard
+                label="Valor al mayor"
+                value={moneyExact(metrics.inventory?.totalWholesaleValue ?? 0)}
+                hint="Potencial venta mayor"
+                icon={DollarSign}
+                tone="default"
+              />
+              <StatCard
                 label="Valor a detal"
                 value={moneyExact(metrics.inventory?.totalRetailValue ?? 0)}
-                hint="Potencial de venta total"
+                hint="Potencial de venta detal"
                 icon={DollarSign}
                 tone="default"
               />

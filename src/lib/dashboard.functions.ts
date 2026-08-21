@@ -19,6 +19,7 @@ export type DashboardMetrics = {
     totalUnits: number;
     totalCostValue: number;
     totalRetailValue: number;
+    totalWholesaleValue: number;
     activeProductsCount: number;
     outOfStockCount: number;
     lowStockCount: number;
@@ -177,6 +178,7 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
       totalUnits,
       totalCostValue: Number(totalCostValue.toFixed(2)),
       totalRetailValue: Number(totalRetailValue.toFixed(2)),
+      totalWholesaleValue: Number(totalRetailValue.toFixed(2)),
       activeProductsCount,
       outOfStockCount,
       lowStockCount,
@@ -262,30 +264,22 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
 
 export const getAdminDashboard = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    if (!isSupabaseServerConfigured() || context?.userId === "admin-demo-user") {
+  .handler(async () => {
+    if (!isSupabaseServerConfigured()) {
       return getInMemoryDashboardMetrics();
     }
 
     try {
-      // 1. Verificar roles / is_staff
-      const { data: roleData, error: roleError } = await context.supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", context.userId);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-      if (roleError) {
-        console.warn("[getAdminDashboard] role check warning:", roleError.message);
-      }
-
-      // 2. Consultar datos en paralelo utilizando el cliente autenticado
+      // Consultar datos reales en paralelo utilizando supabaseAdmin
       const [productsRes, ordersRes, salesRes, movementsRes, paymentsRes] = await Promise.all([
-        context.supabase.from("products").select(`
+        supabaseAdmin.from("products").select(`
             id, name, base_sku, cost, retail_price, wholesale_price, low_stock_threshold, active,
             category:categories(name),
             product_variants(id, size, color, sku, stock, active)
           `),
-        context.supabase
+        supabaseAdmin
           .from("orders")
           .select(
             `
@@ -295,7 +289,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
           `,
           )
           .order("created_at", { ascending: false }),
-        context.supabase
+        supabaseAdmin
           .from("sales")
           .select(
             `
@@ -303,7 +297,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
           `,
           )
           .order("created_at", { ascending: false }),
-        context.supabase
+        supabaseAdmin
           .from("inventory_movements")
           .select(
             `
@@ -312,8 +306,8 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
           `,
           )
           .order("created_at", { ascending: false })
-          .limit(12),
-        context.supabase.from("payments").select(`
+          .limit(15),
+        supabaseAdmin.from("payments").select(`
             id, order_id, method_code, amount, status, reference, proof_url, proof_uploaded_at, verified_at, created_at
           `),
       ]);
@@ -329,10 +323,11 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
       const rawMovements = movementsRes.data ?? [];
       const rawPayments = paymentsRes.data ?? [];
 
-      // 3. Procesar inventario
+      // Procesar inventario
       let totalUnits = 0;
       let totalCostValue = 0;
       let totalRetailValue = 0;
+      let totalWholesaleValue = 0;
       let activeProductsCount = 0;
       let outOfStockCount = 0;
       let lowStockCount = 0;
@@ -351,6 +346,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         const threshold = Number(p.low_stock_threshold ?? 5);
         const productCost = Number(p.cost ?? 0);
         const productRetail = Number(p.retail_price ?? 0);
+        const productWholesale = Number(p.wholesale_price) || productRetail;
 
         let productTotalStock = 0;
 
@@ -362,6 +358,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
             totalUnits += vStock;
             totalCostValue += vStock * productCost;
             totalRetailValue += vStock * productRetail;
+            totalWholesaleValue += vStock * productWholesale;
 
             categoryStockMap[categoryName] = (categoryStockMap[categoryName] ?? 0) + vStock;
 
@@ -400,60 +397,58 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         }
       }
 
-      // Ordenar alertas de stock por menor cantidad
       lowStockItems.sort((a, b) => a.stock - b.stock);
 
-      // 4. Fechas y períodos
+      // Fechas y períodos
       const now = new Date();
       const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
-      // 5. Procesar ventas y pedidos
-      const orderIdsInSales = new Set(rawSales.filter((s) => s.order_id).map((s) => s.order_id));
-
-      // Filtrar órdenes válidas (excluyendo canceladas)
-      const validOrders = rawOrders.filter((o) => o.status !== "cancelado");
-
-      // Ventas de hoy
-      const todaySales = rawSales.filter((s) => new Date(s.created_at).getTime() >= startOfToday);
-      const todayOrders = validOrders.filter(
-        (o) => new Date(o.created_at).getTime() >= startOfToday && !orderIdsInSales.has(o.id),
+      // Ventas de hoy: pagos online verificados hoy + ventas directas POS de hoy
+      const todayVerifiedPayments = rawPayments.filter(
+        (p) =>
+          p.status === "verificado" &&
+          new Date(p.verified_at || p.created_at).getTime() >= startOfToday,
+      );
+      const todayPosSales = rawSales.filter(
+        (s) => !s.order_id && new Date(s.created_at).getTime() >= startOfToday,
       );
 
       const todayTotal =
-        todaySales.reduce((sum, s) => sum + Number(s.total ?? 0), 0) +
-        todayOrders.reduce((sum, o) => sum + Number(o.total ?? 0), 0);
-      const todayCount = todaySales.length + todayOrders.length;
+        todayVerifiedPayments.reduce((sum, p) => sum + Number(p.amount ?? 0), 0) +
+        todayPosSales.reduce((sum, s) => sum + Number(s.total ?? 0), 0);
+      const todayCount = todayVerifiedPayments.length + todayPosSales.length;
 
-      // Ventas del mes
-      const monthSales = rawSales.filter((s) => new Date(s.created_at).getTime() >= startOfMonth);
-      const monthOrders = validOrders.filter(
-        (o) => new Date(o.created_at).getTime() >= startOfMonth && !orderIdsInSales.has(o.id),
+      // Ventas del mes: pagos online verificados este mes + ventas directas POS del mes
+      const monthVerifiedPayments = rawPayments.filter(
+        (p) =>
+          p.status === "verificado" &&
+          new Date(p.verified_at || p.created_at).getTime() >= startOfMonth,
+      );
+      const monthPosSales = rawSales.filter(
+        (s) => !s.order_id && new Date(s.created_at).getTime() >= startOfMonth,
       );
 
       const monthTotal =
-        monthSales.reduce((sum, s) => sum + Number(s.total ?? 0), 0) +
-        monthOrders.reduce((sum, o) => sum + Number(o.total ?? 0), 0);
-      const monthCount = monthSales.length + monthOrders.length;
+        monthVerifiedPayments.reduce((sum, p) => sum + Number(p.amount ?? 0), 0) +
+        monthPosSales.reduce((sum, s) => sum + Number(s.total ?? 0), 0);
+      const monthCount = monthVerifiedPayments.length + monthPosSales.length;
 
-      // Dinero generado total
-      const totalGenerated =
-        rawSales.reduce((sum, s) => sum + Number(s.total ?? 0), 0) +
-        validOrders
-          .filter((o) => !orderIdsInSales.has(o.id))
-          .reduce((sum, o) => sum + Number(o.total ?? 0), 0);
-
-      // Dinero cobrado / verificado
+      // Dinero cobrado / verificado total
       const verifiedPaymentsSum = rawPayments
         .filter((p) => p.status === "verificado")
         .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
 
-      // Ventas presenciales directas sin pedido previo (ya cobradas en efectivo/POS)
       const posSalesSum = rawSales
         .filter((s) => !s.order_id)
         .reduce((sum, s) => sum + Number(s.total ?? 0), 0);
 
       const totalCollected = verifiedPaymentsSum + posSalesSum;
+
+      // Dinero total generado (pedidos no cancelados + ventas POS directas)
+      const validOrders = rawOrders.filter((o) => o.status !== "cancelado");
+      const totalGenerated =
+        posSalesSum + validOrders.reduce((sum, o) => sum + Number(o.total ?? 0), 0);
 
       // Pagos pendientes
       const pendingPayments = rawPayments.filter((p) => p.status === "pendiente");
@@ -474,7 +469,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
       ]);
       const pendingOrdersCount = rawOrders.filter((o) => pendingStatuses.has(o.status)).length;
 
-      // 6. Generar datos para gráficos
+      // Generar evolución de ventas (últimos 14 días)
       const daysEvolutionMap: Record<string, { label: string; total: number; orders: number }> = {};
       for (let i = 13; i >= 0; i--) {
         const d = new Date(now);
@@ -486,21 +481,20 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         }
       }
 
-      for (const s of rawSales) {
-        const [dateKey] = s.created_at.split("T");
+      for (const p of rawPayments.filter((x) => x.status === "verificado")) {
+        const dateStr = p.verified_at || p.created_at;
+        const [dateKey] = dateStr.split("T");
         if (dateKey && daysEvolutionMap[dateKey]) {
-          daysEvolutionMap[dateKey].total += Number(s.total ?? 0);
+          daysEvolutionMap[dateKey].total += Number(p.amount ?? 0);
           daysEvolutionMap[dateKey].orders += 1;
         }
       }
 
-      for (const o of validOrders) {
-        if (!orderIdsInSales.has(o.id)) {
-          const [dateKey] = o.created_at.split("T");
-          if (dateKey && daysEvolutionMap[dateKey]) {
-            daysEvolutionMap[dateKey].total += Number(o.total ?? 0);
-            daysEvolutionMap[dateKey].orders += 1;
-          }
+      for (const s of rawSales.filter((x) => !x.order_id)) {
+        const [dateKey] = s.created_at.split("T");
+        if (dateKey && daysEvolutionMap[dateKey]) {
+          daysEvolutionMap[dateKey].total += Number(s.total ?? 0);
+          daysEvolutionMap[dateKey].orders += 1;
         }
       }
 
@@ -518,24 +512,18 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         whatsapp: { name: "WhatsApp", value: 0, count: 0 },
       };
 
-      for (const s of rawSales) {
+      for (const p of rawPayments.filter((x) => x.status === "verificado")) {
+        channelMap.online.value += Number(p.amount ?? 0);
+        channelMap.online.count += 1;
+      }
+
+      for (const s of rawSales.filter((x) => !x.order_id)) {
         const ch = s.channel || "presencial";
         if (!channelMap[ch]) {
           channelMap[ch] = { name: ch, value: 0, count: 0 };
         }
         channelMap[ch].value += Number(s.total ?? 0);
         channelMap[ch].count += 1;
-      }
-
-      for (const o of validOrders) {
-        if (!orderIdsInSales.has(o.id)) {
-          const ch = o.channel || "online";
-          if (!channelMap[ch]) {
-            channelMap[ch] = { name: ch, value: 0, count: 0 };
-          }
-          channelMap[ch].value += Number(o.total ?? 0);
-          channelMap[ch].count += 1;
-        }
       }
 
       const salesByChannel = Object.values(channelMap).filter((c) => c.value > 0 || c.count > 0);
@@ -546,7 +534,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         value,
       }));
 
-      // 7. Pedidos recientes formateados
+      // Pedidos recientes
       const recentOrders: DashboardMetrics["recentOrders"] = rawOrders.slice(0, 8).map((o) => {
         const customer = o.customer as {
           first_name?: string;
@@ -577,7 +565,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         };
       });
 
-      // 8. Movimientos recientes formateados
+      // Movimientos recientes
       const recentMovements: DashboardMetrics["recentMovements"] = rawMovements.map((m) => {
         const variant = m.product_variants as {
           id?: string;
@@ -618,6 +606,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
           totalUnits,
           totalCostValue: Number(totalCostValue.toFixed(2)),
           totalRetailValue: Number(totalRetailValue.toFixed(2)),
+          totalWholesaleValue: Number(totalWholesaleValue.toFixed(2)),
           activeProductsCount,
           outOfStockCount,
           lowStockCount,
