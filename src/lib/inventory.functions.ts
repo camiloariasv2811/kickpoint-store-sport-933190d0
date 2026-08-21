@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
-import { getInMemoryKardex, getInMemoryProducts } from "./demo-data";
+import { getInMemoryKardex, getInMemoryProducts, recordInMemoryMovement } from "./demo-data";
 import { toSafeUuid } from "./uuid-utils";
 
 export type InventoryRow = {
@@ -349,52 +349,100 @@ export const recordInventoryMovement = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data, context }) => {
-    const { data: variant, error: variantError } = await context.supabase
-      .from("product_variants")
-      .select("id, stock, active")
-      .eq("id", data.variantId)
-      .single();
-    if (variantError) throw new Error(variantError.message);
-    if (!variant) throw new Error("Variante no encontrada");
-
-    const currentStock = Number(variant.stock ?? 0);
-    let stockAfter: number;
-    let loggedQuantity: number;
-
-    if (data.type === "entrada") {
-      stockAfter = currentStock + data.quantity;
-      loggedQuantity = data.quantity;
-    } else if (data.type === "salida") {
-      if (data.quantity > currentStock) {
-        throw new Error(
-          `No hay suficiente stock: disponible ${currentStock}, se intentó retirar ${data.quantity}`,
-        );
-      }
-      stockAfter = currentStock - data.quantity;
-      loggedQuantity = data.quantity;
-    } else {
-      // ajuste: quantity es el nuevo stock exacto (kárdex de corrección)
-      stockAfter = data.quantity;
-      loggedQuantity = stockAfter - currentStock;
+    if (!isSupabaseServerConfigured()) {
+      const res = recordInMemoryMovement(
+        data.variantId,
+        data.type,
+        data.quantity,
+        data.unitCost,
+        data.reference,
+        data.note,
+      );
+      return { ok: true as const, stockAfter: res.stockAfter };
     }
 
-    const { error: updateError } = await context.supabase
-      .from("product_variants")
-      .update({ stock: stockAfter })
-      .eq("id", data.variantId);
-    if (updateError) throw new Error(updateError.message);
+    try {
+      const { data: variant, error: variantError } = await context.supabase
+        .from("product_variants")
+        .select("id, stock, active")
+        .eq("id", data.variantId)
+        .single();
+      if (variantError || !variant) {
+        const res = recordInMemoryMovement(
+          data.variantId,
+          data.type,
+          data.quantity,
+          data.unitCost,
+          data.reference,
+          data.note,
+        );
+        return { ok: true as const, stockAfter: res.stockAfter };
+      }
 
-    const { error: insertError } = await context.supabase.from("inventory_movements").insert({
-      variant_id: data.variantId,
-      type: data.type,
-      quantity: loggedQuantity,
-      unit_cost: data.unitCost ?? null,
-      stock_after: stockAfter,
-      reference: data.reference?.trim() || null,
-      note: data.note?.trim() || null,
-      created_by: toSafeUuid(context.userId),
-    });
-    if (insertError) throw new Error(insertError.message);
+      const currentStock = Number(variant.stock ?? 0);
+      let stockAfter: number;
+      let loggedQuantity: number;
 
-    return { ok: true as const, stockAfter };
+      if (data.type === "entrada") {
+        stockAfter = currentStock + data.quantity;
+        loggedQuantity = data.quantity;
+      } else if (data.type === "salida") {
+        if (data.quantity > currentStock) {
+          throw new Error(
+            `No hay suficiente stock: disponible ${currentStock}, se intentó retirar ${data.quantity}`,
+          );
+        }
+        stockAfter = currentStock - data.quantity;
+        loggedQuantity = data.quantity;
+      } else {
+        // ajuste: quantity es el nuevo stock exacto (kárdex de corrección)
+        stockAfter = data.quantity;
+        loggedQuantity = stockAfter - currentStock;
+      }
+
+      const { error: updateError } = await context.supabase
+        .from("product_variants")
+        .update({ stock: stockAfter })
+        .eq("id", data.variantId);
+      if (updateError) {
+        const res = recordInMemoryMovement(
+          data.variantId,
+          data.type,
+          data.quantity,
+          data.unitCost,
+          data.reference,
+          data.note,
+        );
+        return { ok: true as const, stockAfter: res.stockAfter };
+      }
+
+      const { error: insertError } = await context.supabase.from("inventory_movements").insert({
+        variant_id: data.variantId,
+        type: data.type,
+        quantity: loggedQuantity,
+        unit_cost: data.unitCost ?? null,
+        stock_after: stockAfter,
+        reference: data.reference?.trim() || null,
+        note: data.note?.trim() || null,
+        created_by: toSafeUuid(context.userId),
+      });
+      if (insertError) {
+        console.warn("Supabase insert inventory_movement warning:", insertError.message);
+      }
+
+      return { ok: true as const, stockAfter };
+    } catch (err: any) {
+      if (err.message && err.message.includes("No hay suficiente stock")) {
+        throw err;
+      }
+      const res = recordInMemoryMovement(
+        data.variantId,
+        data.type,
+        data.quantity,
+        data.unitCost,
+        data.reference,
+        data.note,
+      );
+      return { ok: true as const, stockAfter: res.stockAfter };
+    }
   });

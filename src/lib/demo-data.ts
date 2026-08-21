@@ -806,6 +806,168 @@ let _inMemoryPaymentMethods: any[] = [
   },
 ];
 
+let _inMemoryCategories: Category[] = [...DEMO_CATEGORIES];
+
+export function getInMemoryCategories(): Category[] {
+  return _inMemoryCategories;
+}
+
+export function addInMemoryCategory(cat: Category): Category {
+  _inMemoryCategories = [..._inMemoryCategories, cat];
+  return cat;
+}
+
+export function updateInMemoryCategory(id: string, patch: Partial<Category>): boolean {
+  const idx = _inMemoryCategories.findIndex((c) => c.id === id);
+  if (idx === -1) return false;
+  _inMemoryCategories[idx] = { ..._inMemoryCategories[idx], ...patch };
+  return true;
+}
+
+export function deleteInMemoryCategory(id: string): boolean {
+  const len = _inMemoryCategories.length;
+  _inMemoryCategories = _inMemoryCategories.filter((c) => c.id !== id);
+  return _inMemoryCategories.length < len;
+}
+
+let _inMemoryCustomers: any[] = [
+  {
+    id: "cust-demo-1",
+    first_name: "Carlos",
+    last_name: "Pérez",
+    whatsapp: "+58 412 1234567",
+    phone: "+58 412 1234567",
+    email: "carlos.perez@ejemplo.com",
+    address: "TEALCA - Calle Las Flores 12",
+    city: "Caracas",
+    state: "Distrito Capital",
+    notes: "Cliente frecuente",
+    created_at: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
+    order_count: 1,
+    total_spent: 70.0,
+  },
+  {
+    id: "cust-demo-2",
+    first_name: "Mariana",
+    last_name: "Gómez",
+    whatsapp: "+58 424 9876543",
+    phone: "+58 424 9876543",
+    email: "mariana.g@ejemplo.com",
+    address: "MRW - Av. Bolívar Nte 44",
+    city: "Valencia",
+    state: "Carabobo",
+    notes: "Cliente mayorista",
+    created_at: new Date(Date.now() - 3600000 * 24 * 10).toISOString(),
+    order_count: 1,
+    total_spent: 120.0,
+  },
+];
+
+export function getInMemoryCustomers(): any[] {
+  return _inMemoryCustomers;
+}
+
+export function addInMemoryCustomer(cust: any): any {
+  const newCust = {
+    id: `cust-${Date.now()}`,
+    created_at: new Date().toISOString(),
+    order_count: 0,
+    total_spent: 0,
+    ...cust,
+  };
+  _inMemoryCustomers = [newCust, ..._inMemoryCustomers];
+  return newCust;
+}
+
+export function updateInMemoryCustomer(id: string, patch: any): boolean {
+  const idx = _inMemoryCustomers.findIndex((c) => c.id === id);
+  if (idx === -1) return false;
+  _inMemoryCustomers[idx] = { ..._inMemoryCustomers[idx], ...patch };
+  return true;
+}
+
+let _inMemorySales: any[] = [];
+
+export function getInMemorySales(): any[] {
+  return _inMemorySales;
+}
+
+export function addInMemorySale(sale: any): any {
+  const newSale = {
+    id: `sale-${Date.now()}`,
+    sale_number: `VENTA-${Math.floor(100000 + Math.random() * 900000)}`,
+    created_at: new Date().toISOString(),
+    ...sale,
+  };
+  _inMemorySales = [newSale, ..._inMemorySales];
+  return newSale;
+}
+
+export function deleteInMemorySale(saleId: string): boolean {
+  const len = _inMemorySales.length;
+  _inMemorySales = _inMemorySales.filter((s) => s.id !== saleId);
+  return _inMemorySales.length < len;
+}
+
+export function recordInMemoryMovement(
+  variantId: string,
+  type: "entrada" | "salida" | "ajuste",
+  quantity: number,
+  unitCost?: number | null,
+  reference?: string | null,
+  note?: string | null,
+): { ok: boolean; stockAfter: number } {
+  let foundProduct: Product | undefined;
+  let foundVariant: any | undefined;
+
+  for (const p of _inMemoryProducts) {
+    const v = p.variants?.find((va) => va.id === variantId);
+    if (v) {
+      foundProduct = p;
+      foundVariant = v;
+      break;
+    }
+  }
+
+  const currentStock = Number(foundVariant?.stock ?? 0);
+  let stockAfter: number;
+  let loggedQuantity: number;
+
+  if (type === "entrada") {
+    stockAfter = currentStock + quantity;
+    loggedQuantity = quantity;
+  } else if (type === "salida") {
+    stockAfter = Math.max(0, currentStock - quantity);
+    loggedQuantity = quantity;
+  } else {
+    stockAfter = Math.max(0, quantity);
+    loggedQuantity = stockAfter - currentStock;
+  }
+
+  if (foundVariant) {
+    foundVariant.stock = stockAfter;
+  }
+
+  _inMemoryKardex = [
+    {
+      id: `k-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      productName: foundProduct?.name ?? "Producto",
+      size: foundVariant?.size ?? null,
+      color: foundVariant?.color ?? null,
+      sku: foundVariant?.sku ?? foundProduct?.base_sku ?? null,
+      type,
+      quantity: loggedQuantity,
+      stockAfter,
+      reference: reference ?? null,
+      note: note ?? null,
+      createdAt: new Date().toISOString(),
+    },
+    ..._inMemoryKardex,
+  ];
+
+  return { ok: true, stockAfter };
+}
+
 export function getInMemorySettings() {
   return _inMemorySettings;
 }
