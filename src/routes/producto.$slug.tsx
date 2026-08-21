@@ -19,7 +19,10 @@ export const Route = createFileRoute("/producto/$slug")({
   head: ({ loaderData }) => {
     if (!loaderData) {
       return {
-        meta: [{ title: "Producto no disponible | KICKPOINT" }, { name: "robots", content: "noindex" }],
+        meta: [
+          { title: "Producto no disponible | KICKPOINT" },
+          { name: "robots", content: "noindex" },
+        ],
       };
     }
     const p = loaderData.product;
@@ -88,8 +91,7 @@ function ProductPage() {
   const [imageIndex, setImageIndex] = useState(0);
 
   const variant = product.variants.find((v) => v.id === variantId) ?? null;
-  const wholesaleActive =
-    Boolean(product.wholesale_price) && qty >= product.wholesale_min_qty;
+  const wholesaleActive = Boolean(product.wholesale_price) && qty >= product.wholesale_min_qty;
   const unit = wholesaleActive ? Number(product.wholesale_price) : Number(product.retail_price);
   const stock = totalStock(product);
 

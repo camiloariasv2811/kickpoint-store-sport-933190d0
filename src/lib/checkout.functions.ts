@@ -242,7 +242,10 @@ export const uploadPaymentProof = createServerFn({ method: "POST" })
         throw new Error("Número de pedido inválido");
       if (!data.dataBase64) throw new Error("Falta el comprobante");
       if (data.dataBase64.length > 8_000_000) throw new Error("La imagen supera 5 MB");
-      if (!/^image\/(png|jpe?g|webp)$/.test(data.contentType) && data.contentType !== "application/pdf")
+      if (
+        !/^image\/(png|jpe?g|webp)$/.test(data.contentType) &&
+        data.contentType !== "application/pdf"
+      )
         throw new Error("Formato no permitido (usa JPG, PNG, WEBP o PDF)");
       return { ...data, orderNumber: data.orderNumber.toUpperCase() };
     },

@@ -61,7 +61,13 @@ function SectionHeader({ title, eyebrow }: { title: string; eyebrow?: string }) 
   );
 }
 
-function ProductRow({ products, loading }: { products: ReturnType<typeof useProducts>["data"]; loading: boolean }) {
+function ProductRow({
+  products,
+  loading,
+}: {
+  products: ReturnType<typeof useProducts>["data"];
+  loading: boolean;
+}) {
   if (loading) {
     return (
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
@@ -222,14 +228,18 @@ function Home() {
               distribuidores. Precios especiales a partir de 8 unidades y stock real disponible.
             </p>
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {["Revendedores", "Tiendas deportivas", "Emprendedores", "Tiendas online", "Distribuidores"].map(
-                (t) => (
-                  <div key={t} className="flex items-center gap-2 text-sm">
-                    <Store className="size-4 shrink-0 text-primary" />
-                    <span className="text-muted-foreground">{t}</span>
-                  </div>
-                ),
-              )}
+              {[
+                "Revendedores",
+                "Tiendas deportivas",
+                "Emprendedores",
+                "Tiendas online",
+                "Distribuidores",
+              ].map((t) => (
+                <div key={t} className="flex items-center gap-2 text-sm">
+                  <Store className="size-4 shrink-0 text-primary" />
+                  <span className="text-muted-foreground">{t}</span>
+                </div>
+              ))}
             </div>
             <Button asChild variant="hero" size="xl" className="mt-8">
               <Link to="/mayor">

@@ -23,7 +23,8 @@ type Search = {
 export const Route = createFileRoute("/catalogo")({
   validateSearch: (search: Record<string, unknown>): Search => ({
     q: typeof search["q"] === "string" ? (search["q"] as string) : undefined,
-    categoria: typeof search["categoria"] === "string" ? (search["categoria"] as string) : undefined,
+    categoria:
+      typeof search["categoria"] === "string" ? (search["categoria"] as string) : undefined,
     marca: typeof search["marca"] === "string" ? (search["marca"] as string) : undefined,
     talla: typeof search["talla"] === "string" ? (search["talla"] as string) : undefined,
     max: search["max"] ? Number(search["max"]) : undefined,
@@ -120,7 +121,8 @@ function Catalogo() {
           (p.description ?? "").toLowerCase().includes(q),
       );
     }
-    if (categorySlugs) list = list.filter((p) => p.category && categorySlugs.includes(p.category.slug));
+    if (categorySlugs)
+      list = list.filter((p) => p.category && categorySlugs.includes(p.category.slug));
     if (search.marca) list = list.filter((p) => p.brand?.slug === search.marca);
     if (search.talla)
       list = list.filter((p) => p.variants.some((v) => v.size === search.talla && v.stock > 0));
@@ -216,7 +218,9 @@ function Catalogo() {
                 <Chip
                   key={o.value}
                   active={search.orden === o.value}
-                  onClick={() => setSearch({ orden: search.orden === o.value ? undefined : o.value })}
+                  onClick={() =>
+                    setSearch({ orden: search.orden === o.value ? undefined : o.value })
+                  }
                 >
                   {o.label}
                 </Chip>
@@ -247,8 +251,7 @@ function Catalogo() {
             Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="aspect-[3/4] rounded-xl" />
             ))}
-          {!isLoading &&
-            filtered.map((p) => <ProductCard key={p.id} product={p} />)}
+          {!isLoading && filtered.map((p) => <ProductCard key={p.id} product={p} />)}
         </div>
 
         {!isLoading && filtered.length === 0 && (

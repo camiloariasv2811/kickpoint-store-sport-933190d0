@@ -7,10 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/auth/callback")({
   ssr: false,
   head: () => ({
-    meta: [
-      { title: "Verificando acceso | KICKPOINT" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Verificando acceso | KICKPOINT" }, { name: "robots", content: "noindex" }],
   }),
   component: AuthCallbackPage,
 });

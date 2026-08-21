@@ -46,7 +46,9 @@ function Categorias() {
 
         <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {isLoading &&
-            Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-48 rounded-xl" />)}
+            Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-48 rounded-xl" />
+            ))}
 
           {roots.map((root) => {
             const children = (categories ?? []).filter((c) => c.parent_id === root.id);

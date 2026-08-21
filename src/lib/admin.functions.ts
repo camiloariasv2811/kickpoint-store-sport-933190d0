@@ -20,7 +20,9 @@ export const claimAdminIfFirst = createServerFn({ method: "POST" })
       .insert({ user_id: context.userId, role: "admin" });
     if (insertError) {
       if (insertError.code === "42501") {
-        throw new Error("No se pudo asignar el rol de administrador por permisos RLS. Configura SUPABASE_SERVICE_ROLE_KEY en el servidor o asigna el rol en user_roles.");
+        throw new Error(
+          "No se pudo asignar el rol de administrador por permisos RLS. Configura SUPABASE_SERVICE_ROLE_KEY en el servidor o asigna el rol en user_roles.",
+        );
       }
       throw new Error(insertError.message);
     }
