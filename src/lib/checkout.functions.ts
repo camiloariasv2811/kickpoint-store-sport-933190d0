@@ -113,6 +113,11 @@ export const createOrder = createServerFn({ method: "POST" })
       .in("id", ids);
     if (variantError) throw new Error(variantError.message);
 
+    const totalOrderUnits = data.lines.reduce(
+      (sum, l) => sum + Math.max(1, Math.floor(l.quantity)),
+      0,
+    );
+
     const items = data.lines.map((line) => {
       const variant = (variants ?? []).find((v) => v.id === line.variantId) as
         | {
@@ -141,10 +146,9 @@ export const createOrder = createServerFn({ method: "POST" })
         throw new Error(`Stock insuficiente para ${variant.product.name} talla ${variant.size}`);
 
       const wholesale = variant.product.wholesale_price;
-      const unit =
-        wholesale && quantity >= variant.product.wholesale_min_qty
-          ? Number(wholesale)
-          : Number(variant.product.retail_price);
+      const minQty = variant.product.wholesale_min_qty || 6;
+      const isItemWholesale = Boolean(wholesale && totalOrderUnits >= minQty);
+      const unit = isItemWholesale ? Number(wholesale) : Number(variant.product.retail_price);
 
       return {
         variant_id: variant.id,
@@ -157,19 +161,33 @@ export const createOrder = createServerFn({ method: "POST" })
         unit_cost: Number(variant.product.cost ?? 0),
         quantity,
         subtotal: Number((unit * quantity).toFixed(2)),
-        isWholesale: Boolean(wholesale && quantity >= variant.product.wholesale_min_qty),
+        isWholesale: isItemWholesale,
       };
     });
 
     const subtotal = Number(items.reduce((sum, i) => sum + i.subtotal, 0).toFixed(2));
 
-    const rateType = data.rateType || "BCV";
-    const exchangeRate = Number(data.exchangeRateUsed || 78.5);
-    const totalBs = Number((subtotal * exchangeRate).toFixed(2));
+    // Consult configured store settings for authoritative USDT rate
+    let usdtRate = Number(data.exchangeRateUsed || 86.2);
+    try {
+      const { data: st } = await supabaseAdmin
+        .from("store_settings")
+        .select("exchange_rate_usdt")
+        .limit(1)
+        .maybeSingle();
+      if (st?.exchange_rate_usdt) {
+        usdtRate = Number(st.exchange_rate_usdt);
+      }
+    } catch {
+      /* fallback */
+    }
+
+    const rateType = "USDT";
+    const totalBs = Number((subtotal * usdtRate).toFixed(2));
 
     const formattedNotes = [
       `[Envío: ${data.shippingMethod}]`,
-      `[Cotización: Tasa ${rateType} a Bs. ${exchangeRate.toFixed(2)} / USD | Total Bs. ${totalBs.toLocaleString("es-VE", { minimumFractionDigits: 2 })}]`,
+      `[Cotización: Tasa USDT a Bs. ${usdtRate.toFixed(2)} / USD | Total Bs. ${totalBs.toLocaleString("es-VE", { minimumFractionDigits: 2 })}]`,
       data.customer.notes?.trim() ? `Nota cliente: ${data.customer.notes.trim()}` : "",
     ]
       .filter(Boolean)

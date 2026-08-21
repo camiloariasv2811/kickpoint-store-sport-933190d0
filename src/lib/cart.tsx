@@ -20,6 +20,8 @@ type CartContextValue = {
   count: number;
   subtotal: number;
   savings: number;
+  isWholesale: boolean;
+  getLineUnitPrice: (line: CartLine) => number;
   addLine: (line: CartLine) => void;
   setQuantity: (variantId: string, quantity: number) => void;
   removeLine: (variantId: string) => void;
@@ -29,9 +31,10 @@ type CartContextValue = {
 const STORAGE_KEY = "kickpoint.cart.v1";
 const CartContext = createContext<CartContextValue | null>(null);
 
-export function unitPrice(line: CartLine) {
-  const totalUnits = line.quantity;
-  if (line.wholesalePrice && totalUnits >= line.wholesaleMinQty) return Number(line.wholesalePrice);
+export function unitPrice(line: CartLine, totalUnits?: number) {
+  const effectiveUnits = typeof totalUnits === "number" ? totalUnits : line.quantity;
+  const minQty = line.wholesaleMinQty || 6;
+  if (line.wholesalePrice && effectiveUnits >= minQty) return Number(line.wholesalePrice);
   return Number(line.retailPrice);
 }
 
@@ -55,13 +58,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [lines, hydrated]);
 
   const value = useMemo<CartContextValue>(() => {
-    const subtotal = lines.reduce((sum, l) => sum + unitPrice(l) * l.quantity, 0);
+    const totalCount = lines.reduce((sum, l) => sum + l.quantity, 0);
+    const subtotal = lines.reduce((sum, l) => sum + unitPrice(l, totalCount) * l.quantity, 0);
     const retailTotal = lines.reduce((sum, l) => sum + Number(l.retailPrice) * l.quantity, 0);
+    const isWholesale = lines.some(
+      (l) => l.wholesalePrice && totalCount >= (l.wholesaleMinQty || 6),
+    );
+
     return {
       lines,
-      count: lines.reduce((sum, l) => sum + l.quantity, 0),
+      count: totalCount,
       subtotal,
       savings: Math.max(0, retailTotal - subtotal),
+      isWholesale,
+      getLineUnitPrice: (line: CartLine) => unitPrice(line, totalCount),
       addLine: (line) =>
         setLines((prev) => {
           const existing = prev.find((l) => l.variantId === line.variantId);

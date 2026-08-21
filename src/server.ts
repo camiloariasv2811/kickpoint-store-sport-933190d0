@@ -8,8 +8,18 @@ const handleRequest = createStartHandler(defaultStreamHandler);
 
 // h3 swallows in-handler throws into a normal 500 Response with body
 // {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
-async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
+async function normalizeCatastrophicSsrResponse(
+  response: Response,
+  request: Request,
+): Promise<Response> {
   if (response.status < 500) return response;
+  const acceptHeader = request.headers.get("accept") ?? "";
+  const isHtmlExpected = acceptHeader.includes("text/html");
+
+  if (!isHtmlExpected) {
+    return response;
+  }
+
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) return response;
 
@@ -36,9 +46,19 @@ export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
       const response = await handleRequest(request);
-      return await normalizeCatastrophicSsrResponse(response);
+      return await normalizeCatastrophicSsrResponse(response, request);
     } catch (error) {
       console.error(error);
+      const acceptHeader = request.headers.get("accept") ?? "";
+      if (!acceptHeader.includes("text/html")) {
+        return new Response(
+          JSON.stringify({ error: "Internal Server Error", message: String(error) }),
+          {
+            status: 500,
+            headers: { "content-type": "application/json; charset=utf-8" },
+          },
+        );
+      }
       return new Response(renderErrorPage(), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },

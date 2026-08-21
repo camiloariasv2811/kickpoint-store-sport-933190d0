@@ -26,7 +26,7 @@ import { moneyExact, whatsappLink } from "@/lib/format";
 
 export const Route = createFileRoute("/pedido")({
   validateSearch: (search: Record<string, unknown>) => ({
-    code: typeof search.code === "string" ? search.code : "",
+    code: typeof search.code === "string" && search.code.trim() ? search.code.trim() : undefined,
   }),
   head: () => ({
     meta: [

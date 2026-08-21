@@ -33,29 +33,39 @@ const FALLBACK_SUPABASE_URL = "https://riufpjmiasquyslutkbp.supabase.co";
 const FALLBACK_SUPABASE_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJpdWZwam1pYXNxdXlzbHV0a2JwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAwMDAwMDAwMH0.dummy-anon-key";
 
-function getEnvVar(key: string, viteKey?: string): string | undefined {
-  if (viteKey && typeof import.meta !== "undefined" && import.meta.env?.[viteKey]) {
-    return import.meta.env[viteKey];
+function getSupabaseUrl(): string {
+  const viteVal =
+    typeof import.meta !== "undefined" ? import.meta.env?.VITE_SUPABASE_URL : undefined;
+  if (viteVal) return viteVal;
+  if (typeof process !== "undefined") {
+    return process.env?.SUPABASE_URL || process.env?.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL;
   }
-  if (typeof process !== "undefined" && process.env?.[key]) {
-    return process.env[key];
+  return FALLBACK_SUPABASE_URL;
+}
+
+function getSupabaseKey(): string {
+  const viteVal =
+    typeof import.meta !== "undefined" ? import.meta.env?.VITE_SUPABASE_PUBLISHABLE_KEY : undefined;
+  if (viteVal) return viteVal;
+  if (typeof process !== "undefined") {
+    return (
+      process.env?.SUPABASE_PUBLISHABLE_KEY ||
+      process.env?.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      FALLBACK_SUPABASE_KEY
+    );
   }
-  if (viteKey && typeof process !== "undefined" && process.env?.[viteKey]) {
-    return process.env[viteKey];
-  }
-  return undefined;
+  return FALLBACK_SUPABASE_KEY;
 }
 
 export function isSupabaseConfigured(): boolean {
-  const url = getEnvVar("SUPABASE_URL", "VITE_SUPABASE_URL");
-  const key = getEnvVar("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY");
+  const url = getSupabaseUrl();
+  const key = getSupabaseKey();
   return Boolean(url && key && !key.includes("dummy-anon-key"));
 }
 
 function createSupabaseClient() {
-  const SUPABASE_URL = getEnvVar("SUPABASE_URL", "VITE_SUPABASE_URL") || FALLBACK_SUPABASE_URL;
-  const SUPABASE_PUBLISHABLE_KEY =
-    getEnvVar("SUPABASE_PUBLISHABLE_KEY", "VITE_SUPABASE_PUBLISHABLE_KEY") || FALLBACK_SUPABASE_KEY;
+  const SUPABASE_URL = getSupabaseUrl();
+  const SUPABASE_PUBLISHABLE_KEY = getSupabaseKey();
 
   if (!isSupabaseConfigured()) {
     console.warn(

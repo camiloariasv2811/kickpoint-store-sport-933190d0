@@ -50,7 +50,7 @@ const FIELDS: readonly {
 
 function CheckoutPage() {
   const navigate = useNavigate();
-  const { lines, subtotal, savings, clear } = useCart();
+  const { lines, count, subtotal, savings, getLineUnitPrice, clear } = useCart();
 
   const { data: methods } = useQuery({
     queryKey: ["payment-methods"],
@@ -73,19 +73,14 @@ function CheckoutPage() {
     notes: "",
   });
   const [shippingMethod, setShippingMethod] = useState<"TEALCA" | "MRW">("MRW");
-  const [rateType, setRateType] = useState<"BCV" | "USDT">("BCV");
   const [method, setMethod] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   const selected = method || methods?.[0]?.code || "";
   const activeMethod = methods?.find((m) => m.code === selected);
 
-  const bcvRate = Number(
-    storeSettings?.exchange_rate_bcv || storeSettings?.exchange_rate_bs || 78.5,
-  );
   const usdtRate = Number(storeSettings?.exchange_rate_usdt || 86.2);
-  const currentRate = rateType === "BCV" ? bcvRate : usdtRate;
-  const totalBs = subtotal * currentRate;
+  const totalBs = subtotal * usdtRate;
 
   async function submit() {
     if (!shippingMethod) {
@@ -99,8 +94,8 @@ function CheckoutPage() {
           customer: form,
           shippingMethod,
           paymentMethod: selected,
-          rateType,
-          exchangeRateUsed: currentRate,
+          rateType: "USDT",
+          exchangeRateUsed: usdtRate,
           lines: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
         },
       });
@@ -293,13 +288,15 @@ function CheckoutPage() {
                       Talla {l.size} × {l.quantity}
                     </span>
                   </span>
-                  <span className="font-semibold">{moneyExact(unitPrice(l) * l.quantity)}</span>
+                  <span className="font-semibold">
+                    {moneyExact(getLineUnitPrice(l) * l.quantity)}
+                  </span>
                 </li>
               ))}
             </ul>
             {savings > 0 && (
               <p className="mt-4 text-sm font-semibold text-primary">
-                Ahorro al mayor {moneyExact(savings)}
+                Ahorro al mayor ({count} uds.): -{moneyExact(savings)}
               </p>
             )}
 
@@ -309,42 +306,19 @@ function CheckoutPage() {
               <span className="text-display text-2xl text-primary">{moneyExact(subtotal)}</span>
             </div>
 
-            {/* Selector de Tasa y Cálculo en Bolívares */}
+            {/* Conversión a Bolívares usando exclusivamente la Tasa USDT */}
             <div className="mt-4 rounded-xl border border-border bg-surface-2/60 p-3.5 text-xs space-y-2.5">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-foreground">Conversión a Bolívares (Bs.)</span>
-                <span className="text-[10px] text-muted-foreground">Selecciona tasa</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5 bg-background/80 p-1 rounded-lg border border-border">
-                <button
-                  type="button"
-                  onClick={() => setRateType("BCV")}
-                  className={`rounded py-1 font-semibold text-center transition-all ${
-                    rateType === "BCV"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Tasa BCV
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRateType("USDT")}
-                  className={`rounded py-1 font-semibold text-center transition-all ${
-                    rateType === "USDT"
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Tasa USDT
-                </button>
+                <span className="rounded bg-primary/10 px-2 py-0.5 font-bold text-[10px] text-primary">
+                  Tasa USDT Oficial
+                </span>
               </div>
 
               <div className="flex justify-between items-center text-muted-foreground pt-1">
-                <span>Tasa seleccionada:</span>
-                <span className="font-medium text-foreground">
-                  {rateType} (Bs. {currentRate.toFixed(2)})
+                <span>Tasa de cambio:</span>
+                <span className="font-semibold text-foreground font-mono">
+                  Bs. {usdtRate.toFixed(2)} / USD
                 </span>
               </div>
 

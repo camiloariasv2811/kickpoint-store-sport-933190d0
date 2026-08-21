@@ -25,7 +25,16 @@ export const Route = createFileRoute("/carrito")({
 });
 
 function CartPage() {
-  const { lines, subtotal, savings, setQuantity, removeLine } = useCart();
+  const {
+    lines,
+    count,
+    subtotal,
+    savings,
+    isWholesale,
+    getLineUnitPrice,
+    setQuantity,
+    removeLine,
+  } = useCart();
 
   return (
     <SiteLayout>
@@ -47,79 +56,88 @@ function CartPage() {
         ) : (
           <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
             <div className="space-y-3">
-              {lines.map((line) => (
-                <div key={line.variantId} className="surface-card flex gap-4 p-4">
-                  <Link
-                    to="/producto/$slug"
-                    params={{ slug: line.slug }}
-                    className="size-24 shrink-0 overflow-hidden rounded-lg bg-surface-2"
-                  >
-                    {line.image && (
-                      <img
-                        src={line.image}
-                        alt={line.name}
-                        loading="lazy"
-                        className="size-full object-cover"
-                      />
-                    )}
-                  </Link>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <Link
-                          to="/producto/$slug"
-                          params={{ slug: line.slug }}
-                          className="font-semibold hover:text-primary"
-                        >
-                          {line.name}
-                        </Link>
-                        <p className="text-xs text-muted-foreground">
-                          Talla {line.size}
-                          {line.color ? ` · ${line.color}` : ""}
-                        </p>
-                      </div>
-                      <button
-                        aria-label="Eliminar"
-                        onClick={() => removeLine(line.variantId)}
-                        className="text-muted-foreground transition-colors hover:text-destructive"
-                      >
-                        <Trash2 className="size-4" />
-                      </button>
-                    </div>
+              {lines.map((line) => {
+                const linePrice = getLineUnitPrice(line);
+                const isItemWholesale = Boolean(
+                  line.wholesalePrice && count >= (line.wholesaleMinQty || 6),
+                );
 
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center rounded-lg border border-border">
+                return (
+                  <div key={line.variantId} className="surface-card flex gap-4 p-4">
+                    <Link
+                      to="/producto/$slug"
+                      params={{ slug: line.slug }}
+                      className="size-24 shrink-0 overflow-hidden rounded-lg bg-surface-2"
+                    >
+                      {line.image && (
+                        <img
+                          src={line.image}
+                          alt={line.name}
+                          loading="lazy"
+                          className="size-full object-cover"
+                        />
+                      )}
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <Link
+                            to="/producto/$slug"
+                            params={{ slug: line.slug }}
+                            className="font-semibold hover:text-primary"
+                          >
+                            {line.name}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">
+                            Talla {line.size}
+                            {line.color ? ` · ${line.color}` : ""}
+                          </p>
+                        </div>
                         <button
-                          aria-label="Disminuir"
-                          onClick={() => setQuantity(line.variantId, line.quantity - 1)}
-                          className="flex size-10 items-center justify-center text-muted-foreground hover:text-primary"
+                          aria-label="Eliminar"
+                          onClick={() => removeLine(line.variantId)}
+                          className="text-muted-foreground transition-colors hover:text-destructive"
                         >
-                          <Minus className="size-4" />
-                        </button>
-                        <span className="w-8 text-center font-bold">{line.quantity}</span>
-                        <button
-                          aria-label="Aumentar"
-                          onClick={() => setQuantity(line.variantId, line.quantity + 1)}
-                          className="flex size-10 items-center justify-center text-muted-foreground hover:text-primary"
-                        >
-                          <Plus className="size-4" />
+                          <Trash2 className="size-4" />
                         </button>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-muted-foreground">
-                          {money(unitPrice(line))} c/u
-                          {line.wholesalePrice && line.quantity >= line.wholesaleMinQty
-                            ? " · precio al mayor"
-                            : ""}
-                        </p>
-                        <p className="text-lg font-bold text-primary">
-                          {moneyExact(unitPrice(line) * line.quantity)}
-                        </p>
+
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center rounded-lg border border-border">
+                          <button
+                            aria-label="Disminuir"
+                            onClick={() => setQuantity(line.variantId, line.quantity - 1)}
+                            className="flex size-10 items-center justify-center text-muted-foreground hover:text-primary"
+                          >
+                            <Minus className="size-4" />
+                          </button>
+                          <span className="w-8 text-center font-bold">{line.quantity}</span>
+                          <button
+                            aria-label="Aumentar"
+                            onClick={() => setQuantity(line.variantId, line.quantity + 1)}
+                            className="flex size-10 items-center justify-center text-muted-foreground hover:text-primary"
+                          >
+                            <Plus className="size-4" />
+                          </button>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-muted-foreground">
+                            {money(linePrice)} c/u
+                            {isItemWholesale ? (
+                              <span className="ml-1 font-semibold text-primary">
+                                · precio al mayor ({count} uds. totales)
+                              </span>
+                            ) : null}
+                          </p>
+                          <p className="text-lg font-bold text-primary">
+                            {moneyExact(linePrice * line.quantity)}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <aside className="surface-card h-fit p-5 lg:sticky lg:top-24">
@@ -127,11 +145,11 @@ function CartPage() {
               <div className="mt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Productos</span>
-                  <span>{lines.reduce((s, l) => s + l.quantity, 0)} unidades</span>
+                  <span>{count} unidades</span>
                 </div>
                 {savings > 0 && (
-                  <div className="flex justify-between text-primary">
-                    <span>Descuento por cantidad</span>
+                  <div className="flex justify-between text-primary font-semibold">
+                    <span>Descuento al mayor ({count} uds.)</span>
                     <span>-{moneyExact(savings)}</span>
                   </div>
                 )}

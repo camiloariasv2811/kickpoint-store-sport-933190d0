@@ -1,5 +1,6 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
 import { isNotFound, isRedirect } from "@tanstack/react-router";
+import { getRequest } from "@tanstack/react-start/server";
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
@@ -17,6 +18,22 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
     ) {
       throw error;
     }
+
+    let isServerFn = false;
+    let isHtmlExpected = true;
+    try {
+      const req = getRequest();
+      const accept = req?.headers?.get("accept") ?? "";
+      isHtmlExpected = accept.includes("text/html");
+      isServerFn = Boolean(req?.headers?.get("x-ts-server-fn") || req?.url?.includes("_serverFn"));
+    } catch {
+      // ignore
+    }
+
+    if (isServerFn || !isHtmlExpected) {
+      throw error;
+    }
+
     console.error("[TanStack Start SSR Error]:", error);
     return new Response(renderErrorPage(), {
       status: 500,

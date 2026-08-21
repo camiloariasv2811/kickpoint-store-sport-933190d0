@@ -15,7 +15,7 @@ import { unitPrice, useCart } from "@/lib/cart";
 import { money, moneyExact } from "@/lib/format";
 
 export function CartSheet({ children }: { children: React.ReactNode }) {
-  const { lines, subtotal, savings, setQuantity, removeLine } = useCart();
+  const { lines, count, subtotal, savings, getLineUnitPrice, setQuantity, removeLine } = useCart();
 
   return (
     <Sheet>
@@ -79,10 +79,10 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-primary">
-                      {moneyExact(unitPrice(line) * line.quantity)}
+                      {moneyExact(getLineUnitPrice(line) * line.quantity)}
                     </p>
                     <p className="text-[0.65rem] text-muted-foreground">
-                      {money(unitPrice(line))} c/u
+                      {money(getLineUnitPrice(line))} c/u
                     </p>
                   </div>
                   <button
