@@ -95,7 +95,15 @@ export function AdminShell({
 
   const { data: badges } = useQuery({
     queryKey: ["admin", "pending-badges"],
-    queryFn: () => getPendingAdminBadges(),
+    queryFn: async () => {
+      try {
+        const res = await getPendingAdminBadges();
+        return res ?? { pendingOrders: 0, pendingPayments: 0 };
+      } catch (err) {
+        console.warn("[AdminShell] Error fetching badges:", err);
+        return { pendingOrders: 0, pendingPayments: 0 };
+      }
+    },
     refetchInterval: 15000,
   });
 

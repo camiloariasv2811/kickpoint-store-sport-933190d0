@@ -86,15 +86,42 @@ function Catalogo() {
   const setSearch = (patch: Partial<Search>) =>
     navigate({ search: (prev) => ({ ...prev, ...patch }) });
 
-  const { data: products, isLoading } = useQuery({
+  const { data: products = [], isLoading } = useQuery({
     queryKey: ["products"],
-    queryFn: () => listProducts(),
+    queryFn: async () => {
+      try {
+        const res = await listProducts();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[Catalogo] Error loading products:", err);
+        return [];
+      }
+    },
   });
-  const { data: categories } = useQuery({
+  const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
-    queryFn: () => listCategories(),
+    queryFn: async () => {
+      try {
+        const res = await listCategories();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[Catalogo] Error loading categories:", err);
+        return [];
+      }
+    },
   });
-  const { data: brands } = useQuery({ queryKey: ["brands"], queryFn: () => listBrands() });
+  const { data: brands = [] } = useQuery({
+    queryKey: ["brands"],
+    queryFn: async () => {
+      try {
+        const res = await listBrands();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[Catalogo] Error loading brands:", err);
+        return [];
+      }
+    },
+  });
 
   const sizes = useMemo(() => {
     const set = new Set<string>();

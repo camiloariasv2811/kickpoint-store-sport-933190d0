@@ -64,17 +64,37 @@ function AdminConfiguracion() {
 
   const { data: settings, isLoading: loadingSettings } = useQuery<StoreSettings>({
     queryKey: ["admin", "settings", "store"],
-    queryFn: () => getStoreSettings(),
+    queryFn: async () => {
+      const res = await getStoreSettings();
+      if (!res) throw new Error("No settings");
+      return res;
+    },
   });
 
   const { data: paymentMethods = [], isLoading: loadingMethods } = useQuery<PaymentMethodRow[]>({
     queryKey: ["admin", "payment-methods"],
-    queryFn: () => listAllPaymentMethods(),
+    queryFn: async () => {
+      try {
+        const res = await listAllPaymentMethods();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminConfiguracion] Error loading payment methods:", err);
+        return [];
+      }
+    },
   });
 
   const { data: staff = [] } = useQuery({
     queryKey: ["admin", "staff"],
-    queryFn: () => listStaffUsers(),
+    queryFn: async () => {
+      try {
+        const res = await listStaffUsers();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminConfiguracion] Error loading staff:", err);
+        return [];
+      }
+    },
   });
 
   useEffect(() => {

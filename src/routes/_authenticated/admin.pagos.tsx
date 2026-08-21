@@ -66,7 +66,15 @@ function AdminPagos() {
 
   const { data: orders = [], isLoading } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
-    queryFn: () => listOrders(),
+    queryFn: async () => {
+      try {
+        const res = await listOrders();
+        return (res ?? []) as AdminOrder[];
+      } catch (err) {
+        console.warn("[AdminPagos] Error fetching orders:", err);
+        return [] as AdminOrder[];
+      }
+    },
   });
 
   // Flatten payments with order context

@@ -90,14 +90,33 @@ function ProductRow({
 }
 
 function useProducts() {
-  return useQuery({ queryKey: ["products"], queryFn: () => listProducts() });
+  return useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      try {
+        const res = await listProducts();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[Home] Error loading products:", err);
+        return [];
+      }
+    },
+  });
 }
 
 function Home() {
-  const { data: products, isLoading } = useProducts();
-  const { data: categories } = useQuery({
+  const { data: products = [], isLoading } = useProducts();
+  const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
-    queryFn: () => listCategories(),
+    queryFn: async () => {
+      try {
+        const res = await listCategories();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[Home] Error loading categories:", err);
+        return [];
+      }
+    },
   });
 
   const featured = products?.filter((p) => p.is_featured) ?? [];

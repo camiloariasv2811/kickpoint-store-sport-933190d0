@@ -44,7 +44,15 @@ function AdminProductos() {
   const queryClient = useQueryClient();
   const { data: products = [], isLoading } = useQuery<AdminProductRow[]>({
     queryKey: ["admin", "products"],
-    queryFn: () => listAdminProducts(),
+    queryFn: async () => {
+      try {
+        const res = await listAdminProducts();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminProductos] Error loading products:", err);
+        return [];
+      }
+    },
   });
 
   const rows = products.filter(

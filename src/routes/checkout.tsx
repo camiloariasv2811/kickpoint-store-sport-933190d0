@@ -64,14 +64,30 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const { lines, count, subtotal, savings, getLineUnitPrice, clear } = useCart();
 
-  const { data: methods } = useQuery({
+  const { data: methods = [] } = useQuery({
     queryKey: ["payment-methods"],
-    queryFn: () => listPaymentMethods(),
+    queryFn: async () => {
+      try {
+        const res = await listPaymentMethods();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[Checkout] Error loading payment methods:", err);
+        return [];
+      }
+    },
   });
 
   const { data: storeSettings } = useQuery({
     queryKey: ["public", "store-settings"],
-    queryFn: () => getPublicStoreSettings(),
+    queryFn: async () => {
+      try {
+        const res = await getPublicStoreSettings();
+        return res ?? null;
+      } catch (err) {
+        console.warn("[Checkout] Error loading store settings:", err);
+        return null;
+      }
+    },
   });
 
   const [form, setForm] = useState({

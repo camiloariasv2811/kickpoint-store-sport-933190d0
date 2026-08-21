@@ -25,7 +25,11 @@ export const Route = createFileRoute("/_authenticated/admin/reportes")({
 function AdminReportes() {
   const { data: metrics, isLoading } = useQuery<ReportMetrics>({
     queryKey: ["admin", "reports"],
-    queryFn: () => getReportMetrics(),
+    queryFn: async () => {
+      const res = await getReportMetrics();
+      if (!res) throw new Error("No metrics");
+      return res;
+    },
   });
 
   function exportCSV() {

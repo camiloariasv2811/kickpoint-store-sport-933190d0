@@ -59,7 +59,15 @@ function AdminClientes() {
 
   const { data: customers = [], isLoading } = useQuery<CustomerRow[]>({
     queryKey: ["admin", "customers"],
-    queryFn: () => listCustomers(),
+    queryFn: async () => {
+      try {
+        const res = await listCustomers();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminClientes] Error loading customers:", err);
+        return [];
+      }
+    },
   });
 
   const filtered = customers.filter((c) => {

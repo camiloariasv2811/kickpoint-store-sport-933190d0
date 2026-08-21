@@ -64,7 +64,15 @@ function AdminPedidos() {
 
   const { data: orders = [], isLoading } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
-    queryFn: () => listOrders(),
+    queryFn: async () => {
+      try {
+        const res = await listOrders();
+        return (res ?? []) as AdminOrder[];
+      } catch (err) {
+        console.warn("[AdminPedidos] Error fetching orders:", err);
+        return [] as AdminOrder[];
+      }
+    },
   });
 
   const filteredOrders = orders.filter((o) => {

@@ -71,12 +71,28 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
 
   const { data: brands = [] } = useQuery({
     queryKey: ["catalog", "brands"],
-    queryFn: () => listBrands(),
+    queryFn: async () => {
+      try {
+        const res = await listBrands();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[ProductForm] Error loading brands:", err);
+        return [];
+      }
+    },
   });
 
   const { data: categories = [] } = useQuery({
     queryKey: ["catalog", "categories"],
-    queryFn: () => listCategories(),
+    queryFn: async () => {
+      try {
+        const res = await listCategories();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[ProductForm] Error loading categories:", err);
+        return [];
+      }
+    },
   });
 
   useEffect(() => {

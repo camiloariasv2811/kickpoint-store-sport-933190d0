@@ -53,13 +53,20 @@ function KardexPage() {
 
   const kardexQuery = useQuery({
     queryKey: ["admin", "kardex-all", typeFilter],
-    queryFn: () =>
-      listInventoryMovements({
-        data: {
-          type: typeFilter === "all" ? undefined : typeFilter,
-          limit: 200,
-        },
-      }),
+    queryFn: async () => {
+      try {
+        const res = await listInventoryMovements({
+          data: {
+            type: typeFilter === "all" ? undefined : typeFilter,
+            limit: 200,
+          },
+        });
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminKardex] Error loading movements:", err);
+        return [];
+      }
+    },
   });
 
   const movements = (kardexQuery.data ?? []).filter((m: InventoryMovementRow) => {

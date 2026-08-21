@@ -82,7 +82,15 @@ function Page() {
 
   const inventoryQuery = useQuery({
     queryKey: ["admin", "inventory"],
-    queryFn: () => listInventory(),
+    queryFn: async () => {
+      try {
+        const res = await listInventory();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminInventario] Error loading inventory:", err);
+        return [];
+      }
+    },
   });
 
   const rows = (inventoryQuery.data ?? []).filter((r) => {
@@ -391,7 +399,15 @@ function KardexDialog({
 }) {
   const query = useQuery({
     queryKey: ["admin", "inventory-movements", variantId ?? "all"],
-    queryFn: () => listInventoryMovements({ data: { variantId: variantId ?? undefined } }),
+    queryFn: async () => {
+      try {
+        const res = await listInventoryMovements({ data: { variantId: variantId ?? undefined } });
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminInventario] Error loading movements:", err);
+        return [];
+      }
+    },
     enabled: open,
   });
 

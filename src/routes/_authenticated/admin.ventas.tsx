@@ -86,17 +86,41 @@ function AdminVentas() {
 
   const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ["admin", "products"],
-    queryFn: () => listAdminProducts(),
+    queryFn: async () => {
+      try {
+        const res = await listAdminProducts();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminVentas] Error loading products:", err);
+        return [];
+      }
+    },
   });
 
   const { data: customers = [] } = useQuery({
     queryKey: ["admin", "customers"],
-    queryFn: () => listCustomers(),
+    queryFn: async () => {
+      try {
+        const res = await listCustomers();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminVentas] Error loading customers:", err);
+        return [];
+      }
+    },
   });
 
   const { data: sales = [], isLoading: loadingSales } = useQuery({
     queryKey: ["admin", "sales"],
-    queryFn: () => listSales(),
+    queryFn: async () => {
+      try {
+        const res = await listSales();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminVentas] Error loading sales:", err);
+        return [];
+      }
+    },
   });
 
   async function handleDeleteSale(sale: AdminSale) {

@@ -28,11 +28,30 @@ export const Route = createFileRoute("/categorias")({
 });
 
 function Categorias() {
-  const { data: categories, isLoading } = useQuery({
+  const { data: categories = [], isLoading } = useQuery({
     queryKey: ["categories"],
-    queryFn: () => listCategories(),
+    queryFn: async () => {
+      try {
+        const res = await listCategories();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[Categorias] Error loading categories:", err);
+        return [];
+      }
+    },
   });
-  const { data: products } = useQuery({ queryKey: ["products"], queryFn: () => listProducts() });
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
+      try {
+        const res = await listProducts();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[Categorias] Error loading products:", err);
+        return [];
+      }
+    },
+  });
 
   const roots = (categories ?? []).filter((c) => !c.parent_id);
   const countFor = (slugs: string[]) =>

@@ -51,7 +51,15 @@ function AdminCategorias() {
 
   const { data: categories = [], isLoading } = useQuery<CategoryRow[]>({
     queryKey: ["admin", "categories"],
-    queryFn: () => listAdminCategories(),
+    queryFn: async () => {
+      try {
+        const res = await listAdminCategories();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[AdminCategorias] Error loading categories:", err);
+        return [];
+      }
+    },
   });
 
   const roots = categories.filter((r) => !r.parent_id);

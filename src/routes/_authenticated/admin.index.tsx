@@ -141,7 +141,13 @@ function Dashboard() {
     refetch,
   } = useQuery<DashboardMetrics>({
     queryKey: ["admin", "dashboard-metrics"],
-    queryFn: () => getAdminDashboard(),
+    queryFn: async () => {
+      const res = await getAdminDashboard();
+      if (!res) {
+        throw new Error("No se pudieron cargar las métricas del dashboard");
+      }
+      return res;
+    },
     refetchInterval: 60000,
   });
 
