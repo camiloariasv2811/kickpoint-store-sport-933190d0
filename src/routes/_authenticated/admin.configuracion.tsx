@@ -79,7 +79,7 @@ function AdminConfiguracion() {
 
   useEffect(() => {
     if (settings) {
-      setWhatsapp(settings.whatsapp ?? "+58 412 0000000");
+      setWhatsapp(settings.whatsapp ?? "+58 412 1546698");
       setShippingFlat(String(settings.shipping_flat ?? 0));
       setExchangeRateBcv(String(settings.exchange_rate_bcv ?? settings.exchange_rate_bs ?? 78.5));
       setExchangeRateUsdt(String(settings.exchange_rate_usdt ?? 86.2));
@@ -246,7 +246,7 @@ function AdminConfiguracion() {
                     id="s-wpp"
                     value={whatsapp}
                     onChange={(e) => setWhatsapp(e.target.value)}
-                    placeholder="+58 412 1234567"
+                    placeholder="+58 412 1546698"
                     className="mt-1.5"
                   />
                   <p className="mt-1 text-[11px] text-muted-foreground">

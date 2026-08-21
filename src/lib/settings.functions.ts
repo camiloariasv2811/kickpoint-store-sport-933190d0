@@ -43,7 +43,7 @@ export const getPublicStoreSettings = createServerFn({ method: "GET" }).handler(
     }
     const val = (data?.value ?? {}) as StoreSettings;
     return {
-      whatsapp: val.whatsapp ?? "+58 412 1234567",
+      whatsapp: val.whatsapp ?? "+58 412 1546698",
       shipping_flat: val.shipping_flat ?? 0,
       exchange_rate_bcv: Number(val.exchange_rate_bcv || val.exchange_rate_bs || 78.5),
       exchange_rate_usdt: Number(val.exchange_rate_usdt || 86.2),

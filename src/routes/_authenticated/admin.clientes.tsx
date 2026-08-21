@@ -310,7 +310,7 @@ function AdminClientes() {
                 <Input
                   id="c-phone"
                   value={whatsapp}
-                  placeholder="+58 412 1234567"
+                  placeholder="+58 412 1546698"
                   onChange={(e) => setWhatsapp(e.target.value)}
                 />
               </div>

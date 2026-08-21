@@ -490,122 +490,9 @@ export type InMemoryKardex = {
   createdAt: string;
 };
 
-let _inMemoryOrders: InMemoryOrder[] = [
-  {
-    id: "ord-demo-1",
-    order_number: "KP-2026-000124",
-    status: "pedido_recibido",
-    channel: "online",
-    payment_method_code: "pago_movil",
-    subtotal: 70.0,
-    total: 70.0,
-    is_wholesale: false,
-    inventory_applied: false,
-    notes: "[Envío: TEALCA] | [Cotización: Tasa USDT a Bs. 86.20 / USD | Total Bs. 6.034,00]",
-    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-    customer: {
-      first_name: "Carlos",
-      last_name: "Pérez",
-      whatsapp: "+58 412 1234567",
-      email: "carlos.perez@ejemplo.com",
-      address: "TEALCA - Calle Las Flores 12",
-      city: "Caracas",
-      state: "Distrito Capital",
-    },
-    items: [
-      {
-        id: "item-1",
-        product_name: "Camiseta Real Madrid Local 2025/2026 Versión Jugador",
-        size: "M",
-        color: "Blanco",
-        quantity: 2,
-        unit_price: 35.0,
-        unit_cost: 15.0,
-        subtotal: 70.0,
-        variant_id: "v-rm-m",
-        image_url: "/__l5e/assets-v1/fb5cafd4-50ef-4ab9-b830-5e5bf6619dad/p-jersey-1.jpg",
-      },
-    ],
-    payments: [
-      {
-        id: "pay-demo-1",
-        status: "pendiente",
-        amount: 70.0,
-        method_code: "pago_movil",
-        reference: "PM-982341",
-        proof_url: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600",
-        proof_uploaded_at: new Date(Date.now() - 3600000).toISOString(),
-        rejection_reason: null,
-        created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
-      },
-    ],
-  },
-  {
-    id: "ord-demo-2",
-    order_number: "KP-2026-000123",
-    status: "pago_verificado",
-    channel: "online",
-    payment_method_code: "binance_pay",
-    subtotal: 120.0,
-    total: 120.0,
-    is_wholesale: true,
-    inventory_applied: true,
-    notes: "[Envío: MRW] | [Cotización: Tasa USDT a Bs. 86.20 / USD]",
-    created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-    customer: {
-      first_name: "Mariana",
-      last_name: "Gómez",
-      whatsapp: "+58 424 9876543",
-      email: "mariana.g@ejemplo.com",
-      address: "MRW - Av. Bolívar Nte 44",
-      city: "Valencia",
-      state: "Carabobo",
-    },
-    items: [
-      {
-        id: "item-2",
-        product_name: "Camiseta FC Barcelona Visita 2025/2026 Black Edition",
-        size: "S",
-        color: "Negro",
-        quantity: 5,
-        unit_price: 24.0,
-        unit_cost: 14.0,
-        subtotal: 120.0,
-        variant_id: "v-fcb-s",
-        image_url: "/__l5e/assets-v1/a4816654-219d-4720-bc40-10928e4693a1/p-jersey-2.jpg",
-      },
-    ],
-    payments: [
-      {
-        id: "pay-demo-2",
-        status: "verificado",
-        amount: 120.0,
-        method_code: "binance_pay",
-        reference: "BIN-449102",
-        proof_url: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=600",
-        proof_uploaded_at: new Date(Date.now() - 3600000 * 4).toISOString(),
-        rejection_reason: null,
-        created_at: new Date(Date.now() - 3600000 * 5).toISOString(),
-      },
-    ],
-  },
-];
+let _inMemoryOrders: InMemoryOrder[] = [];
 
-let _inMemoryKardex: InMemoryKardex[] = [
-  {
-    id: "k-demo-1",
-    productName: "Camiseta FC Barcelona Visita 2025/2026 Black Edition",
-    size: "S",
-    color: "Negro",
-    sku: "KP-FCB-02-S",
-    type: "salida",
-    quantity: 5,
-    stockAfter: 9,
-    reference: "KP-2026-000123",
-    note: "Pago verificado - Pedido KP-2026-000123",
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-  },
-];
+let _inMemoryKardex: InMemoryKardex[] = [];
 
 export function getInMemoryOrders(): InMemoryOrder[] {
   return _inMemoryOrders;
@@ -738,7 +625,7 @@ export function getInMemoryBadges(): { pendingOrders: number; pendingPayments: n
 }
 
 let _inMemorySettings: any = {
-  whatsapp: "+58 412 1234567",
+  whatsapp: "+58 412 1546698",
   shipping_flat: 0,
   exchange_rate_bcv: 78.5,
   exchange_rate_usdt: 86.2,
@@ -754,10 +641,10 @@ let _inMemoryPaymentMethods: any[] = [
     active: true,
     sort_order: 1,
     instructions:
-      "Banco: Banesco (0134) | Teléfono: 0412-1234567 | Cédula: V-12345678 | Titular: KICKPOINT C.A.",
+      "Banco: Banesco (0134) | Teléfono: 0412-1546698 | Cédula: V-12345678 | Titular: KICKPOINT C.A.",
     details: {
       banco: "Banesco (0134)",
-      telefono: "0412-1234567",
+      telefono: "0412-1546698",
       cedula: "V-12345678",
       titular: "KICKPOINT C.A.",
     },
@@ -835,31 +722,16 @@ let _inMemoryCustomers: any[] = [
     id: "cust-demo-1",
     first_name: "Carlos",
     last_name: "Pérez",
-    whatsapp: "+58 412 1234567",
-    phone: "+58 412 1234567",
+    whatsapp: "+58 412 1546698",
+    phone: "+58 412 1546698",
     email: "carlos.perez@ejemplo.com",
     address: "TEALCA - Calle Las Flores 12",
     city: "Caracas",
     state: "Distrito Capital",
     notes: "Cliente frecuente",
     created_at: new Date(Date.now() - 3600000 * 24 * 5).toISOString(),
-    order_count: 1,
-    total_spent: 70.0,
-  },
-  {
-    id: "cust-demo-2",
-    first_name: "Mariana",
-    last_name: "Gómez",
-    whatsapp: "+58 424 9876543",
-    phone: "+58 424 9876543",
-    email: "mariana.g@ejemplo.com",
-    address: "MRW - Av. Bolívar Nte 44",
-    city: "Valencia",
-    state: "Carabobo",
-    notes: "Cliente mayorista",
-    created_at: new Date(Date.now() - 3600000 * 24 * 10).toISOString(),
-    order_count: 1,
-    total_spent: 120.0,
+    order_count: 0,
+    total_spent: 0,
   },
 ];
 

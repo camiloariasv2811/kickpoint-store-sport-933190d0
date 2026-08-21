@@ -7,6 +7,6 @@ export function moneyExact(value: number | null | undefined) {
   return `$${Number(value ?? 0).toFixed(2)}`;
 }
 
-export function whatsappLink(message: string, phone = "584121234567") {
+export function whatsappLink(message: string, phone = "584121546698") {
   return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
 }

@@ -25,7 +25,7 @@ const DEFAULT_PAYMENT_METHODS: PaymentMethod[] = [
       "Realiza el pago móvil a nuestra cuenta oficial KICKPOINT y sube tu comprobante o referencia.",
     details: {
       banco: "0102 - Banco de Venezuela",
-      telefono: "0412-1234567",
+      telefono: "0412-1546698",
       cedula: "V-28.123.456",
     },
   },

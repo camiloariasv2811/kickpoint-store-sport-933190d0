@@ -1,6 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, CheckCircle2, Loader2, ShoppingBag, Truck } from "lucide-react";
+import {
+  ArrowRight,
+  Check,
+  CheckCircle2,
+  Copy,
+  Loader2,
+  Package,
+  ShoppingBag,
+  Truck,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -75,6 +84,13 @@ function CheckoutPage() {
   const [shippingMethod, setShippingMethod] = useState<"TEALCA" | "MRW">("MRW");
   const [method, setMethod] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
+
+  const [successOrder, setSuccessOrder] = useState<{
+    orderNumber: string;
+    total: number;
+    shippingMethod: string;
+  } | null>(null);
 
   const selected = method || methods?.[0]?.code || "";
   const activeMethod = methods?.find((m) => m.code === selected);
@@ -100,8 +116,12 @@ function CheckoutPage() {
         },
       });
       clear();
-      toast.success("Pedido creado", { description: result.orderNumber });
-      await navigate({ to: "/pedido", search: { code: result.orderNumber } });
+      setSuccessOrder({
+        orderNumber: result.orderNumber,
+        total: Number(result.total || subtotal),
+        shippingMethod,
+      });
+      toast.success("¡Pedido registrado exitosamente!", { description: result.orderNumber });
     } catch (error) {
       toast.error("No pudimos crear el pedido", {
         description: error instanceof Error ? error.message : undefined,
@@ -109,6 +129,129 @@ function CheckoutPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleCopyOrderNumber(orderNum: string) {
+    navigator.clipboard.writeText(orderNum);
+    setCopiedCode(true);
+    toast.success("Número de orden copiado al portapapeles");
+    setTimeout(() => setCopiedCode(false), 2500);
+  }
+
+  // Pantalla de Confirmación de Pedido Exitoso
+  if (successOrder) {
+    return (
+      <SiteLayout>
+        <div className="mx-auto max-w-2xl px-4 py-12 sm:py-16 animate-in fade-in zoom-in-95 duration-300">
+          <div className="surface-card relative overflow-hidden rounded-2xl border border-primary/20 p-6 sm:p-10 text-center shadow-xl shadow-primary/5">
+            {/* Animación del Checkmark */}
+            <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500 ring-8 ring-emerald-500/10 animate-in zoom-in-50 duration-500">
+              <Check className="size-10 stroke-[3]" />
+            </div>
+
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <span className="mt-6 inline-block rounded-full bg-primary/10 px-3.5 py-1 text-xs font-bold text-primary">
+                Paso 3 de 4 • Registro Exitoso
+              </span>
+
+              <h1 className="mt-3 text-display text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
+                ¡Pedido Realizado Exitosamente!
+              </h1>
+
+              <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+                Tu orden ha sido registrada en nuestro sistema. A continuación puedes consultar el
+                seguimiento en tiempo real y subir tu comprobante de pago.
+              </p>
+            </div>
+
+            {/* Tarjeta de Resumen del Pedido */}
+            <div className="mt-6 rounded-xl border border-border bg-surface-2/60 p-4 sm:p-5 text-left animate-in fade-in slide-in-from-bottom-3 duration-500">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-3.5">
+                <div>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Número de Seguimiento
+                  </span>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="font-mono text-lg sm:text-xl font-bold text-primary">
+                      {successOrder.orderNumber}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyOrderNumber(successOrder.orderNumber)}
+                      className="inline-flex items-center gap-1 rounded-md bg-background px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground border border-border transition-colors"
+                      title="Copiar código"
+                    >
+                      {copiedCode ? (
+                        <>
+                          <Check className="size-3.5 text-emerald-500" />
+                          <span className="text-emerald-500 font-semibold">Copiado</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-3.5" />
+                          <span>Copiar</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Monto Total
+                  </span>
+                  <p className="text-display text-lg font-bold text-foreground">
+                    {moneyExact(successOrder.total)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-3 text-xs">
+                <div>
+                  <span className="text-muted-foreground block">Empresa de Envío:</span>
+                  <span className="font-semibold text-foreground flex items-center gap-1 mt-0.5">
+                    <Truck className="size-3.5 text-primary" />
+                    Agencia {successOrder.shippingMethod}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block">Estado inicial:</span>
+                  <span className="inline-flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400 mt-0.5">
+                    <span className="size-2 rounded-full bg-amber-500 animate-pulse" />
+                    Pago pendiente
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Botones de Acción */}
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <Button
+                variant="hero"
+                size="lg"
+                className="w-full sm:w-auto gap-2 px-6"
+                onClick={() =>
+                  navigate({ to: "/pedido", search: { code: successOrder.orderNumber } })
+                }
+              >
+                <Package className="size-4" />
+                Ver seguimiento de mi pedido
+                <ArrowRight className="size-4" />
+              </Button>
+
+              <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
+                <Link to="/catalogo">Volver al catálogo</Link>
+              </Button>
+            </div>
+
+            <p className="mt-4 text-xs text-muted-foreground">
+              Guarda tu número de pedido para consultar su estatus en cualquier momento desde el
+              menú principal.
+            </p>
+          </div>
+        </div>
+      </SiteLayout>
+    );
   }
 
   if (lines.length === 0) {

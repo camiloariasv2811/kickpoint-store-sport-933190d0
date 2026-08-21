@@ -1,7 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
-import { getInMemoryKardex, getInMemoryOrders, getInMemoryProducts } from "./demo-data";
+import {
+  getInMemoryKardex,
+  getInMemoryOrders,
+  getInMemoryProducts,
+  getInMemorySales,
+} from "./demo-data";
 
 export type DashboardMetrics = {
   sales: {
@@ -141,52 +146,133 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
     }
   }
 
-  const now = new Date();
-  const daysEvolution: DashboardMetrics["charts"]["salesEvolution"] = [];
-  for (let i = 13; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const dateKey = d.toISOString().split("T")[0]!;
-    const dayLabel = d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
-    const dayOrders = i === 0 ? 3 : (i % 4) + 1;
-    const dayTotal = dayOrders * (35 + ((i * 7) % 50));
-    daysEvolution.push({
-      date: dateKey,
-      label: dayLabel,
-      total: Number(dayTotal.toFixed(2)),
-      orders: dayOrders,
-    });
-  }
-
   const inventoryByCategory = Object.entries(categoryStockMap).map(([name, value]) => ({
     name,
     value,
   }));
 
   const orders = getInMemoryOrders();
+  const sales = getInMemorySales();
   const kardex = getInMemoryKardex();
 
   let totalGenerated = 0;
   let totalCollected = 0;
+  let todayTotal = 0;
+  let todayCount = 0;
+  let monthTotal = 0;
+  let monthCount = 0;
   let pendingPaymentsCount = 0;
   let pendingPaymentsAmount = 0;
   let pendingOrdersCount = 0;
+  let totalUnitsSold = 0;
+
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+
+  // Evolution chart map
+  const daysEvolutionMap: Record<string, { label: string; total: number; orders: number }> = {};
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dateKey = d.toISOString().split("T")[0]!;
+    const dayLabel = d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+    daysEvolutionMap[dateKey] = { label: dayLabel, total: 0, orders: 0 };
+  }
+
+  const channelMap: Record<string, { name: string; value: number; count: number }> = {
+    online: { name: "Web / Online", value: 0, count: 0 },
+    presencial: { name: "Tienda / POS", value: 0, count: 0 },
+    whatsapp: { name: "WhatsApp", value: 0, count: 0 },
+  };
 
   for (const o of orders) {
-    totalGenerated += o.total;
-    const isCollected = o.payments.some((p) => p.status === "verificado");
-    if (isCollected) {
-      totalCollected += o.total;
+    if (o.status !== "cancelado") {
+      totalGenerated += Number(o.total || 0);
     }
+    const isCollected =
+      o.payments.some((p) => p.status === "verificado") ||
+      ["pago_verificado", "preparando_pedido", "empacando_pedido", "enviado", "entregado"].includes(
+        o.status,
+      );
+
+    if (isCollected) {
+      const orderAmount = Number(o.total || 0);
+      totalCollected += orderAmount;
+      const orderDate = new Date(o.created_at).getTime();
+      if (orderDate >= startOfToday) {
+        todayTotal += orderAmount;
+        todayCount++;
+      }
+      if (orderDate >= startOfMonth) {
+        monthTotal += orderAmount;
+        monthCount++;
+      }
+      for (const item of o.items ?? []) {
+        totalUnitsSold += Number(item.quantity || 0);
+      }
+      const [dateKey] = o.created_at.split("T");
+      if (dateKey && daysEvolutionMap[dateKey]) {
+        daysEvolutionMap[dateKey].total += orderAmount;
+        daysEvolutionMap[dateKey].orders += 1;
+      }
+      channelMap.online.value += orderAmount;
+      channelMap.online.count += 1;
+    }
+
     const hasPendingPayment = o.payments.some((p) => p.status === "pendiente");
     if (hasPendingPayment) {
       pendingPaymentsCount++;
-      pendingPaymentsAmount += o.total;
+      pendingPaymentsAmount += Number(o.total || 0);
     }
     if (["pedido_recibido", "pago_pendiente", "pago_subido"].includes(o.status)) {
       pendingOrdersCount++;
     }
   }
+
+  for (const s of sales) {
+    const saleTotal = Number(s.total || 0);
+    totalGenerated += saleTotal;
+    totalCollected += saleTotal;
+    const saleDate = new Date(s.created_at).getTime();
+    if (saleDate >= startOfToday) {
+      todayTotal += saleTotal;
+      todayCount++;
+    }
+    if (saleDate >= startOfMonth) {
+      monthTotal += saleTotal;
+      monthCount++;
+    }
+    for (const item of s.items ?? []) {
+      totalUnitsSold += Number(item.quantity || 0);
+    }
+    const [dateKey] = s.created_at.split("T");
+    if (dateKey && daysEvolutionMap[dateKey]) {
+      daysEvolutionMap[dateKey].total += saleTotal;
+      daysEvolutionMap[dateKey].orders += 1;
+    }
+    const ch = s.channel || "presencial";
+    if (!channelMap[ch]) {
+      channelMap[ch] = { name: ch, value: 0, count: 0 };
+    }
+    channelMap[ch].value += saleTotal;
+    channelMap[ch].count += 1;
+  }
+
+  const daysEvolution: DashboardMetrics["charts"]["salesEvolution"] = Object.entries(
+    daysEvolutionMap,
+  ).map(([date, val]) => ({
+    date,
+    label: val.label,
+    total: Number(val.total.toFixed(2)),
+    orders: val.orders,
+  }));
+
+  const salesByChannel = Object.values(channelMap).map((ch) => ({
+    name: ch.name,
+    value: Number(ch.value.toFixed(2)),
+    count: ch.count,
+  }));
 
   const recentOrders = orders.slice(0, 10).map((o) => {
     const payment = o.payments[o.payments.length - 1];
@@ -220,19 +306,15 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
     createdAt: k.createdAt,
   }));
 
-  const inMemoryUnitsSold = kardex
-    .filter((k) => k.type === "salida" || k.type === "venta")
-    .reduce((sum, k) => sum + Math.abs(k.quantity), 0);
-
   return {
     sales: {
-      todayTotal: Number((totalCollected * 0.4).toFixed(2)),
-      todayCount: Math.max(1, Math.floor(orders.length / 2)),
-      monthTotal: Number(totalCollected.toFixed(2)),
-      monthCount: orders.filter((o) => o.payments.some((p) => p.status === "verificado")).length,
+      todayTotal: Number(todayTotal.toFixed(2)),
+      todayCount,
+      monthTotal: Number(monthTotal.toFixed(2)),
+      monthCount,
       totalGenerated: Number(totalGenerated.toFixed(2)),
       totalCollected: Number(totalCollected.toFixed(2)),
-      totalUnitsSold: inMemoryUnitsSold,
+      totalUnitsSold,
       pendingPaymentsCount,
       pendingPaymentsAmount: Number(pendingPaymentsAmount.toFixed(2)),
       pendingOrdersCount,
@@ -248,15 +330,7 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
     },
     charts: {
       salesEvolution: daysEvolution,
-      salesByChannel: [
-        {
-          name: "Web / Online",
-          value: Number((totalGenerated * 0.7).toFixed(2)),
-          count: orders.length,
-        },
-        { name: "Tienda / POS", value: Number((totalGenerated * 0.2).toFixed(2)), count: 2 },
-        { name: "WhatsApp", value: Number((totalGenerated * 0.1).toFixed(2)), count: 1 },
-      ],
+      salesByChannel,
       inventoryByCategory,
     },
     recentOrders,
@@ -288,7 +362,8 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
             `
             id, order_number, status, channel, total, subtotal, is_wholesale, created_at, payment_method_code,
             customer:customers(first_name, last_name, whatsapp, phone),
-            payments(id, status, amount, method_code, reference, proof_url, proof_uploaded_at, verified_at)
+            payments(id, status, amount, method_code, reference, proof_url, proof_uploaded_at, verified_at),
+            order_items(id, quantity)
           `,
           )
           .order("created_at", { ascending: false }),
@@ -296,7 +371,8 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
           .from("sales")
           .select(
             `
-            id, sale_number, order_id, customer_id, channel, payment_method_code, total, cost_total, created_at
+            id, sale_number, order_id, customer_id, channel, payment_method_code, total, cost_total, created_at,
+            sale_items(id, quantity)
           `,
           )
           .order("created_at", { ascending: false }),
@@ -593,10 +669,37 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         };
       });
 
-      // Total de unidades vendidas (productos vendidos)
-      const totalUnitsSold = rawMovements
-        .filter((m) => m.type === "salida" || m.type === "venta")
-        .reduce((sum, m) => sum + Math.abs(Number(m.quantity ?? 0)), 0);
+      // Total de unidades vendidas (únicamente de pedidos con pago verificado y ventas directas POS)
+      const verifiedOrders = rawOrders.filter(
+        (o) =>
+          o.status !== "cancelado" &&
+          ((o.payments as any[])?.some((p) => p.status === "verificado") ||
+            [
+              "pago_verificado",
+              "preparando_pedido",
+              "empacando_pedido",
+              "enviado",
+              "entregado",
+            ].includes(o.status)),
+      );
+      let onlineUnitsSold = 0;
+      for (const o of verifiedOrders) {
+        const items = (o.order_items as { quantity?: number }[]) || [];
+        for (const it of items) {
+          onlineUnitsSold += Number(it.quantity || 0);
+        }
+      }
+
+      const directPosSales = rawSales.filter((s) => !s.order_id);
+      let posUnitsSold = 0;
+      for (const s of directPosSales) {
+        const items = (s.sale_items as { quantity?: number }[]) || [];
+        for (const it of items) {
+          posUnitsSold += Number(it.quantity || 0);
+        }
+      }
+
+      const totalUnitsSold = onlineUnitsSold + posUnitsSold;
 
       return {
         sales: {
