@@ -332,6 +332,11 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
       ? Math.max(0, totalUnits + totalExitsUnits - totalEntriesUnits)
       : totalUnits + totalUnitsSold;
 
+  const flowDescription =
+    totalUnitsSold === 0 && totalExitsUnits === 0 && totalEntriesUnits === 0
+      ? `${totalUnits.toLocaleString()} disponibles · 0 vendidas · 0 salidas`
+      : `${initialUnits.toLocaleString()} iniciales → ${totalUnitsSold.toLocaleString()} vendidas → ${totalUnits.toLocaleString()} disponibles`;
+
   return {
     sales: {
       todayTotal: Number(todayTotal.toFixed(2)),
@@ -363,7 +368,7 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
       totalAdjustmentsUnits: 0,
       initialUnits,
       hasHistoricalMovements: kardex.length > 0,
-      flowDescription: `${initialUnits.toLocaleString()} iniciales → ${totalUnitsSold.toLocaleString()} vendidas → ${totalUnits.toLocaleString()} disponibles`,
+      flowDescription,
     },
     charts: {
       salesEvolution: daysEvolution,
@@ -755,6 +760,11 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         ? Math.max(0, totalUnits + totalExitsUnits - totalEntriesUnits)
         : totalUnits + totalUnitsSold;
 
+      const flowDescription =
+        totalUnitsSold === 0 && totalExitsUnits === 0 && totalEntriesUnits === 0
+          ? `${totalUnits.toLocaleString()} disponibles · 0 vendidas · 0 salidas`
+          : `${initialUnits.toLocaleString()} iniciales → ${totalUnitsSold.toLocaleString()} vendidas → ${totalUnits.toLocaleString()} disponibles`;
+
       return {
         sales: {
           todayTotal: Number(todayTotal.toFixed(2)),
@@ -786,7 +796,7 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
           totalAdjustmentsUnits,
           initialUnits,
           hasHistoricalMovements,
-          flowDescription: `${initialUnits.toLocaleString()} iniciales → ${totalUnitsSold.toLocaleString()} vendidas → ${totalUnits.toLocaleString()} disponibles`,
+          flowDescription,
         },
         charts: {
           salesEvolution,
