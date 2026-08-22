@@ -135,8 +135,16 @@ function AdminVentas() {
     try {
       await deleteSale({ data: { saleId: sale.id, restoreStock: true } });
       toast.success(`Venta ${sale.sale_number} eliminada y stock restituido`);
-      await queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "sales"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] }),
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] }),
+      ]);
       setSelectedHistorySale(null);
     } catch (err: any) {
       toast.error(`Error: ${err.message}`);
@@ -255,9 +263,16 @@ function AdminVentas() {
       });
 
       setCart([]);
-      await queryClient.invalidateQueries({ queryKey: ["admin", "sales"] });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "sales"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] }),
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] }),
+      ]);
     } catch (err: any) {
       console.error(err);
       toast.error(`Error al registrar venta: ${err.message || "Error desconocido"}`);

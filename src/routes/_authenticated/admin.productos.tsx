@@ -92,7 +92,9 @@ function AdminProductos() {
         queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "sales"] }),
         queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] }),
       ]);
     } catch (err: any) {
       console.error(err);
@@ -118,7 +120,9 @@ function AdminProductos() {
         queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "sales"] }),
         queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] }),
       ]);
     } catch (err: any) {
       console.error(err);

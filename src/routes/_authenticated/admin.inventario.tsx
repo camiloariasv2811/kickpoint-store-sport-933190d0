@@ -217,8 +217,10 @@ function Page() {
             queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
             queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
             queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "sales"] }),
             queryClient.invalidateQueries({ queryKey: ["admin", "pending-orders-count"] }),
             queryClient.invalidateQueries({ queryKey: ["products"] }),
+            queryClient.invalidateQueries({ queryKey: ["reports"] }),
           ]);
         }}
       />

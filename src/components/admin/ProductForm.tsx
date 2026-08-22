@@ -350,8 +350,10 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
         queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "sales"] }),
         queryClient.invalidateQueries({ queryKey: ["products"] }),
         queryClient.invalidateQueries({ queryKey: ["catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["reports"] }),
       ]);
       setOpen(false);
       if (onClose) onClose();
