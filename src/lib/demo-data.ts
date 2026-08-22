@@ -921,3 +921,42 @@ export function addInMemoryWhatsAppNotification(n: InMemoryWhatsAppNotification)
 export function clearInMemoryWhatsAppNotifications() {
   _inMemoryWhatsAppNotifications = [];
 }
+
+export type InMemoryEmailNotification = {
+  id: string;
+  event_type: string;
+  recipient_email: string;
+  recipient_type: "admin" | "customer";
+  subject: string;
+  order_id?: string | null;
+  order_code?: string | null;
+  status: "pending" | "sent" | "failed";
+  provider_message_id?: string | null;
+  error_message?: string | null;
+  attempts: number;
+  idempotency_key: string;
+  created_at: string;
+  sent_at?: string | null;
+};
+
+let _inMemoryEmailNotifications: InMemoryEmailNotification[] = [];
+
+export function getInMemoryEmailNotifications(): InMemoryEmailNotification[] {
+  return _inMemoryEmailNotifications;
+}
+
+export function addInMemoryEmailNotification(n: InMemoryEmailNotification) {
+  const existingIdx = _inMemoryEmailNotifications.findIndex(
+    (item) => item.idempotency_key === n.idempotency_key,
+  );
+  if (existingIdx >= 0) {
+    _inMemoryEmailNotifications[existingIdx] = n;
+  } else {
+    _inMemoryEmailNotifications = [n, ..._inMemoryEmailNotifications];
+  }
+  return n;
+}
+
+export function clearInMemoryEmailNotifications() {
+  _inMemoryEmailNotifications = [];
+}

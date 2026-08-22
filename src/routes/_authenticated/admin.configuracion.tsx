@@ -17,6 +17,7 @@ import {
   AlertCircle,
   RefreshCw,
   ExternalLink,
+  Mail,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -51,6 +52,11 @@ import {
   updateWhatsAppNotificationSettings,
   type WhatsAppDashboardStatus,
 } from "@/lib/whatsapp.functions";
+import {
+  getEmailDashboardStatus,
+  sendEmailTest,
+  type EmailDashboardStatus,
+} from "@/lib/email.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/configuracion")({
   component: AdminConfiguracion,
@@ -190,6 +196,63 @@ function AdminConfiguracion() {
       toast.error(err.message || "Error al enviar mensaje de prueba");
     } finally {
       setSendingTest(false);
+    }
+  }
+
+  // Email Notifications (Resend) State & Queries
+  const {
+    data: emailStatus,
+    isLoading: loadingEmailStatus,
+    refetch: refetchEmailStatus,
+  } = useQuery<EmailDashboardStatus>({
+    queryKey: ["admin", "email", "status"],
+    queryFn: () => getEmailDashboardStatus(),
+  });
+
+  const [testEmailRecipient, setTestEmailRecipient] = useState("camiloariasv2811@gmail.com");
+  const [testEmailSubject, setTestEmailSubject] = useState("");
+  const [testEmailBody, setTestEmailBody] = useState("");
+  const [sendingEmailTest, setSendingEmailTest] = useState(false);
+
+  useEffect(() => {
+    if (emailStatus?.adminRecipientEmail) {
+      setTestEmailRecipient(emailStatus.adminRecipientEmail);
+    }
+  }, [emailStatus]);
+
+  async function handleSendEmailTest(e: React.FormEvent) {
+    e.preventDefault();
+    if (!testEmailRecipient.trim() || !testEmailRecipient.includes("@")) {
+      toast.error("Ingresa un correo electrónico válido para la prueba");
+      return;
+    }
+
+    setSendingEmailTest(true);
+    try {
+      const res = await sendEmailTest({
+        data: {
+          email: testEmailRecipient.trim(),
+          subject: testEmailSubject.trim() || undefined,
+          message: testEmailBody.trim() || undefined,
+        },
+      });
+
+      if (res.ok) {
+        toast.success(`Correo de prueba enviado exitosamente a ${testEmailRecipient}`);
+      } else {
+        if (res.status === "pending") {
+          toast.info(
+            `Notificación registrada en cola (${res.errorMessage || "Falta RESEND_API_KEY"})`,
+          );
+        } else {
+          toast.error(`Error al enviar: ${res.errorMessage || "No se pudo entregar"}`);
+        }
+      }
+      await refetchEmailStatus();
+    } catch (err: any) {
+      toast.error(err.message || "Error al enviar correo de prueba");
+    } finally {
+      setSendingEmailTest(false);
     }
   }
 
@@ -731,6 +794,271 @@ function AdminConfiguracion() {
                         <div className="flex items-center gap-2.5 sm:flex-col sm:items-end">
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              log.status === "sent"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                : log.status === "pending"
+                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                            }`}
+                          >
+                            {log.status === "sent" ? (
+                              <CheckCircle2 className="size-3" />
+                            ) : log.status === "pending" ? (
+                              <Clock className="size-3" />
+                            ) : (
+                              <AlertCircle className="size-3" />
+                            )}
+                            {log.status === "sent"
+                              ? "Enviado"
+                              : log.status === "pending"
+                                ? "Pendiente / Cola"
+                                : "Fallido"}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {new Date(log.created_at).toLocaleTimeString("es-VE", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Notificaciones por Correo Electrónico (Resend) */}
+        <div className="surface-card p-6">
+          <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center gap-2">
+              <Mail className="size-5 text-primary" />
+              <h2 className="text-display text-lg font-bold">Notificaciones por Correo (Resend)</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchEmailStatus()}
+                className="h-8 gap-1.5 text-xs"
+              >
+                <RefreshCw className="size-3.5" />
+                Actualizar Estado
+              </Button>
+            </div>
+          </div>
+
+          {loadingEmailStatus ? (
+            <Skeleton className="mt-4 h-48 w-full" />
+          ) : (
+            <div className="mt-4 space-y-6">
+              {/* Estado de Conexión & Métricas */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="p-4 rounded-lg bg-card/50 border border-border flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Servicio Resend
+                    </span>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <div
+                        className={`size-2.5 rounded-full ${
+                          emailStatus?.isConfigured
+                            ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                            : "bg-amber-500"
+                        }`}
+                      />
+                      <span className="font-bold text-sm">
+                        {emailStatus?.isConfigured ? "Conectado y Listo" : "En Espera de API Key"}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    {emailStatus?.isConfigured
+                      ? "Envío transaccional activo hacia el administrador."
+                      : "Configura RESEND_API_KEY para habilitar envíos a bandeja."}
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-card/50 border border-border flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Destinatario Admin
+                    </span>
+                    <div className="font-mono font-bold text-sm text-primary mt-1 truncate">
+                      {emailStatus?.adminRecipientEmail || "camiloariasv2811@gmail.com"}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    Recibe alertas inmediatas de nuevos pedidos.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-card/50 border border-border flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Remitente (From)
+                    </span>
+                    <div className="font-mono font-bold text-xs text-foreground mt-1 truncate">
+                      {emailStatus?.fromEmail || "KICKPOINT <onboarding@resend.dev>"}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    Encabezado oficial de envío.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-card/50 border border-border flex flex-col justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Métricas de Envío
+                    </span>
+                    <div className="flex items-center gap-3 mt-1.5">
+                      <div className="text-center">
+                        <span className="block font-bold text-sm text-emerald-500">
+                          {emailStatus?.stats.sent ?? 0}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">Enviados</span>
+                      </div>
+                      <div className="text-center">
+                        <span className="block font-bold text-sm text-amber-500">
+                          {emailStatus?.stats.pending ?? 0}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">En Cola</span>
+                      </div>
+                      <div className="text-center">
+                        <span className="block font-bold text-sm text-rose-500">
+                          {emailStatus?.stats.failed ?? 0}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">Fallidos</span>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    Total registros: {emailStatus?.stats.total ?? 0}
+                  </p>
+                </div>
+              </div>
+
+              {/* Panel de Prueba Segura de Email */}
+              <div className="p-4 rounded-lg bg-card/30 border border-border/70">
+                <div className="flex items-center gap-2 mb-3">
+                  <Send className="size-4 text-primary" />
+                  <h3 className="text-sm font-bold">Prueba Segura de Notificación por Correo</h3>
+                  <span className="text-[11px] text-muted-foreground font-normal">
+                    (No crea ventas, no altera stock ni Kárdex)
+                  </span>
+                </div>
+                <form onSubmit={handleSendEmailTest} className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="space-y-1">
+                      <Label htmlFor="test-email-dest" className="text-xs">
+                        Destinatario
+                      </Label>
+                      <Input
+                        id="test-email-dest"
+                        type="email"
+                        value={testEmailRecipient}
+                        onChange={(e) => setTestEmailRecipient(e.target.value)}
+                        placeholder="camiloariasv2811@gmail.com"
+                        className="text-xs font-mono"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="test-email-sub" className="text-xs">
+                        Asunto (Opcional)
+                      </Label>
+                      <Input
+                        id="test-email-sub"
+                        value={testEmailSubject}
+                        onChange={(e) => setTestEmailSubject(e.target.value)}
+                        placeholder="🔔 KICKPOINT — Prueba de notificaciones"
+                        className="text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="test-email-msg" className="text-xs">
+                        Mensaje (Opcional)
+                      </Label>
+                      <Input
+                        id="test-email-msg"
+                        value={testEmailBody}
+                        onChange={(e) => setTestEmailBody(e.target.value)}
+                        placeholder="El sistema de correo administrativo está funcionando correctamente."
+                        className="text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <p className="text-[11px] text-muted-foreground">
+                      Destinatario oficial:{" "}
+                      <span className="text-primary font-mono font-semibold">
+                        camiloariasv2811@gmail.com
+                      </span>
+                    </p>
+                    <Button
+                      type="submit"
+                      disabled={sendingEmailTest}
+                      size="sm"
+                      className="gap-1.5 text-xs font-bold"
+                    >
+                      {sendingEmailTest ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Send className="size-3.5" />
+                      )}
+                      Enviar Correo de Prueba
+                    </Button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Registro Reciente de Correos */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                  Historial de Auditoría de Correos
+                </h3>
+                {emailStatus?.recentLogs.length === 0 ? (
+                  <div className="p-6 text-center rounded-lg border border-dashed border-border bg-card/20">
+                    <Mail className="size-6 text-muted-foreground mx-auto mb-2 opacity-50" />
+                    <p className="text-xs text-muted-foreground">
+                      No hay registros de correos aún. Las notificaciones se registrarán
+                      automáticamente al crearse nuevos pedidos o al realizar pruebas.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border border border-border rounded-lg overflow-hidden bg-card/20">
+                    {emailStatus?.recentLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="p-3 text-xs flex flex-col md:flex-row md:items-center justify-between gap-2 hover:bg-card/40 transition-colors"
+                      >
+                        <div className="space-y-0.5 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-foreground truncate">
+                              {log.subject}
+                            </span>
+                            {log.order_code && (
+                              <span className="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold">
+                                #{log.order_code}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground truncate font-mono">
+                            Hacia: {log.recipient_email}
+                          </p>
+                          {log.error_message && (
+                            <p className="text-[10px] text-rose-400 truncate">
+                              Detalle: {log.error_message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
+                          <span
+                            className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                               log.status === "sent"
                                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                                 : log.status === "pending"
