@@ -90,7 +90,9 @@ function AdminProductos() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
       ]);
     } catch (err: any) {
       console.error(err);
@@ -114,7 +116,9 @@ function AdminProductos() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
         queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
-        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
       ]);
     } catch (err: any) {
       console.error(err);
@@ -301,7 +305,9 @@ function AdminProductos() {
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
             queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
-            queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+            queryClient.invalidateQueries({ queryKey: ["products"] }),
           ]);
           setOpenForm(false);
         }}

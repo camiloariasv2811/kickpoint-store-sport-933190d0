@@ -212,8 +212,14 @@ function Page() {
         row={movementFor}
         onClose={() => setMovementFor(null)}
         onSaved={async () => {
-          await queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
-          await queryClient.invalidateQueries({ queryKey: ["admin", "pending-orders-count"] });
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "pending-orders-count"] }),
+            queryClient.invalidateQueries({ queryKey: ["products"] }),
+          ]);
         }}
       />
 

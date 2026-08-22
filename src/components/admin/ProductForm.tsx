@@ -345,7 +345,14 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
         if (onSaved) onSaved(result.id);
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "kardex-all"] }),
+        queryClient.invalidateQueries({ queryKey: ["products"] }),
+        queryClient.invalidateQueries({ queryKey: ["catalog"] }),
+      ]);
       setOpen(false);
       if (onClose) onClose();
     } catch (err: any) {

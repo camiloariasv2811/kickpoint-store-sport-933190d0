@@ -111,14 +111,15 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
   const categoryStockMap: Record<string, number> = {};
 
   for (const p of products) {
-    if (p.active) activeProductsCount++;
+    if (p.active === false) continue;
+    activeProductsCount++;
     const threshold = p.low_stock_threshold ?? 5;
     const catName = p.category?.name ?? "General";
     let productStock = 0;
 
     for (const v of p.variants ?? []) {
-      if (!v.active) continue;
-      const vStock = v.stock ?? 0;
+      if (v.active === false) continue;
+      const vStock = Number(v.stock ?? 0);
       productStock += vStock;
       totalUnits += vStock;
       const cost = p.cost ?? (p.retail_price ? p.retail_price * 0.6 : 15);
@@ -154,9 +155,9 @@ export function getInMemoryDashboardMetrics(): DashboardMetrics {
       }
     }
 
-    if (p.active && productStock === 0) {
+    if (productStock === 0) {
       outOfStockCount++;
-    } else if (p.active && productStock <= threshold) {
+    } else if (productStock <= threshold) {
       lowStockCount++;
     }
   }
