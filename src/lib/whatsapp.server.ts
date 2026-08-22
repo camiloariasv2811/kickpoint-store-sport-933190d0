@@ -83,7 +83,8 @@ export interface WhatsAppNotificationPayload {
 
 export interface WhatsAppSendResult {
   ok: boolean;
-  status: "sent" | "pending" | "failed" | "already_sent";
+  status: "sent" | "pending" | "failed" | "already_sent" | "not_configured";
+  missingSecrets?: string[];
   notificationId?: string;
   providerMessageId?: string | null;
   errorMessage?: string | null;
