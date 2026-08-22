@@ -28,6 +28,7 @@ export interface WhatsAppNotificationLogItem {
 
 export interface WhatsAppDashboardStatus {
   isConfigured: boolean;
+  missingSecrets: string[];
   officialNumber: string;
   adminRecipientNumber: string;
   stats: {
