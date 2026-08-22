@@ -181,9 +181,7 @@ function AdminConfiguracion() {
       });
 
       if (res.ok && res.providerMessageId) {
-        toast.success(
-          `WhatsApp enviado a ${testPhone} (ID de Meta: ${res.providerMessageId})`,
-        );
+        toast.success(`WhatsApp enviado a ${testPhone} (ID de Meta: ${res.providerMessageId})`);
       } else if (res.status === "not_configured") {
         toast.error(
           `WhatsApp no configurado. Faltan credenciales: ${(res.missingSecrets ?? []).join(", ")}`,
@@ -563,7 +561,9 @@ function AdminConfiguracion() {
                 hasta configurarlas:
               </p>
               <ul className="mt-1.5 list-inside list-disc font-mono">
-                {waStatus?.missingSecrets.map((s) => <li key={s}>{s}</li>)}
+                {waStatus?.missingSecrets.map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
               </ul>
             </div>
           )}

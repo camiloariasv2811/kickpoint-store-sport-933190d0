@@ -489,7 +489,6 @@ export async function sendWhatsAppNotification(
     };
   }
 
-
   // 4. Meta Cloud API Request with 3-Attempt Retry
   const metaUrl = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
   const metaBody = {

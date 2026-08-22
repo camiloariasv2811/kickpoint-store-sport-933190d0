@@ -261,10 +261,10 @@ export const createOrder = createServerFn({ method: "POST" })
         console.warn("[Checkout] Failed to trigger WhatsApp admin notification:", notifErr);
       }
 
-      // Trigger asynchronous Email notification to Admin (non-blocking)
+      // Trigger Email notification to Admin (non-blocking for checkout error handling)
       try {
         const { sendEmailNotification, getAdminEmail } = await import("./email.server");
-        sendEmailNotification({
+        await sendEmailNotification({
           eventType: "order_created",
           recipientType: "admin",
           recipientEmail: getAdminEmail(),
@@ -272,11 +272,15 @@ export const createOrder = createServerFn({ method: "POST" })
           orderCode: newOrder.order_number,
           customerName:
             `${newOrder.customer.first_name} ${newOrder.customer.last_name || ""}`.trim(),
-          customerPhone: newOrder.customer.whatsapp || newOrder.customer.phone || null,
+          customerPhone: newOrder.customer.whatsapp || null,
+          customerEmail: newOrder.customer.email || data.customer.email || null,
           total: newOrder.total,
           paymentMethod: data.paymentMethod,
           paymentReference: data.paymentProof?.reference?.trim() || null,
-        }).catch((err) => console.warn("[Checkout] Email admin notification warning:", err));
+          metadata: {
+            idempotencyKey: `new-order-admin-${newOrder.id || newOrder.order_number}`,
+          },
+        });
       } catch (emailErr) {
         console.warn("[Checkout] Failed to trigger Email admin notification:", emailErr);
       }
@@ -467,10 +471,10 @@ export const createOrder = createServerFn({ method: "POST" })
       console.warn("[Checkout] Failed to trigger WhatsApp admin notification:", notifErr);
     }
 
-    // Trigger asynchronous Email notification to Admin (non-blocking)
+    // Trigger Email notification to Admin (non-blocking for checkout error handling)
     try {
       const { sendEmailNotification, getAdminEmail } = await import("./email.server");
-      sendEmailNotification({
+      await sendEmailNotification({
         eventType: "order_created",
         recipientType: "admin",
         recipientEmail: getAdminEmail(),
@@ -478,11 +482,15 @@ export const createOrder = createServerFn({ method: "POST" })
         orderCode: order.order_number,
         customerName:
           `${data.customer.firstName.trim()} ${data.customer.lastName?.trim() || ""}`.trim(),
-        customerPhone: data.customer.whatsapp || data.customer.phone || null,
+        customerPhone: data.customer.whatsapp || null,
+        customerEmail: data.customer.email || null,
         total: Number(order.total),
         paymentMethod: data.paymentMethod,
         paymentReference: data.paymentProof?.reference?.trim() || null,
-      }).catch((err) => console.warn("[Checkout] Supabase Email admin notification warning:", err));
+        metadata: {
+          idempotencyKey: `new-order-admin-${order.id || order.order_number}`,
+        },
+      });
     } catch (emailErr) {
       console.warn("[Checkout] Failed to trigger Email admin notification:", emailErr);
     }

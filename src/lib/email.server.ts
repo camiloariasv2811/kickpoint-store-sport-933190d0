@@ -39,6 +39,9 @@ export function isResendConfigured(): boolean {
 export function getPublicStoreUrl(): string {
   const url =
     process.env["KICKPOINT_PUBLIC_URL"] ||
+    process.env["APP_URL"] ||
+    process.env["SITE_URL"] ||
+    process.env["PUBLIC_APP_URL"] ||
     process.env["VITE_APP_URL"] ||
     "https://kickpoint-store-sport-933190d0.lovable.app";
   return url.replace(/\/+$/, "");
@@ -62,6 +65,7 @@ export interface EmailNotificationPayload {
   orderCode?: string | null;
   customerName?: string | null;
   customerPhone?: string | null;
+  customerEmail?: string | null;
   total?: number | null;
   paymentMethod?: string | null;
   paymentReference?: string | null;
@@ -94,6 +98,7 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
   const orderCode = payload.orderCode || "N/A";
   const customerName = payload.customerName || "Cliente";
   const phone = payload.customerPhone || "No especificado";
+  const customerEmail = payload.customerEmail || "No especificado";
   const totalStr =
     payload.total !== undefined && payload.total !== null
       ? `$${payload.total.toFixed(2)}`
@@ -103,18 +108,21 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
 
   switch (payload.eventType) {
     case "order_created": {
-      const subject = `🔔 KICKPOINT — Nuevo pedido pendiente de aprobación #${orderCode}`;
+      const subject = payload.customSubject || `🚨 Nuevo pedido recibido — KICKPOINT`;
       const text =
-        `KICKPOINT — Nuevo Pedido Recibido\n\n` +
+        `KICKPOINT\n\n` +
+        `🚨 TIENES UN NUEVO PEDIDO\n\n` +
+        `Se ha recibido un nuevo pedido en KICKPOINT.\n\n` +
+        `Información del pedido\n\n` +
         `Pedido: #${orderCode}\n` +
         `Cliente: ${customerName}\n` +
         `Teléfono: ${phone}\n` +
+        `Correo: ${customerEmail}\n` +
         `Total: ${totalStr}\n` +
         `Método de pago: ${paymentMethod}\n` +
-        `Referencia de pago: ${paymentRef}\n` +
+        `Referencia: ${paymentRef}\n` +
         `Estado: Pendiente de verificación\n\n` +
-        `Ingresa al panel administrativo para revisar y aprobar el pedido:\n` +
-        `${adminUrl}\n\n` +
+        `Verificar pedido:\n${adminUrl}\n\n` +
         `KICKPOINT Store System`;
 
       const html = `
@@ -129,7 +137,7 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
   <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0b0f17; padding: 32px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; background-color: #131b2e; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden;">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; background-color: #131b2e; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
           
           <!-- Header -->
           <tr>
@@ -137,12 +145,12 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
               <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
                 <tr>
                   <td>
-                    <span style="font-size: 20px; font-weight: 800; letter-spacing: 1.5px; color: #38bdf8; text-transform: uppercase;">⚡ KICKPOINT</span>
-                    <span style="display: block; font-size: 11px; color: #94a3b8; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px;">Notificación de Administración</span>
+                    <span style="font-size: 22px; font-weight: 900; letter-spacing: 1.5px; color: #38bdf8; text-transform: uppercase;">⚡ KICKPOINT</span>
+                    <span style="display: block; font-size: 12px; color: #94a3b8; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px;">Notificación de Administración</span>
                   </td>
                   <td align="right">
-                    <span style="display: inline-block; background-color: rgba(56, 189, 248, 0.15); color: #38bdf8; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px; border: 1px solid rgba(56, 189, 248, 0.3);">
-                      Nuevo Pedido
+                    <span style="display: inline-block; background-color: rgba(239, 68, 68, 0.15); color: #f87171; font-size: 11px; font-weight: 800; padding: 6px 12px; border-radius: 9999px; border: 1px solid rgba(239, 68, 68, 0.3); text-transform: uppercase; letter-spacing: 0.5px;">
+                      🚨 TIENES UN NUEVO PEDIDO
                     </span>
                   </td>
                 </tr>
@@ -153,21 +161,21 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
           <!-- Main Body -->
           <tr>
             <td style="padding: 32px;">
-              <h1 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 700; color: #ffffff;">
-                Nuevo pedido recibido que requiere revisión
+              <h1 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 800; color: #ffffff;">
+                Se ha recibido un nuevo pedido en KICKPOINT.
               </h1>
               <p style="margin: 0 0 24px 0; font-size: 14px; color: #94a3b8; line-height: 1.5;">
-                Un cliente ha completado el checkout en la tienda y su comprobante de pago está listo para ser validado.
+                Un cliente ha completado el checkout en la tienda KICKPOINT. Por favor revisa los detalles y valida el comprobante de pago.
               </p>
 
               <!-- Order Details Card -->
-              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0b0f17; border: 1px solid #1e293b; border-radius: 8px; margin-bottom: 28px;">
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0b0f17; border: 1px solid #1e293b; border-radius: 10px; margin-bottom: 28px; overflow: hidden;">
                 <tr>
                   <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
-                        <td style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Número de Pedido</td>
-                        <td align="right" style="font-size: 14px; color: #38bdf8; font-weight: 700; font-family: monospace;">#${orderCode}</td>
+                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Número de Pedido</td>
+                        <td align="right" style="font-size: 15px; color: #38bdf8; font-weight: 800; font-family: monospace;">#${orderCode}</td>
                       </tr>
                     </table>
                   </td>
@@ -176,8 +184,8 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
-                        <td style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Cliente</td>
-                        <td align="right" style="font-size: 14px; color: #f8fafc; font-weight: 600;">${customerName}</td>
+                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Cliente</td>
+                        <td align="right" style="font-size: 14px; color: #f8fafc; font-weight: 700;">${customerName}</td>
                       </tr>
                     </table>
                   </td>
@@ -186,8 +194,8 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
-                        <td style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Teléfono / WhatsApp</td>
-                        <td align="right" style="font-size: 14px; color: #f8fafc; font-family: monospace;">${phone}</td>
+                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Teléfono</td>
+                        <td align="right" style="font-size: 14px; color: #f8fafc; font-family: monospace; font-weight: 600;">${phone}</td>
                       </tr>
                     </table>
                   </td>
@@ -196,8 +204,8 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
-                        <td style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Método de Pago</td>
-                        <td align="right" style="font-size: 14px; color: #f8fafc;">${paymentMethod}</td>
+                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Correo</td>
+                        <td align="right" style="font-size: 14px; color: #f8fafc; font-weight: 600;">${customerEmail}</td>
                       </tr>
                     </table>
                   </td>
@@ -206,8 +214,8 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
-                        <td style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Referencia de Pago</td>
-                        <td align="right" style="font-size: 14px; color: #fbbf24; font-family: monospace; font-weight: 600;">${paymentRef}</td>
+                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Método de Pago</td>
+                        <td align="right" style="font-size: 14px; color: #f8fafc; font-weight: 600;">${paymentMethod}</td>
                       </tr>
                     </table>
                   </td>
@@ -216,20 +224,32 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
-                        <td style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Estado Inicial</td>
-                        <td align="right" style="font-size: 12px; color: #fbbf24; font-weight: 700; background: rgba(251, 191, 36, 0.1); padding: 2px 8px; border-radius: 4px;">
-                          Pendiente de Verificación
+                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Referencia de Pago</td>
+                        <td align="right" style="font-size: 14px; color: #fbbf24; font-family: monospace; font-weight: 700;">${paymentRef}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
+                    <table width="100%">
+                      <tr>
+                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Estado</td>
+                        <td align="right">
+                          <span style="font-size: 12px; color: #fbbf24; font-weight: 800; background: rgba(251, 191, 36, 0.15); padding: 4px 10px; border-radius: 4px; border: 1px solid rgba(251, 191, 36, 0.3);">
+                            Pendiente de verificación
+                          </span>
                         </td>
                       </tr>
                     </table>
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 18px 20px; background-color: rgba(56, 189, 248, 0.04);">
+                  <td style="padding: 18px 20px; background-color: rgba(56, 189, 248, 0.08);">
                     <table width="100%">
                       <tr>
-                        <td style="font-size: 14px; color: #ffffff; font-weight: 700;">Monto Total del Pedido</td>
-                        <td align="right" style="font-size: 18px; color: #38bdf8; font-weight: 800; font-family: monospace;">${totalStr}</td>
+                        <td style="font-size: 14px; color: #ffffff; font-weight: 800; text-transform: uppercase;">Total</td>
+                        <td align="right" style="font-size: 20px; color: #38bdf8; font-weight: 900; font-family: monospace;">${totalStr}</td>
                       </tr>
                     </table>
                   </td>
@@ -240,15 +260,15 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
               <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom: 24px;">
                 <tr>
                   <td align="center">
-                    <a href="${adminUrl}" target="_blank" style="display: inline-block; background-color: #38bdf8; color: #0f172a; font-size: 14px; font-weight: 800; text-decoration: none; padding: 14px 32px; border-radius: 8px; text-transform: uppercase; letter-spacing: 0.5px;">
-                      REVISAR PEDIDO EN ADMIN →
+                    <a href="${adminUrl}" target="_blank" style="display: inline-block; background-color: #38bdf8; color: #0b0f17; font-size: 15px; font-weight: 900; text-decoration: none; padding: 16px 40px; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 14px rgba(56, 189, 248, 0.4);">
+                      VERIFICAR PEDIDO
                     </a>
                   </td>
                 </tr>
               </table>
 
               <p style="margin: 0; font-size: 12px; color: #64748b; text-align: center; line-height: 1.4;">
-                También puedes acceder directamente desde: <a href="${adminUrl}" style="color: #38bdf8; text-decoration: underline;">${adminUrl}</a>
+                Enlace directo al panel: <a href="${adminUrl}" style="color: #38bdf8; text-decoration: underline;">${adminUrl}</a>
               </p>
             </td>
           </tr>
@@ -257,7 +277,7 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
           <tr>
             <td style="background-color: #0f172a; padding: 20px 32px; border-top: 1px solid #1e293b; text-align: center;">
               <p style="margin: 0; font-size: 11px; color: #64748b;">
-                Mensaje automático del sistema KICKPOINT Store. Destinatario administrativo configurado: ${payload.recipientEmail}
+                Mensaje administrativo de KICKPOINT Store. Destinatario: ${payload.recipientEmail}
               </p>
             </td>
           </tr>
@@ -377,10 +397,12 @@ export async function sendEmailNotification(
   const apiKey = getResendApiKey();
   const fromEmail = getResendFromEmail();
 
-  // Generate unique idempotency key
+  // Generate unique idempotency key adhering to new-order-admin-[ORDER_ID] standard
   const idempotencyKey =
     payload.metadata?.idempotencyKey ||
-    `email-${payload.eventType}-${payload.orderId || payload.orderCode || Date.now()}-${payload.recipientType}`;
+    (payload.eventType === "order_created"
+      ? `new-order-admin-${payload.orderId || payload.orderCode || Date.now()}`
+      : `email-${payload.eventType}-${payload.orderId || payload.orderCode || Date.now()}-${payload.recipientType}`);
 
   const { subject, html, text } = buildEmailMessage({
     ...payload,
@@ -450,21 +472,24 @@ export async function sendEmailNotification(
     if (isSupabaseServerConfigured()) {
       try {
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        await supabaseAdmin.from("email_notifications").upsert({
-          event_type: payload.eventType,
-          recipient_email: recipientEmail,
-          recipient_type: payload.recipientType,
-          order_id: payload.orderId ?? null,
-          order_code: payload.orderCode ?? null,
-          subject,
-          body_html: html,
-          status: "pending",
-          error_message: "RESEND_API_KEY no configurada en las variables de entorno.",
-          attempts: 0,
-          idempotency_key: idempotencyKey,
-          metadata: payload.metadata || {},
-          created_at: new Date().toISOString(),
-        });
+        await supabaseAdmin.from("email_notifications").upsert(
+          {
+            event_type: payload.eventType,
+            recipient_email: recipientEmail,
+            recipient_type: payload.recipientType,
+            order_id: payload.orderId ?? null,
+            order_code: payload.orderCode ?? null,
+            subject,
+            body_html: html,
+            status: "pending",
+            error_message: "RESEND_API_KEY no configurada en las variables de entorno.",
+            attempts: 0,
+            idempotency_key: idempotencyKey,
+            metadata: payload.metadata || {},
+            created_at: new Date().toISOString(),
+          },
+          { onConflict: "idempotency_key" },
+        );
       } catch {
         /* fallback */
       }
@@ -496,6 +521,7 @@ export async function sendEmailNotification(
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
           "User-Agent": "KICKPOINT-Store/1.0",
         },
         body: JSON.stringify({
@@ -512,15 +538,17 @@ export async function sendEmailNotification(
 
       const resData = await response.json().catch(() => ({}));
 
-      if (response.ok && resData?.id) {
+      if (response.ok && (resData?.id || resData?.data?.id)) {
         isSuccess = true;
-        providerMessageId = String(resData.id);
+        providerMessageId = String(resData.id || resData?.data?.id);
         break;
       } else {
         lastError =
           resData?.message ||
           resData?.error?.message ||
-          `HTTP ${response.status}: ${response.statusText}`;
+          (typeof resData?.error === "string" ? resData.error : null) ||
+          resData?.name ||
+          `HTTP ${response.status}: ${response.statusText || "Resend dispatch rejected"}`;
       }
     } catch (err: any) {
       lastError = err.message || "Network timeout connecting to Resend API";
@@ -557,23 +585,26 @@ export async function sendEmailNotification(
   if (isSupabaseServerConfigured()) {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin.from("email_notifications").upsert({
-        event_type: payload.eventType,
-        recipient_email: recipientEmail,
-        recipient_type: payload.recipientType,
-        order_id: payload.orderId ?? null,
-        order_code: payload.orderCode ?? null,
-        subject,
-        body_html: html,
-        status,
-        provider_message_id: providerMessageId,
-        error_message: isSuccess ? null : lastError,
-        attempts,
-        idempotency_key: idempotencyKey,
-        metadata: payload.metadata || {},
-        created_at: new Date().toISOString(),
-        sent_at: sentAt,
-      });
+      await supabaseAdmin.from("email_notifications").upsert(
+        {
+          event_type: payload.eventType,
+          recipient_email: recipientEmail,
+          recipient_type: payload.recipientType,
+          order_id: payload.orderId ?? null,
+          order_code: payload.orderCode ?? null,
+          subject,
+          body_html: html,
+          status,
+          provider_message_id: providerMessageId,
+          error_message: isSuccess ? null : lastError,
+          attempts,
+          idempotency_key: idempotencyKey,
+          metadata: payload.metadata || {},
+          created_at: new Date().toISOString(),
+          sent_at: sentAt,
+        },
+        { onConflict: "idempotency_key" },
+      );
     } catch (dbErr) {
       console.warn("[Email Resend] Supabase audit log error:", dbErr);
     }
