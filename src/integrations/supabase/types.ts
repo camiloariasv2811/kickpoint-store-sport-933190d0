@@ -713,6 +713,74 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_notifications: {
+        Row: {
+          attempts: number
+          created_at: string
+          error_message: string | null
+          event_type: string
+          id: string
+          idempotency_key: string
+          message: string
+          metadata: Json
+          order_code: string | null
+          order_id: string | null
+          provider_message_id: string | null
+          recipient_phone: string
+          recipient_type: string
+          sent_at: string | null
+          status: string
+          template_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          idempotency_key: string
+          message: string
+          metadata?: Json
+          order_code?: string | null
+          order_id?: string | null
+          provider_message_id?: string | null
+          recipient_phone: string
+          recipient_type?: string
+          sent_at?: string | null
+          status?: string
+          template_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          idempotency_key?: string
+          message?: string
+          metadata?: Json
+          order_code?: string | null
+          order_id?: string | null
+          provider_message_id?: string | null
+          recipient_phone?: string
+          recipient_type?: string
+          sent_at?: string | null
+          status?: string
+          template_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
