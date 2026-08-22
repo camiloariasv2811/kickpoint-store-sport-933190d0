@@ -500,7 +500,9 @@ function AdminConfiguracion() {
                   <p className="mt-1 font-mono text-sm font-bold text-foreground">
                     {waStatus?.officialNumber || "+58 412 1546698"}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">Emisor de notificaciones</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Emisor de notificaciones
+                  </p>
                 </div>
 
                 <div className="rounded-lg border border-border bg-surface-2/40 p-3.5">
@@ -510,7 +512,9 @@ function AdminConfiguracion() {
                   <p className="mt-1 font-mono text-sm font-bold text-foreground">
                     +{waStatus?.adminRecipientNumber || "584121546698"}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">Recibe alertas de pedidos</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Recibe alertas de pedidos
+                  </p>
                 </div>
 
                 <div className="rounded-lg border border-border bg-surface-2/40 p-3.5">
@@ -520,7 +524,9 @@ function AdminConfiguracion() {
                   <p className="mt-1 font-mono text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
                     {waStatus?.stats.sent ?? 0}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">Entregadas a destinatarios</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    Entregadas a destinatarios
+                  </p>
                 </div>
 
                 <div className="rounded-lg border border-border bg-surface-2/40 p-3.5">
@@ -545,11 +551,15 @@ function AdminConfiguracion() {
                 <div className="space-y-3 divide-y divide-border/60">
                   <div className="flex items-center justify-between pt-2">
                     <div className="space-y-0.5 pr-4">
-                      <Label htmlFor="toggle-wa-admin" className="text-sm font-semibold text-foreground cursor-pointer">
+                      <Label
+                        htmlFor="toggle-wa-admin"
+                        className="text-sm font-semibold text-foreground cursor-pointer"
+                      >
                         Notificar al Administrador en nuevos pedidos
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        Envía un mensaje de WhatsApp a +58 412 1546698 cada vez que un cliente complete un checkout.
+                        Envía un mensaje de WhatsApp a +58 412 1546698 cada vez que un cliente
+                        complete un checkout.
                       </p>
                     </div>
                     <Switch
@@ -562,11 +572,15 @@ function AdminConfiguracion() {
 
                   <div className="flex items-center justify-between pt-3">
                     <div className="space-y-0.5 pr-4">
-                      <Label htmlFor="toggle-wa-cust" className="text-sm font-semibold text-foreground cursor-pointer">
+                      <Label
+                        htmlFor="toggle-wa-cust"
+                        className="text-sm font-semibold text-foreground cursor-pointer"
+                      >
                         Notificar al Cliente en cambios de estado
                       </Label>
                       <p className="text-xs text-muted-foreground">
-                        Envía confirmaciones automáticas al WhatsApp del cliente: pago verificado, en preparación, empacado y despacho con número de guía.
+                        Envía confirmaciones automáticas al WhatsApp del cliente: pago verificado,
+                        en preparación, empacado y despacho con número de guía.
                       </p>
                     </div>
                     <Switch
@@ -591,7 +605,10 @@ function AdminConfiguracion() {
                 <form onSubmit={handleSendTestMessage} className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
-                      <Label htmlFor="wa-test-phone" className="text-xs font-semibold text-foreground">
+                      <Label
+                        htmlFor="wa-test-phone"
+                        className="text-xs font-semibold text-foreground"
+                      >
                         Teléfono Destino (Formato Nacional o Internacional)
                       </Label>
                       <Input
@@ -603,7 +620,10 @@ function AdminConfiguracion() {
                       />
                     </div>
                     <div className="sm:col-span-2">
-                      <Label htmlFor="wa-test-msg" className="text-xs font-semibold text-foreground">
+                      <Label
+                        htmlFor="wa-test-msg"
+                        className="text-xs font-semibold text-foreground"
+                      >
                         Mensaje Opcional Personalizado
                       </Label>
                       <Input
@@ -648,7 +668,8 @@ function AdminConfiguracion() {
 
                 {!waStatus?.recentLogs || waStatus.recentLogs.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
-                    No hay notificaciones enviadas todavía. Cuando se generen pedidos o envíos, aparecerán aquí con su identificador único de entrega.
+                    No hay notificaciones enviadas todavía. Cuando se generen pedidos o envíos,
+                    aparecerán aquí con su identificador único de entrega.
                   </div>
                 ) : (
                   <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface-1">
@@ -679,7 +700,8 @@ function AdminConfiguracion() {
                           </div>
                           <p className="text-[11px] text-muted-foreground font-mono">
                             Destino: +{log.recipient_phone}
-                            {log.provider_message_id && ` • ID: ${log.provider_message_id.slice(0, 16)}...`}
+                            {log.provider_message_id &&
+                              ` • ID: ${log.provider_message_id.slice(0, 16)}...`}
                           </p>
                           {log.error_message && log.status === "failed" && (
                             <p className="text-[11px] text-rose-500 font-medium">
@@ -694,8 +716,8 @@ function AdminConfiguracion() {
                               log.status === "sent"
                                 ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                                 : log.status === "pending"
-                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                  : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
                             }`}
                           >
                             {log.status === "sent" ? (
@@ -708,8 +730,8 @@ function AdminConfiguracion() {
                             {log.status === "sent"
                               ? "Enviado"
                               : log.status === "pending"
-                              ? "Pendiente / Cola"
-                              : "Fallido"}
+                                ? "Pendiente / Cola"
+                                : "Fallido"}
                           </span>
                           <span className="text-[10px] text-muted-foreground font-mono">
                             {new Date(log.created_at).toLocaleTimeString("es-VE", {

@@ -1,10 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
-import {
-  getInMemoryWhatsAppNotifications,
-  type InMemoryWhatsAppNotification,
-} from "./demo-data";
+import { getInMemoryWhatsAppNotifications, type InMemoryWhatsAppNotification } from "./demo-data";
 import {
   DEFAULT_ADMIN_WHATSAPP,
   getAdminWhatsAppNumber,

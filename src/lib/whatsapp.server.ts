@@ -21,7 +21,9 @@ export const DEFAULT_ADMIN_WHATSAPP = "584121546698";
  */
 export function normalizeWhatsAppPhone(phone: string | null | undefined): string | null {
   if (!phone) return null;
-  let cleaned = String(phone).replace(/[^\d+]/g, "").trim();
+  let cleaned = String(phone)
+    .replace(/[^\d+]/g, "")
+    .trim();
   if (cleaned.startsWith("+")) {
     cleaned = cleaned.slice(1);
   }
@@ -426,7 +428,9 @@ export async function sendWhatsAppNotification(
   if (!accessToken || !phoneNumberId) {
     const infoMsg =
       "WhatsApp Cloud API credentials (WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID) not configured in environment";
-    console.info(`[WhatsApp] Notification queued (simulated delivery in non-configured mode): ${payload.eventType} -> ${normalizedPhone}`);
+    console.info(
+      `[WhatsApp] Notification queued (simulated delivery in non-configured mode): ${payload.eventType} -> ${normalizedPhone}`,
+    );
 
     const simulatedId = `wamid.sim_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 

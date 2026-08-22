@@ -145,7 +145,9 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
               orderCode: order.order_number,
               customerName: `${order.customer.first_name} ${order.customer.last_name || ""}`.trim(),
               shippingCarrier,
-            }).catch((err) => console.warn("[updateOrderStatus] In-memory WhatsApp notification warning:", err));
+            }).catch((err) =>
+              console.warn("[updateOrderStatus] In-memory WhatsApp notification warning:", err),
+            );
           }
         }
       } catch (notifErr) {
@@ -208,7 +210,9 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
               orderCode: orderData.order_number,
               customerName: `${cust?.first_name || ""} ${cust?.last_name || ""}`.trim(),
               shippingCarrier,
-            }).catch((err) => console.warn("[updateOrderStatus] Supabase WhatsApp notification warning:", err));
+            }).catch((err) =>
+              console.warn("[updateOrderStatus] Supabase WhatsApp notification warning:", err),
+            );
           }
         }
       }
@@ -422,7 +426,9 @@ export const reviewPayment = createServerFn({ method: "POST" })
             orderCode: order.order_number,
             customerName: `${customerData.first_name || ""} ${customerData.last_name || ""}`.trim(),
             total: Number(order.total || 0),
-          }).catch((err) => console.warn("[reviewPayment] Supabase WhatsApp notification warning:", err));
+          }).catch((err) =>
+            console.warn("[reviewPayment] Supabase WhatsApp notification warning:", err),
+          );
         }
       }
     } catch (notifErr) {
@@ -542,7 +548,9 @@ export const cancelOrder = createServerFn({ method: "POST" })
             orderId: order.id,
             orderCode: order.order_number,
             customerName: `${customerData.first_name || ""} ${customerData.last_name || ""}`.trim(),
-          }).catch((err) => console.warn("[cancelOrder] Supabase WhatsApp notification warning:", err));
+          }).catch((err) =>
+            console.warn("[cancelOrder] Supabase WhatsApp notification warning:", err),
+          );
         }
       }
     } catch (notifErr) {

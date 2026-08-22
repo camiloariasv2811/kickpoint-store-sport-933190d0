@@ -61,7 +61,8 @@ Deno.serve(async (req: Request) => {
 
             if (status === "failed") {
               updatePayload.status = "failed";
-              updatePayload.error_message = errors?.[0]?.message || "Delivery failed according to Meta webhook";
+              updatePayload.error_message =
+                errors?.[0]?.message || "Delivery failed according to Meta webhook";
             }
 
             await supabase

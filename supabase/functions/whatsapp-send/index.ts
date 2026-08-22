@@ -66,8 +66,10 @@ Deno.serve(async (req: Request) => {
 
     if (!event_type || !recipient_phone || !message || !idempotency_key) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields (event_type, recipient_phone, message, idempotency_key)" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: "Missing required fields (event_type, recipient_phone, message, idempotency_key)",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -90,7 +92,7 @@ Deno.serve(async (req: Request) => {
           notification_id: existingNotif.id,
           provider_message_id: existingNotif.provider_message_id,
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -115,13 +117,13 @@ Deno.serve(async (req: Request) => {
           attempts: 1,
           metadata,
         },
-        { onConflict: "idempotency_key" }
+        { onConflict: "idempotency_key" },
       );
 
-      return new Response(
-        JSON.stringify({ ok: false, status: "failed", error: errorMsg }),
-        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ ok: false, status: "failed", error: errorMsg }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     // 3. Check Meta API Credentials
@@ -130,7 +132,8 @@ Deno.serve(async (req: Request) => {
     const apiVersion = Deno.env.get("WHATSAPP_API_VERSION") || "v21.0";
 
     if (!accessToken || !phoneNumberId) {
-      const errorMsg = "WhatsApp Cloud API credentials (WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID) not configured in environment";
+      const errorMsg =
+        "WhatsApp Cloud API credentials (WHATSAPP_ACCESS_TOKEN or WHATSAPP_PHONE_NUMBER_ID) not configured in environment";
       console.warn(`[whatsapp-send] ${errorMsg}`);
 
       await supabase.from("whatsapp_notifications").upsert(
@@ -148,12 +151,16 @@ Deno.serve(async (req: Request) => {
           attempts: 1,
           metadata: { ...metadata, unconfigured_mode: true },
         },
-        { onConflict: "idempotency_key" }
+        { onConflict: "idempotency_key" },
       );
 
       return new Response(
-        JSON.stringify({ ok: true, status: "pending", message: "Notification queued. Meta credentials pending." }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          ok: true,
+          status: "pending",
+          message: "Notification queued. Meta credentials pending.",
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -244,7 +251,7 @@ Deno.serve(async (req: Request) => {
           sent_at: providerMessageId ? new Date().toISOString() : null,
           metadata,
         },
-        { onConflict: "idempotency_key" }
+        { onConflict: "idempotency_key" },
       )
       .select("id")
       .maybeSingle();
@@ -264,13 +271,13 @@ Deno.serve(async (req: Request) => {
       {
         status: finalStatus === "sent" ? 200 : 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      },
     );
   } catch (err: any) {
     console.error("[whatsapp-send] Fatal catch:", err);
-    return new Response(
-      JSON.stringify({ error: err.message || "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: err.message || "Internal server error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

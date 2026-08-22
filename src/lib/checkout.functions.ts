@@ -244,16 +244,16 @@ export const createOrder = createServerFn({ method: "POST" })
 
       // Trigger asynchronous WhatsApp notification to Admin (non-blocking)
       try {
-        const { sendWhatsAppNotification, getAdminWhatsAppNumber } = await import(
-          "./whatsapp.server"
-        );
+        const { sendWhatsAppNotification, getAdminWhatsAppNumber } =
+          await import("./whatsapp.server");
         sendWhatsAppNotification({
           eventType: "order_created",
           recipientType: "admin",
           recipientPhone: getAdminWhatsAppNumber(),
           orderId: newOrder.id,
           orderCode: newOrder.order_number,
-          customerName: `${newOrder.customer.first_name} ${newOrder.customer.last_name || ""}`.trim(),
+          customerName:
+            `${newOrder.customer.first_name} ${newOrder.customer.last_name || ""}`.trim(),
           total: newOrder.total,
           paymentMethod: data.paymentMethod,
         }).catch((err) => console.warn("[Checkout] WhatsApp admin notification warning:", err));
@@ -428,19 +428,21 @@ export const createOrder = createServerFn({ method: "POST" })
 
     // Trigger asynchronous WhatsApp notification to Admin (non-blocking)
     try {
-      const { sendWhatsAppNotification, getAdminWhatsAppNumber } = await import(
-        "./whatsapp.server"
-      );
+      const { sendWhatsAppNotification, getAdminWhatsAppNumber } =
+        await import("./whatsapp.server");
       sendWhatsAppNotification({
         eventType: "order_created",
         recipientType: "admin",
         recipientPhone: getAdminWhatsAppNumber(),
         orderId: order.id,
         orderCode: order.order_number,
-        customerName: `${data.customer.firstName.trim()} ${data.customer.lastName?.trim() || ""}`.trim(),
+        customerName:
+          `${data.customer.firstName.trim()} ${data.customer.lastName?.trim() || ""}`.trim(),
         total: Number(order.total),
         paymentMethod: data.paymentMethod,
-      }).catch((err) => console.warn("[Checkout] Supabase WhatsApp admin notification warning:", err));
+      }).catch((err) =>
+        console.warn("[Checkout] Supabase WhatsApp admin notification warning:", err),
+      );
     } catch (notifErr) {
       console.warn("[Checkout] Failed to trigger WhatsApp admin notification:", notifErr);
     }
