@@ -83,7 +83,8 @@ export interface WhatsAppNotificationPayload {
 
 export interface WhatsAppSendResult {
   ok: boolean;
-  status: "sent" | "pending" | "failed" | "already_sent";
+  status: "sent" | "pending" | "failed" | "already_sent" | "not_configured";
+  missingSecrets?: string[];
   notificationId?: string;
   providerMessageId?: string | null;
   errorMessage?: string | null;
@@ -393,7 +394,7 @@ export async function sendWhatsAppNotification(
         ok: true,
         status: "already_sent",
         notificationId: existing.id,
-        providerMessageId: existing.provider_message_id,
+        providerMessageId: existing.provider_message_id ?? null,
         idempotencyKey,
       };
     }
@@ -426,13 +427,11 @@ export async function sendWhatsAppNotification(
   const apiVersion = process.env["WHATSAPP_API_VERSION"] || "v21.0";
 
   if (!accessToken || !phoneNumberId) {
-    const infoMsg =
-      "WhatsApp Cloud API credentials (WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID) not configured in environment";
-    console.info(
-      `[WhatsApp] Notification queued (simulated delivery in non-configured mode): ${payload.eventType} -> ${normalizedPhone}`,
-    );
-
-    const simulatedId = `wamid.sim_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const missingSecrets: string[] = [];
+    if (!accessToken) missingSecrets.push("WHATSAPP_ACCESS_TOKEN");
+    if (!phoneNumberId) missingSecrets.push("WHATSAPP_PHONE_NUMBER_ID");
+    const infoMsg = `WhatsApp no configurado. Faltan credenciales de Meta Cloud API: ${missingSecrets.join(", ")}`;
+    console.warn(`[WhatsApp] ${infoMsg} (evento: ${payload.eventType})`);
 
     const notifRecord: InMemoryWhatsAppNotification = {
       id: `wn-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -444,9 +443,9 @@ export async function sendWhatsAppNotification(
       message: messageText,
       template_name: templateName,
       status: "pending",
-      provider_message_id: simulatedId,
+      provider_message_id: null,
       error_message: infoMsg,
-      attempts: 1,
+      attempts: 0,
       idempotency_key: idempotencyKey,
       created_at: new Date().toISOString(),
       sent_at: null,
@@ -468,10 +467,10 @@ export async function sendWhatsAppNotification(
             message: messageText,
             template_name: templateName,
             status: "pending",
-            provider_message_id: simulatedId,
+            provider_message_id: null,
             error_message: infoMsg,
-            attempts: 1,
-            metadata: payload.metadata || {},
+            attempts: 0,
+            metadata: { ...(payload.metadata || {}), missing_secrets: missingSecrets },
           },
           { onConflict: "idempotency_key" },
         );
@@ -481,13 +480,15 @@ export async function sendWhatsAppNotification(
     }
 
     return {
-      ok: true,
-      status: "pending",
-      providerMessageId: simulatedId,
+      ok: false,
+      status: "not_configured",
+      providerMessageId: null,
       errorMessage: infoMsg,
+      missingSecrets,
       idempotencyKey,
     };
   }
+
 
   // 4. Meta Cloud API Request with 3-Attempt Retry
   const metaUrl = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;

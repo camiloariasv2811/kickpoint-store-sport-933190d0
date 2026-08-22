@@ -174,10 +174,16 @@ function AdminConfiguracion() {
         },
       });
 
-      if (res.ok) {
-        toast.success(`Mensaje de prueba procesado (${res.status}) con destino a ${testPhone}`);
+      if (res.ok && res.providerMessageId) {
+        toast.success(
+          `WhatsApp enviado a ${testPhone} (ID de Meta: ${res.providerMessageId})`,
+        );
+      } else if (res.status === "not_configured") {
+        toast.error(
+          `WhatsApp no configurado. Faltan credenciales: ${(res.missingSecrets ?? []).join(", ")}`,
+        );
       } else {
-        toast.error(`Error en el envío: ${res.errorMessage || "No se pudo entregar"}`);
+        toast.error(`Meta rechazó el mensaje: ${res.errorMessage || "No se pudo entregar"}`);
       }
       await refetchWaStatus();
     } catch (err: any) {
@@ -474,7 +480,7 @@ function AdminConfiguracion() {
                     waStatus?.isConfigured ? "bg-emerald-500" : "bg-amber-500"
                   }`}
                 />
-                {waStatus?.isConfigured ? "API Oficial Conectada" : "Modo Seguro / Cola Activa"}
+                {waStatus?.isConfigured ? "API Oficial Conectada" : "WhatsApp no configurado"}
               </span>
               <Button
                 size="sm"
@@ -486,6 +492,18 @@ function AdminConfiguracion() {
               </Button>
             </div>
           </div>
+
+          {!loadingWaStatus && (waStatus?.missingSecrets?.length ?? 0) > 0 && (
+            <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3.5 text-xs text-amber-700 dark:text-amber-300">
+              <p className="font-semibold">
+                Faltan credenciales de Meta WhatsApp Cloud API. No se enviará ningún mensaje real
+                hasta configurarlas:
+              </p>
+              <ul className="mt-1.5 list-inside list-disc font-mono">
+                {waStatus?.missingSecrets.map((s) => <li key={s}>{s}</li>)}
+              </ul>
+            </div>
+          )}
 
           {loadingWaStatus ? (
             <Skeleton className="mt-4 h-48 w-full" />
