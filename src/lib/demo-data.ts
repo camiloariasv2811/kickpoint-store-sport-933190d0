@@ -430,6 +430,12 @@ export function setInMemoryProductActive(id: string, active: boolean): boolean {
   return true;
 }
 
+export function deleteInMemoryProduct(id: string): boolean {
+  const len = _inMemoryProducts.length;
+  _inMemoryProducts = _inMemoryProducts.filter((p) => p.id !== id);
+  return _inMemoryProducts.length < len;
+}
+
 export type InMemoryOrder = {
   id: string;
   order_number: string;

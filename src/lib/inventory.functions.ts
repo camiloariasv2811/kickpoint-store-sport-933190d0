@@ -20,7 +20,7 @@ export type InventoryRow = {
 };
 
 const INVENTORY_SELECT = `
-  id, name, base_sku, low_stock_threshold,
+  id, name, base_sku, low_stock_threshold, active,
   category:categories ( name ),
   variants:product_variants ( id, size, color, sku, stock, active )
 `;
@@ -33,11 +33,13 @@ export const listInventory = createServerFn({ method: "GET" })
       const products = getInMemoryProducts();
       const rows: InventoryRow[] = [];
       for (const p of products) {
+        if (p.active === false) continue;
         const threshold = p.low_stock_threshold ?? 5;
         for (const v of p.variants ?? []) {
-          if (!v.active) continue;
+          if (v.active === false) continue;
+          const vStock = Number(v.stock ?? 0);
           const status: InventoryRow["status"] =
-            v.stock <= 0 ? "agotado" : v.stock <= threshold ? "bajo" : "ok";
+            vStock <= 0 ? "agotado" : vStock <= threshold ? "bajo" : "ok";
           rows.push({
             variantId: v.id,
             productId: p.id,
@@ -46,8 +48,8 @@ export const listInventory = createServerFn({ method: "GET" })
             size: v.size,
             color: v.color,
             sku: v.sku,
-            stock: v.stock,
-            active: v.active,
+            stock: vStock,
+            active: v.active !== false,
             lowStockThreshold: threshold,
             categoryName: p.category?.name ?? null,
             status,
@@ -66,11 +68,13 @@ export const listInventory = createServerFn({ method: "GET" })
         const products = getInMemoryProducts();
         const rows: InventoryRow[] = [];
         for (const p of products) {
+          if (p.active === false) continue;
           const threshold = p.low_stock_threshold ?? 5;
           for (const v of p.variants ?? []) {
-            if (!v.active) continue;
+            if (v.active === false) continue;
+            const vStock = Number(v.stock ?? 0);
             const status: InventoryRow["status"] =
-              v.stock <= 0 ? "agotado" : v.stock <= threshold ? "bajo" : "ok";
+              vStock <= 0 ? "agotado" : vStock <= threshold ? "bajo" : "ok";
             rows.push({
               variantId: v.id,
               productId: p.id,
@@ -79,8 +83,8 @@ export const listInventory = createServerFn({ method: "GET" })
               size: v.size,
               color: v.color,
               sku: v.sku,
-              stock: v.stock,
-              active: v.active,
+              stock: vStock,
+              active: v.active !== false,
               lowStockThreshold: threshold,
               categoryName: p.category?.name ?? null,
               status,
@@ -99,6 +103,7 @@ export const listInventory = createServerFn({ method: "GET" })
         name: string;
         base_sku: string | null;
         low_stock_threshold: number | null;
+        active: boolean;
         category: { name: string } | null;
         variants: {
           id: string;
@@ -109,11 +114,13 @@ export const listInventory = createServerFn({ method: "GET" })
           active: boolean;
         }[];
       }[]) {
+        if (p.active === false) continue;
         const threshold = p.low_stock_threshold ?? 5;
         for (const v of p.variants ?? []) {
-          if (!v.active) continue;
+          if (v.active === false) continue;
+          const vStock = Number(v.stock ?? 0);
           const status: InventoryRow["status"] =
-            v.stock <= 0 ? "agotado" : v.stock <= threshold ? "bajo" : "ok";
+            vStock <= 0 ? "agotado" : vStock <= threshold ? "bajo" : "ok";
           rows.push({
             variantId: v.id,
             productId: p.id,
@@ -122,8 +129,8 @@ export const listInventory = createServerFn({ method: "GET" })
             size: v.size,
             color: v.color,
             sku: v.sku,
-            stock: v.stock,
-            active: v.active,
+            stock: vStock,
+            active: v.active !== false,
             lowStockThreshold: threshold,
             categoryName: p.category?.name ?? null,
             status,
@@ -139,11 +146,13 @@ export const listInventory = createServerFn({ method: "GET" })
       const products = getInMemoryProducts();
       const rows: InventoryRow[] = [];
       for (const p of products) {
+        if (p.active === false) continue;
         const threshold = p.low_stock_threshold ?? 5;
         for (const v of p.variants ?? []) {
-          if (!v.active) continue;
+          if (v.active === false) continue;
+          const vStock = Number(v.stock ?? 0);
           const status: InventoryRow["status"] =
-            v.stock <= 0 ? "agotado" : v.stock <= threshold ? "bajo" : "ok";
+            vStock <= 0 ? "agotado" : vStock <= threshold ? "bajo" : "ok";
           rows.push({
             variantId: v.id,
             productId: p.id,
@@ -152,8 +161,8 @@ export const listInventory = createServerFn({ method: "GET" })
             size: v.size,
             color: v.color,
             sku: v.sku,
-            stock: v.stock,
-            active: v.active,
+            stock: vStock,
+            active: v.active !== false,
             lowStockThreshold: threshold,
             categoryName: p.category?.name ?? null,
             status,

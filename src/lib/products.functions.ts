@@ -6,7 +6,11 @@ import {
   DEMO_BRANDS,
   DEMO_CATEGORIES,
   addInMemoryProduct,
+  deleteInMemoryProduct,
+  getInMemoryOrders,
   getInMemoryProducts,
+  getInMemorySales,
+  recordInMemoryMovement,
   setInMemoryProductActive,
   updateInMemoryProduct,
 } from "./demo-data";
@@ -265,16 +269,55 @@ export const createProduct = createServerFn({ method: "POST" })
 
         if (!insertErr && inserted?.[0]?.id) {
           const liveProductId = inserted[0].id;
-          const liveVariants = builtVariants.map((v) => ({
+          const liveVariantsPayload = builtVariants.map((v) => ({
             product_id: liveProductId,
             size: v.size,
             color: v.color,
             sku: v.sku,
-            stock: v.stock,
+            stock: Number(v.stock || 0),
             active: v.active,
           }));
-          if (liveVariants.length > 0) {
-            await supabaseAdmin.from("product_variants").insert(liveVariants);
+
+          if (liveVariantsPayload.length > 0) {
+            const { data: insertedVariants } = await supabaseAdmin
+              .from("product_variants")
+              .insert(liveVariantsPayload)
+              .select("id, product_id, size, color, sku, stock, active");
+
+            // Update in-memory product with live IDs
+            newProduct.id = liveProductId;
+            if (insertedVariants && insertedVariants.length > 0) {
+              newProduct.variants = insertedVariants.map((iv: any) => ({
+                id: iv.id,
+                product_id: liveProductId,
+                size: iv.size,
+                color: iv.color,
+                sku: iv.sku,
+                stock: Number(iv.stock || 0),
+                active: iv.active,
+              }));
+
+              // Registrar movimientos iniciales en Kárdex para cada variante con stock > 0
+              for (const iv of insertedVariants) {
+                const stockQty = Number(iv.stock || 0);
+                if (stockQty > 0) {
+                  try {
+                    await supabaseAdmin.from("inventory_movements").insert({
+                      variant_id: iv.id,
+                      type: "entrada",
+                      quantity: stockQty,
+                      unit_cost: newProduct.cost || null,
+                      stock_after: stockQty,
+                      reference: newProduct.base_sku || "INVENTARIO-INICIAL",
+                      note: `Registro inicial de producto: ${name} (${iv.size})`,
+                      created_by: toSafeUuid(context.userId),
+                    });
+                  } catch (movErr) {
+                    console.warn("[createProduct] Warning registering initial movement:", movErr);
+                  }
+                }
+              }
+            }
           }
           return { id: liveProductId };
         }
@@ -481,6 +524,146 @@ export const setProductActive = createServerFn({ method: "POST" })
       }
     }
     return { ok: true as const };
+  });
+
+export const deleteProduct = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data, context }) => {
+    await assertIsStaff(context);
+    const productId = data.id;
+    if (!productId) throw new Error("ID de producto no especificado");
+
+    // Check in-memory history
+    const inMemOrders = getInMemoryOrders();
+    const inMemSales = getInMemorySales();
+    const inMemProduct = getInMemoryProducts().find((p) => p.id === productId);
+    const variantIds = (inMemProduct?.variants ?? []).map((v) => v.id).filter(Boolean);
+
+    let hasOrdersOrSales = false;
+
+    // Check if in-memory orders or sales reference this product's variants
+    for (const ord of inMemOrders) {
+      if (ord.items.some((it) => it.variant_id && variantIds.includes(it.variant_id))) {
+        hasOrdersOrSales = true;
+        break;
+      }
+    }
+    if (!hasOrdersOrSales) {
+      for (const sale of inMemSales) {
+        if (sale.items?.some((it: any) => it.variant_id && variantIds.includes(it.variant_id))) {
+          hasOrdersOrSales = true;
+          break;
+        }
+      }
+    }
+
+    if (isSupabaseServerConfigured()) {
+      try {
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+        // Fetch all variant IDs for this product in Supabase
+        const { data: dbVariants } = await supabaseAdmin
+          .from("product_variants")
+          .select("id")
+          .eq("product_id", productId);
+
+        const allVariantIds = Array.from(
+          new Set([...variantIds, ...(dbVariants ?? []).map((v) => v.id)]),
+        ).filter(Boolean);
+
+        if (allVariantIds.length > 0) {
+          // Check order_items
+          const { count: orderItemsCount } = await supabaseAdmin
+            .from("order_items")
+            .select("id", { count: "exact", head: true })
+            .in("variant_id", allVariantIds);
+
+          // Check sale_items
+          const { count: saleItemsCount } = await supabaseAdmin
+            .from("sale_items")
+            .select("id", { count: "exact", head: true })
+            .in("variant_id", allVariantIds);
+
+          if ((orderItemsCount ?? 0) > 0 || (saleItemsCount ?? 0) > 0) {
+            hasOrdersOrSales = true;
+          }
+        }
+
+        if (hasOrdersOrSales) {
+          // SAFE STRATEGY: Archive product and its variants to preserve financial history
+          await supabaseAdmin.from("products").update({ active: false }).eq("id", productId);
+          if (allVariantIds.length > 0) {
+            await supabaseAdmin
+              .from("product_variants")
+              .update({ active: false })
+              .in("id", allVariantIds);
+          }
+
+          setInMemoryProductActive(productId, false);
+          if (inMemProduct?.variants) {
+            for (const v of inMemProduct.variants) {
+              v.active = false;
+            }
+          }
+
+          return {
+            ok: true as const,
+            deleted: false,
+            archived: true,
+            message:
+              "El producto cuenta con historial de pedidos o ventas. Ha sido archivado y desactivado de forma segura para proteger los registros contables y el kárdex.",
+          };
+        } else {
+          // Hard delete: no orders/sales depend on it
+          if (allVariantIds.length > 0) {
+            // Clean up standalone initial inventory movements if any
+            await supabaseAdmin
+              .from("inventory_movements")
+              .delete()
+              .in("variant_id", allVariantIds);
+
+            await supabaseAdmin.from("product_variants").delete().in("id", allVariantIds);
+          }
+
+          await supabaseAdmin.from("products").delete().eq("id", productId);
+          deleteInMemoryProduct(productId);
+
+          return {
+            ok: true as const,
+            deleted: true,
+            archived: false,
+            message: "Producto eliminado correctamente del catálogo e inventario.",
+          };
+        }
+      } catch (err) {
+        console.warn("[deleteProduct] Live delete failed, falling back to memory:", err);
+      }
+    }
+
+    if (hasOrdersOrSales) {
+      setInMemoryProductActive(productId, false);
+      if (inMemProduct?.variants) {
+        for (const v of inMemProduct.variants) {
+          v.active = false;
+        }
+      }
+      return {
+        ok: true as const,
+        deleted: false,
+        archived: true,
+        message:
+          "El producto cuenta con historial registrado y ha sido archivado/desactivado de forma segura.",
+      };
+    } else {
+      deleteInMemoryProduct(productId);
+      return {
+        ok: true as const,
+        deleted: true,
+        archived: false,
+        message: "Producto eliminado correctamente.",
+      };
+    }
   });
 
 export const uploadProductImage = createServerFn({ method: "POST" })

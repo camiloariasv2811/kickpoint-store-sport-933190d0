@@ -1,15 +1,32 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Search, Edit2, Plus, AlertTriangle, CheckCircle, Package } from "lucide-react";
+import {
+  Search,
+  Edit2,
+  Plus,
+  AlertTriangle,
+  CheckCircle,
+  Package,
+  Trash2,
+  Loader2,
+} from "lucide-react";
 import { useState } from "react";
 
 import { AdminShell } from "@/components/admin/AdminShell";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { moneyExact } from "@/lib/format";
 import ProductForm from "@/components/admin/ProductForm";
-import { listAdminProducts, setProductActive } from "@/lib/products.functions";
+import { deleteProduct, listAdminProducts, setProductActive } from "@/lib/products.functions";
 import { toast } from "sonner";
 
 type AdminProductRow = {
@@ -63,15 +80,47 @@ function AdminProductos() {
 
   const [openForm, setOpenForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<AdminProductRow | null>(null);
+  const [productToDelete, setProductToDelete] = useState<AdminProductRow | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   async function handleToggleActive(id: string, active: boolean) {
     try {
       await setProductActive({ data: { id, active: !active } });
       toast.success(active ? "Producto desactivado" : "Producto activado");
-      await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] }),
+      ]);
     } catch (err: any) {
       console.error(err);
       toast.error(`Error: ${err.message || "No se pudo cambiar el estado"}`);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!productToDelete) return;
+    setIsDeleting(true);
+    try {
+      const res = await deleteProduct({ data: { id: productToDelete.id } });
+      if (res.archived) {
+        toast.info("Producto archivado", {
+          description: res.message,
+        });
+      } else {
+        toast.success(res.message || "Producto eliminado correctamente");
+      }
+      setProductToDelete(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] }),
+      ]);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(`Error al eliminar: ${err.message || "Error desconocido"}`);
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -133,7 +182,9 @@ function AdminProductos() {
                 </tr>
               )}
               {rows.map((r) => {
-                const totalStock = (r.variants || []).reduce((s, v) => s + (v.stock || 0), 0);
+                const totalStock = (r.variants || [])
+                  .filter((v) => v.active !== false)
+                  .reduce((s, v) => s + (Number(v.stock) || 0), 0);
                 const isLowStock = totalStock <= (r.low_stock_threshold || 5);
                 const firstImage =
                   Array.isArray(r.images) && r.images.length > 0 ? r.images[0] : null;
@@ -156,8 +207,8 @@ function AdminProductos() {
                         <div>
                           <p className="font-semibold text-foreground">{r.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {r.variants?.length ?? 0} variantes · Umbral:{" "}
-                            {r.low_stock_threshold || 5}
+                            {(r.variants || []).filter((v) => v.active !== false).length} variantes
+                            activas · Umbral: {r.low_stock_threshold || 5}
                           </p>
                         </div>
                       </div>
@@ -223,6 +274,15 @@ function AdminProductos() {
                         >
                           {r.active ? "Desactivar" : "Activar"}
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setProductToDelete(r)}
+                          className="h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          title="Eliminar producto"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -238,10 +298,65 @@ function AdminProductos() {
         open={openForm}
         onClose={() => setOpenForm(false)}
         onSaved={async () => {
-          await queryClient.invalidateQueries({ queryKey: ["admin", "products"] });
+          await Promise.all([
+            queryClient.invalidateQueries({ queryKey: ["admin", "products"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] }),
+            queryClient.invalidateQueries({ queryKey: ["admin", "dashboard"] }),
+          ]);
           setOpenForm(false);
         }}
       />
+
+      {/* Modal de confirmación para eliminación segura */}
+      <Dialog
+        open={Boolean(productToDelete)}
+        onOpenChange={(open) => !open && setProductToDelete(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="size-5" />
+              ¿Eliminar producto?
+            </DialogTitle>
+            <DialogDescription className="space-y-2 pt-2 text-foreground/80">
+              <p>
+                Estás a punto de eliminar{" "}
+                <span className="font-semibold text-foreground">{productToDelete?.name}</span>.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Si el producto ya posee pedidos o ventas asociadas en el sistema, será archivado y
+                desactivado de forma segura para proteger la integridad contable y el historial de
+                transacciones.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              disabled={isDeleting}
+              onClick={() => setProductToDelete(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={handleConfirmDelete}
+              className="gap-1.5"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" /> Eliminando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="size-4" /> Confirmar eliminación
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminShell>
   );
 }
