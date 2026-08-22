@@ -394,7 +394,7 @@ export async function sendWhatsAppNotification(
         ok: true,
         status: "already_sent",
         notificationId: existing.id,
-        providerMessageId: existing.provider_message_id,
+        providerMessageId: existing.provider_message_id ?? null,
         idempotencyKey,
       };
     }
