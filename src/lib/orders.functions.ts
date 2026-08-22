@@ -117,6 +117,41 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (!isSupabaseServerConfigured()) {
       updateInMemoryOrderStatus(data.orderId, data.status);
+
+      // Trigger asynchronous WhatsApp customer notification (non-blocking)
+      try {
+        const order = getInMemoryOrders().find((o) => o.id === data.orderId);
+        if (order && order.customer?.whatsapp) {
+          const { sendWhatsAppNotification } = await import("./whatsapp.server");
+          const statusToEventMap: Record<string, any> = {
+            preparando_pedido: "preparando_pedido",
+            empacando_pedido: "empacando_pedido",
+            pedido_enviado: "pedido_enviado",
+            pedido_entregado: "pedido_entregado",
+            pago_verificado: "payment_verified",
+            cancelado: "pedido_cancelado",
+          };
+          const eventType = statusToEventMap[data.status];
+          if (eventType) {
+            let shippingCarrier: string | null = null;
+            if (order.notes?.includes("TEALCA")) shippingCarrier = "TEALCA";
+            else if (order.notes?.includes("MRW")) shippingCarrier = "MRW";
+
+            sendWhatsAppNotification({
+              eventType,
+              recipientType: "customer",
+              recipientPhone: order.customer.whatsapp,
+              orderId: order.id,
+              orderCode: order.order_number,
+              customerName: `${order.customer.first_name} ${order.customer.last_name || ""}`.trim(),
+              shippingCarrier,
+            }).catch((err) => console.warn("[updateOrderStatus] In-memory WhatsApp notification warning:", err));
+          }
+        }
+      } catch (notifErr) {
+        console.warn("[updateOrderStatus] In-memory WhatsApp notification error:", notifErr);
+      }
+
       return { ok: true as const };
     }
 
@@ -136,6 +171,49 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
       });
     } catch {
       /* audit log fallback */
+    }
+
+    // Trigger asynchronous WhatsApp customer notification (non-blocking)
+    try {
+      const { data: orderData } = await supabaseAdmin
+        .from("orders")
+        .select("id, order_number, notes, customer:customers(first_name, last_name, whatsapp)")
+        .eq("id", data.orderId)
+        .maybeSingle();
+
+      if (orderData) {
+        const cust = orderData.customer as any;
+        const customerPhone = cust?.whatsapp;
+        if (customerPhone) {
+          const { sendWhatsAppNotification } = await import("./whatsapp.server");
+          const statusToEventMap: Record<string, any> = {
+            preparando_pedido: "preparando_pedido",
+            empacando_pedido: "empacando_pedido",
+            pedido_enviado: "pedido_enviado",
+            pedido_entregado: "pedido_entregado",
+            pago_verificado: "payment_verified",
+            cancelado: "pedido_cancelado",
+          };
+          const eventType = statusToEventMap[data.status];
+          if (eventType) {
+            let shippingCarrier: string | null = null;
+            if (orderData.notes?.includes("TEALCA")) shippingCarrier = "TEALCA";
+            else if (orderData.notes?.includes("MRW")) shippingCarrier = "MRW";
+
+            sendWhatsAppNotification({
+              eventType,
+              recipientType: "customer",
+              recipientPhone: customerPhone,
+              orderId: orderData.id,
+              orderCode: orderData.order_number,
+              customerName: `${cust?.first_name || ""} ${cust?.last_name || ""}`.trim(),
+              shippingCarrier,
+            }).catch((err) => console.warn("[updateOrderStatus] Supabase WhatsApp notification warning:", err));
+          }
+        }
+      }
+    } catch (notifErr) {
+      console.warn("[updateOrderStatus] Supabase WhatsApp notification error:", notifErr);
     }
 
     return { ok: true as const };
@@ -325,6 +403,32 @@ export const reviewPayment = createServerFn({ method: "POST" })
       /* audit log */
     }
 
+    // Trigger customer notification for payment_verified (non-blocking)
+    try {
+      if (order?.customer_id) {
+        const { data: customerData } = await supabaseAdmin
+          .from("customers")
+          .select("first_name, last_name, whatsapp")
+          .eq("id", order.customer_id)
+          .maybeSingle();
+
+        if (customerData?.whatsapp) {
+          const { sendWhatsAppNotification } = await import("./whatsapp.server");
+          sendWhatsAppNotification({
+            eventType: "payment_verified",
+            recipientType: "customer",
+            recipientPhone: customerData.whatsapp,
+            orderId: order.id,
+            orderCode: order.order_number,
+            customerName: `${customerData.first_name || ""} ${customerData.last_name || ""}`.trim(),
+            total: Number(order.total || 0),
+          }).catch((err) => console.warn("[reviewPayment] Supabase WhatsApp notification warning:", err));
+        }
+      }
+    } catch (notifErr) {
+      console.warn("[reviewPayment] Supabase WhatsApp notification error:", notifErr);
+    }
+
     return { ok: true as const, approved: true as const };
   });
 
@@ -418,6 +522,31 @@ export const cancelOrder = createServerFn({ method: "POST" })
       });
     } catch {
       /* audit log */
+    }
+
+    // Trigger customer notification for pedido_cancelado (non-blocking)
+    try {
+      if (order?.customer_id) {
+        const { data: customerData } = await supabaseAdmin
+          .from("customers")
+          .select("first_name, last_name, whatsapp")
+          .eq("id", order.customer_id)
+          .maybeSingle();
+
+        if (customerData?.whatsapp) {
+          const { sendWhatsAppNotification } = await import("./whatsapp.server");
+          sendWhatsAppNotification({
+            eventType: "pedido_cancelado",
+            recipientType: "customer",
+            recipientPhone: customerData.whatsapp,
+            orderId: order.id,
+            orderCode: order.order_number,
+            customerName: `${customerData.first_name || ""} ${customerData.last_name || ""}`.trim(),
+          }).catch((err) => console.warn("[cancelOrder] Supabase WhatsApp notification warning:", err));
+        }
+      }
+    } catch (notifErr) {
+      console.warn("[cancelOrder] Supabase WhatsApp notification error:", notifErr);
     }
 
     return { ok: true as const };

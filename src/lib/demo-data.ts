@@ -881,3 +881,43 @@ export function deleteInMemoryOrder(orderId: string): boolean {
   _inMemoryOrders = _inMemoryOrders.filter((o) => o.id !== orderId);
   return _inMemoryOrders.length < initialLength;
 }
+
+export type InMemoryWhatsAppNotification = {
+  id: string;
+  event_type: string;
+  recipient_phone: string;
+  recipient_type: "admin" | "customer";
+  order_id?: string | null;
+  order_code?: string | null;
+  message: string;
+  template_name?: string | null;
+  status: "pending" | "sent" | "failed";
+  provider_message_id?: string | null;
+  error_message?: string | null;
+  attempts: number;
+  idempotency_key: string;
+  created_at: string;
+  sent_at?: string | null;
+};
+
+let _inMemoryWhatsAppNotifications: InMemoryWhatsAppNotification[] = [];
+
+export function getInMemoryWhatsAppNotifications(): InMemoryWhatsAppNotification[] {
+  return _inMemoryWhatsAppNotifications;
+}
+
+export function addInMemoryWhatsAppNotification(n: InMemoryWhatsAppNotification) {
+  const existingIdx = _inMemoryWhatsAppNotifications.findIndex(
+    (item) => item.idempotency_key === n.idempotency_key,
+  );
+  if (existingIdx >= 0) {
+    _inMemoryWhatsAppNotifications[existingIdx] = n;
+  } else {
+    _inMemoryWhatsAppNotifications = [n, ..._inMemoryWhatsAppNotifications];
+  }
+  return n;
+}
+
+export function clearInMemoryWhatsAppNotifications() {
+  _inMemoryWhatsAppNotifications = [];
+}

@@ -10,6 +10,13 @@ import {
   Save,
   Loader2,
   Edit2,
+  MessageSquare,
+  Send,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  RefreshCw,
+  ExternalLink,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -38,6 +45,12 @@ import {
   type StoreSettings,
   type PaymentMethodRow,
 } from "@/lib/settings.functions";
+import {
+  getWhatsAppDashboardStatus,
+  sendWhatsAppTest,
+  updateWhatsAppNotificationSettings,
+  type WhatsAppDashboardStatus,
+} from "@/lib/whatsapp.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/configuracion")({
   component: AdminConfiguracion,
@@ -96,6 +109,83 @@ function AdminConfiguracion() {
       }
     },
   });
+
+  // WhatsApp Cloud API Integration State & Queries
+  const {
+    data: waStatus,
+    isLoading: loadingWaStatus,
+    refetch: refetchWaStatus,
+  } = useQuery<WhatsAppDashboardStatus>({
+    queryKey: ["admin", "whatsapp", "status"],
+    queryFn: () => getWhatsAppDashboardStatus(),
+  });
+
+  const [testPhone, setTestPhone] = useState("+584121546698");
+  const [testMessage, setTestMessage] = useState("");
+  const [sendingTest, setSendingTest] = useState(false);
+  const [notifyAdminNewOrder, setNotifyAdminNewOrder] = useState(true);
+  const [notifyCustomerStatusChange, setNotifyCustomerStatusChange] = useState(true);
+  const [savingWaToggles, setSavingWaToggles] = useState(false);
+
+  useEffect(() => {
+    if (waStatus) {
+      setNotifyAdminNewOrder(waStatus.settings.notifyAdminNewOrder);
+      setNotifyCustomerStatusChange(waStatus.settings.notifyCustomerStatusChange);
+    }
+  }, [waStatus]);
+
+  async function handleToggleWaSetting(key: "admin" | "customer", nextVal: boolean) {
+    const nextAdmin = key === "admin" ? nextVal : notifyAdminNewOrder;
+    const nextCustomer = key === "customer" ? nextVal : notifyCustomerStatusChange;
+
+    if (key === "admin") setNotifyAdminNewOrder(nextVal);
+    if (key === "customer") setNotifyCustomerStatusChange(nextVal);
+
+    setSavingWaToggles(true);
+    try {
+      await updateWhatsAppNotificationSettings({
+        data: {
+          notifyAdminNewOrder: nextAdmin,
+          notifyCustomerStatusChange: nextCustomer,
+        },
+      });
+      toast.success("Preferencia de notificación de WhatsApp actualizada");
+      await queryClient.invalidateQueries({ queryKey: ["admin", "whatsapp", "status"] });
+    } catch (err: any) {
+      toast.error(`Error al actualizar preferencias: ${err.message || "Error desconocido"}`);
+    } finally {
+      setSavingWaToggles(false);
+    }
+  }
+
+  async function handleSendTestMessage(e: React.FormEvent) {
+    e.preventDefault();
+    if (!testPhone.trim()) {
+      toast.error("Ingresa un número de WhatsApp para la prueba");
+      return;
+    }
+
+    setSendingTest(true);
+    try {
+      const res = await sendWhatsAppTest({
+        data: {
+          phone: testPhone.trim(),
+          message: testMessage.trim() || undefined,
+        },
+      });
+
+      if (res.ok) {
+        toast.success(`Mensaje de prueba procesado (${res.status}) con destino a ${testPhone}`);
+      } else {
+        toast.error(`Error en el envío: ${res.errorMessage || "No se pudo entregar"}`);
+      }
+      await refetchWaStatus();
+    } catch (err: any) {
+      toast.error(err.message || "Error al enviar mensaje de prueba");
+    } finally {
+      setSendingTest(false);
+    }
+  }
 
   useEffect(() => {
     if (settings) {
@@ -354,6 +444,287 @@ function AdminConfiguracion() {
                 </Button>
               </div>
             </form>
+          )}
+        </div>
+
+        {/* WhatsApp Business Platform & Notificaciones Automáticas */}
+        <div className="surface-card p-6">
+          <div className="flex flex-col justify-between gap-2 border-b border-border pb-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                <MessageSquare className="size-5" />
+              </div>
+              <div>
+                <h2 className="text-display text-lg font-bold">WhatsApp Business (Cloud API)</h2>
+                <p className="text-xs text-muted-foreground">
+                  Notificaciones transaccionales automáticas para nuevos pedidos, pagos y despachos
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  waStatus?.isConfigured
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                }`}
+              >
+                <span
+                  className={`size-1.5 rounded-full ${
+                    waStatus?.isConfigured ? "bg-emerald-500" : "bg-amber-500"
+                  }`}
+                />
+                {waStatus?.isConfigured ? "API Oficial Conectada" : "Modo Seguro / Cola Activa"}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => refetchWaStatus()}
+                className="h-8 gap-1 text-xs font-semibold"
+              >
+                <RefreshCw className="size-3" /> Actualizar
+              </Button>
+            </div>
+          </div>
+
+          {loadingWaStatus ? (
+            <Skeleton className="mt-4 h-48 w-full" />
+          ) : (
+            <div className="mt-5 space-y-6">
+              {/* Información de la Cuenta y Métricas */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-lg border border-border bg-surface-2/40 p-3.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Número Oficial KICKPOINT
+                  </p>
+                  <p className="mt-1 font-mono text-sm font-bold text-foreground">
+                    {waStatus?.officialNumber || "+58 412 1546698"}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">Emisor de notificaciones</p>
+                </div>
+
+                <div className="rounded-lg border border-border bg-surface-2/40 p-3.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Receptor Alertas Admin
+                  </p>
+                  <p className="mt-1 font-mono text-sm font-bold text-foreground">
+                    +{waStatus?.adminRecipientNumber || "584121546698"}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">Recibe alertas de pedidos</p>
+                </div>
+
+                <div className="rounded-lg border border-border bg-surface-2/40 p-3.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Enviadas Exitosamente
+                  </p>
+                  <p className="mt-1 font-mono text-xl font-extrabold text-emerald-600 dark:text-emerald-400">
+                    {waStatus?.stats.sent ?? 0}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">Entregadas a destinatarios</p>
+                </div>
+
+                <div className="rounded-lg border border-border bg-surface-2/40 p-3.5">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Total Procesadas
+                  </p>
+                  <p className="mt-1 font-mono text-xl font-extrabold text-foreground">
+                    {waStatus?.stats.total ?? 0}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {waStatus?.stats.failed ? `${waStatus.stats.failed} con error` : "0 con error"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Toggles de Eventos Automáticos */}
+              <div className="rounded-lg border border-border bg-surface-2/30 p-4 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Reglas de Envío Automático
+                </h3>
+
+                <div className="space-y-3 divide-y divide-border/60">
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="space-y-0.5 pr-4">
+                      <Label htmlFor="toggle-wa-admin" className="text-sm font-semibold text-foreground cursor-pointer">
+                        Notificar al Administrador en nuevos pedidos
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Envía un mensaje de WhatsApp a +58 412 1546698 cada vez que un cliente complete un checkout.
+                      </p>
+                    </div>
+                    <Switch
+                      id="toggle-wa-admin"
+                      checked={notifyAdminNewOrder}
+                      disabled={savingWaToggles}
+                      onCheckedChange={(val) => handleToggleWaSetting("admin", val)}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3">
+                    <div className="space-y-0.5 pr-4">
+                      <Label htmlFor="toggle-wa-cust" className="text-sm font-semibold text-foreground cursor-pointer">
+                        Notificar al Cliente en cambios de estado
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Envía confirmaciones automáticas al WhatsApp del cliente: pago verificado, en preparación, empacado y despacho con número de guía.
+                      </p>
+                    </div>
+                    <Switch
+                      id="toggle-wa-cust"
+                      checked={notifyCustomerStatusChange}
+                      disabled={savingWaToggles}
+                      onCheckedChange={(val) => handleToggleWaSetting("customer", val)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Probador en Vivo de WhatsApp */}
+              <div className="rounded-lg border border-border bg-surface-2/30 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Send className="size-4 text-primary" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Probador en Vivo de Notificación
+                  </h3>
+                </div>
+
+                <form onSubmit={handleSendTestMessage} className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <Label htmlFor="wa-test-phone" className="text-xs font-semibold text-foreground">
+                        Teléfono Destino (Formato Nacional o Internacional)
+                      </Label>
+                      <Input
+                        id="wa-test-phone"
+                        value={testPhone}
+                        onChange={(e) => setTestPhone(e.target.value)}
+                        placeholder="Ej: 04121546698 o +584121546698"
+                        className="mt-1 text-xs font-mono"
+                      />
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label htmlFor="wa-test-msg" className="text-xs font-semibold text-foreground">
+                        Mensaje Opcional Personalizado
+                      </Label>
+                      <Input
+                        id="wa-test-msg"
+                        value={testMessage}
+                        onChange={(e) => setTestMessage(e.target.value)}
+                        placeholder="Ej: Hola! Mensaje de prueba de KICKPOINT WhatsApp Cloud API"
+                        className="mt-1 text-xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      variant="hero"
+                      size="sm"
+                      disabled={sendingTest}
+                      className="gap-1.5 text-xs"
+                    >
+                      {sendingTest ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Send className="size-3.5" />
+                      )}
+                      Enviar Mensaje de Prueba
+                    </Button>
+                  </div>
+                </form>
+              </div>
+
+              {/* Registro Reciente de Notificaciones (Auditoría en Vivo) */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    Historial Reciente de Notificaciones
+                  </h3>
+                  <span className="text-[11px] text-muted-foreground font-mono">
+                    Últimos {waStatus?.recentLogs.length ?? 0} registros
+                  </span>
+                </div>
+
+                {!waStatus?.recentLogs || waStatus.recentLogs.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+                    No hay notificaciones enviadas todavía. Cuando se generen pedidos o envíos, aparecerán aquí con su identificador único de entrega.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-surface-1">
+                    {waStatus.recentLogs.map((log) => (
+                      <div
+                        key={log.id}
+                        className="flex flex-col justify-between gap-2 p-3 text-xs sm:flex-row sm:items-center hover:bg-surface-2/30 transition-colors"
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
+                                log.recipient_type === "admin"
+                                  ? "bg-primary/10 text-primary"
+                                  : "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                              }`}
+                            >
+                              {log.recipient_type === "admin" ? "Admin" : "Cliente"}
+                            </span>
+                            <span className="font-semibold text-foreground capitalize">
+                              {log.event_type.replace(/_/g, " ")}
+                            </span>
+                            {log.order_code && (
+                              <span className="font-mono text-[11px] text-muted-foreground">
+                                • {log.order_code}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground font-mono">
+                            Destino: +{log.recipient_phone}
+                            {log.provider_message_id && ` • ID: ${log.provider_message_id.slice(0, 16)}...`}
+                          </p>
+                          {log.error_message && log.status === "failed" && (
+                            <p className="text-[11px] text-rose-500 font-medium">
+                              Error: {log.error_message}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2.5 sm:flex-col sm:items-end">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                              log.status === "sent"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                : log.status === "pending"
+                                ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                                : "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                            }`}
+                          >
+                            {log.status === "sent" ? (
+                              <CheckCircle2 className="size-3" />
+                            ) : log.status === "pending" ? (
+                              <Clock className="size-3" />
+                            ) : (
+                              <AlertCircle className="size-3" />
+                            )}
+                            {log.status === "sent"
+                              ? "Enviado"
+                              : log.status === "pending"
+                              ? "Pendiente / Cola"
+                              : "Fallido"}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground font-mono">
+                            {new Date(log.created_at).toLocaleTimeString("es-VE", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
 
