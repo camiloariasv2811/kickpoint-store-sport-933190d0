@@ -174,10 +174,16 @@ function AdminConfiguracion() {
         },
       });
 
-      if (res.ok) {
-        toast.success(`Mensaje de prueba procesado (${res.status}) con destino a ${testPhone}`);
+      if (res.ok && res.providerMessageId) {
+        toast.success(
+          `WhatsApp enviado a ${testPhone} (ID de Meta: ${res.providerMessageId})`,
+        );
+      } else if (res.status === "not_configured") {
+        toast.error(
+          `WhatsApp no configurado. Faltan credenciales: ${(res.missingSecrets ?? []).join(", ")}`,
+        );
       } else {
-        toast.error(`Error en el envío: ${res.errorMessage || "No se pudo entregar"}`);
+        toast.error(`Meta rechazó el mensaje: ${res.errorMessage || "No se pudo entregar"}`);
       }
       await refetchWaStatus();
     } catch (err: any) {
