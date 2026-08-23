@@ -93,6 +93,8 @@ export interface EmailNotificationPayload {
   customerPhone?: string | null;
   customerEmail?: string | null;
   total?: number | null;
+  isWholesale?: boolean | null;
+  orderType?: "retail" | "wholesale" | string | null;
   paymentMethod?: string | null;
   paymentReference?: string | null;
   shippingCarrier?: string | null;
@@ -110,6 +112,17 @@ export interface EmailSendResult {
   providerMessageId?: string | null;
   errorMessage?: string | null;
   idempotencyKey: string;
+}
+
+export function logRuntimeEmailConfig(): void {
+  const hasResend = Boolean(getResendApiKey() && getResendApiKey().length >= 8);
+  console.log(
+    `[ORDER_EMAIL_CONFIG] Runtime variables check:\n` +
+      `  - RESEND_API_KEY: ${hasResend ? "PRESENT" : "MISSING"}\n` +
+      `  - ADMIN_NOTIFICATION_EMAIL: ${getAdminEmail()}\n` +
+      `  - RESEND_FROM_EMAIL: ${getResendFromEmail()}\n` +
+      `  - KICKPOINT_PUBLIC_URL: ${getPublicStoreUrl()}`,
+  );
 }
 
 function formatPaymentMethodLabel(code?: string | null): string {
@@ -159,10 +172,19 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
     minute: "2-digit",
   });
 
+  const isWholesaleOrder = Boolean(
+    payload.isWholesale ||
+    payload.orderType === "wholesale" ||
+    (payload.items && payload.items.reduce((sum, item) => sum + item.quantity, 0) >= 8),
+  );
+
   switch (payload.eventType) {
     case "order_created": {
       const subject =
-        payload.customSubject || `🚨 Nuevo pedido recibido — KICKPOINT (#${orderCode})`;
+        payload.customSubject ||
+        (isWholesaleOrder
+          ? `🔥 Nuevo pedido MAYORISTA recibido — KICKPOINT (#${orderCode})`
+          : `🚨 Nuevo pedido recibido — KICKPOINT (#${orderCode})`);
 
       const itemsListText =
         payload.items && payload.items.length > 0
@@ -209,11 +231,12 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
 
       const text =
         `KICKPOINT\n\n` +
-        `🚨 TIENES UN NUEVO PEDIDO (#${orderCode})\n\n` +
+        `${isWholesaleOrder ? "🔥 TIENES UN NUEVO PEDIDO MAYORISTA" : "🚨 TIENES UN NUEVO PEDIDO"} (#${orderCode})\n\n` +
         `Se ha recibido un nuevo pedido en KICKPOINT.\n\n` +
         `Información del pedido:\n` +
         `----------------------------------------\n` +
         `Pedido: #${orderCode}\n` +
+        `Tipo de Venta: ${isWholesaleOrder ? "Mayorista (Distribución / Min. 8 uds)" : "Minorista (Venta al Detal)"}\n` +
         `Fecha/Hora: ${formattedDate}\n` +
         `Cliente: ${customerName}\n` +
         `Teléfono: ${phone}\n` +
@@ -227,6 +250,11 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
         `----------------------------------------\n` +
         `VERIFICAR PEDIDO EN EL PANEL:\n${adminUrl}\n\n` +
         `KICKPOINT Store System`;
+
+      const badgeBg = isWholesaleOrder ? "rgba(245, 158, 11, 0.15)" : "rgba(239, 68, 68, 0.15)";
+      const badgeBorder = isWholesaleOrder ? "rgba(245, 158, 11, 0.3)" : "rgba(239, 68, 68, 0.3)";
+      const badgeText = isWholesaleOrder ? "#fbbf24" : "#f87171";
+      const badgeLabel = isWholesaleOrder ? "🔥 PEDIDO MAYORISTA" : "🚨 NUEVO PEDIDO";
 
       const html = `
 <!DOCTYPE html>
@@ -252,8 +280,8 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                     <span style="display: block; font-size: 12px; color: #94a3b8; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px;">Notificación de Administración</span>
                   </td>
                   <td align="right">
-                    <span style="display: inline-block; background-color: rgba(239, 68, 68, 0.15); color: #f87171; font-size: 11px; font-weight: 800; padding: 6px 12px; border-radius: 9999px; border: 1px solid rgba(239, 68, 68, 0.3); text-transform: uppercase; letter-spacing: 0.5px;">
-                      🚨 TIENES UN NUEVO PEDIDO
+                    <span style="display: inline-block; background-color: ${badgeBg}; color: ${badgeText}; font-size: 11px; font-weight: 800; padding: 6px 12px; border-radius: 9999px; border: 1px solid ${badgeBorder}; text-transform: uppercase; letter-spacing: 0.5px;">
+                      ${badgeLabel}
                     </span>
                   </td>
                 </tr>
@@ -265,7 +293,7 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
           <tr>
             <td style="padding: 32px;">
               <h1 style="margin: 0 0 8px 0; font-size: 20px; font-weight: 800; color: #ffffff;">
-                Se ha recibido un nuevo pedido en KICKPOINT.
+                ${isWholesaleOrder ? "Se ha recibido un nuevo pedido mayorista en KICKPOINT." : "Se ha recibido un nuevo pedido en KICKPOINT."}
               </h1>
               <p style="margin: 0 0 24px 0; font-size: 14px; color: #94a3b8; line-height: 1.5;">
                 Un cliente ha completado el checkout en la tienda KICKPOINT. Por favor revisa los detalles y valida el comprobante de pago.
@@ -279,6 +307,18 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                       <tr>
                         <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Número de Pedido</td>
                         <td align="right" style="font-size: 15px; color: #38bdf8; font-weight: 800; font-family: monospace;">#${orderCode}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #1e293b;">
+                    <table width="100%">
+                      <tr>
+                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Tipo de Venta</td>
+                        <td align="right" style="font-size: 13px; color: ${isWholesaleOrder ? "#fbbf24" : "#f8fafc"}; font-weight: 700;">
+                          ${isWholesaleOrder ? "Mayorista (Distribución)" : "Minorista (Detal)"}
+                        </td>
                       </tr>
                     </table>
                   </td>
@@ -545,8 +585,10 @@ export async function sendEmailNotification(
     recipientEmail,
   });
 
+  const notificationId = `em-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
   console.log(
-    `[ORDER_EMAIL_04] EMAIL PAYLOAD CREATED - Recipient: ${recipientEmail}, Subject: ${subject}, IdempotencyKey: ${idempotencyKey}`,
+    `[ORDER_EMAIL_03] EMAIL SEND START - Order: ${payload.orderCode || payload.orderId || "N/A"}, Recipient: ${recipientEmail}, Subject: ${subject}, IdempotencyKey: ${idempotencyKey}`,
   );
 
   const isConfigured = isResendConfigured();
@@ -558,7 +600,7 @@ export async function sendEmailNotification(
     );
     if (existing) {
       console.log(
-        `[ORDER_EMAIL_08] EMAIL NOTIFICATION FINISHED - Status: already_sent, ProviderMsgId: ${existing.provider_message_id || "N/A"}`,
+        `[ORDER_EMAIL_06] EMAIL SENT (Idempotent replay detected) - Order: ${payload.orderCode || payload.orderId}, Status: already_sent, ProviderMsgId: ${existing.provider_message_id || "N/A"}`,
       );
       return {
         ok: true,
@@ -580,7 +622,7 @@ export async function sendEmailNotification(
 
       if (existing) {
         console.log(
-          `[ORDER_EMAIL_08] EMAIL NOTIFICATION FINISHED - Status: already_sent, ProviderMsgId: ${existing.provider_message_id || "N/A"}`,
+          `[ORDER_EMAIL_06] EMAIL SENT (Idempotent replay detected) - Order: ${payload.orderCode || payload.orderId}, Status: already_sent, ProviderMsgId: ${existing.provider_message_id || "N/A"}`,
         );
         return {
           ok: true,
@@ -591,14 +633,14 @@ export async function sendEmailNotification(
         };
       }
     } catch {
-      // Table might not exist yet or query failed; continue safely
+      // Table query skipped safely
     }
   }
 
   // 2. If Resend is NOT configured with an active API Key
   if (!isConfigured) {
     const pendingNotification: InMemoryEmailNotification = {
-      id: `em-queued-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: notificationId,
       event_type: payload.eventType,
       recipient_email: recipientEmail,
       recipient_type: payload.recipientType,
@@ -642,11 +684,7 @@ export async function sendEmailNotification(
     }
 
     console.warn(
-      `[Email Resend] Notification queued (${payload.eventType} -> ${recipientEmail}). Set RESEND_API_KEY to deliver real inbox emails.`,
-    );
-
-    console.log(
-      `[ORDER_EMAIL_08] EMAIL NOTIFICATION FINISHED - Status: pending (RESEND_API_KEY unconfigured), ProviderMsgId: N/A`,
+      `[ORDER_EMAIL_ERROR] - OrderId: ${payload.orderId || payload.orderCode}, NotificationId: ${notificationId}, Recipient: ${recipientEmail}, HTTPStatus: 0, Error: RESEND_API_KEY not configured, Timestamp: ${new Date().toISOString()}, IdempotencyKey: ${idempotencyKey}`,
     );
 
     return {
@@ -660,11 +698,12 @@ export async function sendEmailNotification(
   // 3. Dispatch to Resend API endpoint
   let attempts = 0;
   let lastError: string | null = null;
+  let lastHttpStatus: number = 0;
   let providerMessageId: string | null = null;
   let isSuccess = false;
 
   console.log(
-    `[ORDER_EMAIL_05] RESEND REQUEST START - Endpoint: ${getResendEndpoint()}, From: ${fromEmail}, To: ${recipientEmail}`,
+    `[ORDER_EMAIL_04] RESEND REQUEST - Endpoint: ${getResendEndpoint()}, From: ${fromEmail}, To: ${recipientEmail}, IdempotencyKey: ${idempotencyKey}`,
   );
 
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -697,16 +736,16 @@ export async function sendEmailNotification(
         }),
       });
 
+      lastHttpStatus = response.status;
       const resData = await response.json().catch(() => ({}));
 
       console.log(
-        `[ORDER_EMAIL_06] RESEND RESPONSE RECEIVED - Status: ${response.status}, OK: ${response.ok}, Attempt: ${attempt}`,
+        `[ORDER_EMAIL_05] RESEND RESPONSE - Status: ${response.status}, OK: ${response.ok}, Attempt: ${attempt}`,
       );
 
       if (response.ok && (resData?.id || resData?.data?.id)) {
         isSuccess = true;
         providerMessageId = String(resData.id || resData?.data?.id);
-        console.log(`[ORDER_EMAIL_07] PROVIDER MESSAGE ID - ID: ${providerMessageId}`);
         break;
       } else {
         lastError =
@@ -715,14 +754,15 @@ export async function sendEmailNotification(
           (typeof resData?.error === "string" ? resData.error : null) ||
           resData?.name ||
           `HTTP ${response.status}: ${response.statusText || "Resend dispatch rejected"}`;
-        console.warn(`[ORDER_EMAIL_06] Resend attempt ${attempt} failed: ${lastError}`);
+        console.warn(`[ORDER_EMAIL_05] Resend attempt ${attempt} failed: ${lastError}`);
       }
     } catch (err: any) {
+      lastHttpStatus = 0;
       lastError = err.message || "Network timeout connecting to Resend API";
-      console.warn(`[ORDER_EMAIL_06] Resend attempt ${attempt} exception: ${lastError}`);
+      console.warn(`[ORDER_EMAIL_05] Resend attempt ${attempt} exception: ${lastError}`);
     }
 
-    if (attempt < 2) {
+    if (attempt < 2 && !isSuccess) {
       await new Promise((r) => setTimeout(r, 600));
     }
   }
@@ -730,13 +770,19 @@ export async function sendEmailNotification(
   const status: "sent" | "failed" = isSuccess ? "sent" : "failed";
   const sentAt = isSuccess ? new Date().toISOString() : null;
 
-  console.log(
-    `[ORDER_EMAIL_08] EMAIL NOTIFICATION FINISHED - Status: ${status}, ProviderMsgId: ${providerMessageId || "N/A"}`,
-  );
+  if (isSuccess) {
+    console.log(
+      `[ORDER_EMAIL_06] EMAIL SENT - OrderId: ${payload.orderId || payload.orderCode}, NotificationId: ${notificationId}, Recipient: ${recipientEmail}, ProviderMsgId: ${providerMessageId}, Timestamp: ${sentAt}`,
+    );
+  } else {
+    console.warn(
+      `[ORDER_EMAIL_ERROR] - OrderId: ${payload.orderId || payload.orderCode}, NotificationId: ${notificationId}, Recipient: ${recipientEmail}, HTTPStatus: ${lastHttpStatus}, Error: ${lastError}, Timestamp: ${new Date().toISOString()}, IdempotencyKey: ${idempotencyKey}`,
+    );
+  }
 
   // 4. Log in In-Memory / Supabase
   const logRecord: InMemoryEmailNotification = {
-    id: `em-log-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: notificationId,
     event_type: payload.eventType,
     recipient_email: recipientEmail,
     recipient_type: payload.recipientType,

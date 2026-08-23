@@ -272,8 +272,46 @@ export const createOrder = createServerFn({ method: "POST" })
       addInMemoryOrder(newOrder);
 
       console.log(
-        `[ORDER_EMAIL_02] ORDER CREATED - Order Number: ${newOrder.order_number}, Order ID: ${newOrder.id}, Total: $${newOrder.total}`,
+        `[ORDER_EMAIL_01] ORDER CREATED - Order Number: ${newOrder.order_number}, Order ID: ${newOrder.id}, Total: $${newOrder.total}`,
       );
+
+      // Trigger Email notification to Admin (safely awaited to guarantee network transmission, non-failing)
+      try {
+        console.log(
+          `[ORDER_EMAIL_02] EMAIL EVENT CREATED - Order: ${newOrder.order_number}, IdempotencyKey: new-order-admin-${newOrder.id || newOrder.order_number}`,
+        );
+        const { sendEmailNotification, getAdminEmail } = await import("./email.server");
+        await sendEmailNotification({
+          eventType: "order_created",
+          recipientType: "admin",
+          recipientEmail: getAdminEmail(),
+          orderId: newOrder.id,
+          orderCode: newOrder.order_number,
+          customerName:
+            `${newOrder.customer?.first_name} ${newOrder.customer?.last_name || ""}`.trim(),
+          customerPhone: newOrder.customer?.whatsapp || null,
+          customerEmail: newOrder.customer?.email || data.customer.email || null,
+          total: newOrder.total,
+          paymentMethod: data.paymentMethod,
+          paymentReference: data.paymentProof?.reference?.trim() || null,
+          isWholesale: newOrder.is_wholesale || false,
+          orderType: newOrder.is_wholesale ? "wholesale" : "retail",
+          items: newOrder.items.map((i) => ({
+            productName: i.product_name,
+            size: i.size || null,
+            color: i.color || null,
+            quantity: i.quantity,
+            unitPrice: i.unit_price,
+            subtotal: i.subtotal,
+          })),
+          metadata: {
+            idempotencyKey: `new-order-admin-${newOrder.id || newOrder.order_number}`,
+            isWholesale: newOrder.is_wholesale || false,
+          },
+        });
+      } catch (emailErr) {
+        console.warn("[Checkout] Failed to trigger Email admin notification:", emailErr);
+      }
 
       // Trigger asynchronous WhatsApp notification to Admin (non-blocking)
       try {
@@ -293,42 +331,6 @@ export const createOrder = createServerFn({ method: "POST" })
       } catch (notifErr) {
         console.warn("[Checkout] Failed to trigger WhatsApp admin notification:", notifErr);
       }
-
-      // Trigger Email notification to Admin (non-blocking)
-      try {
-        const { sendEmailNotification, getAdminEmail } = await import("./email.server");
-        sendEmailNotification({
-          eventType: "order_created",
-          recipientType: "admin",
-          recipientEmail: getAdminEmail(),
-          orderId: newOrder.id,
-          orderCode: newOrder.order_number,
-          customerName:
-            `${newOrder.customer?.first_name} ${newOrder.customer?.last_name || ""}`.trim(),
-          customerPhone: newOrder.customer?.whatsapp || null,
-          customerEmail: newOrder.customer?.email || data.customer.email || null,
-          total: newOrder.total,
-          paymentMethod: data.paymentMethod,
-          paymentReference: data.paymentProof?.reference?.trim() || null,
-          items: newOrder.items.map((i) => ({
-            productName: i.product_name,
-            size: i.size || null,
-            color: i.color || null,
-            quantity: i.quantity,
-            unitPrice: i.unit_price,
-            subtotal: i.subtotal,
-          })),
-          metadata: {
-            idempotencyKey: `new-order-admin-${newOrder.id || newOrder.order_number}`,
-          },
-        }).catch((err) => console.warn("[Checkout] Demo Email admin notification warning:", err));
-      } catch (emailErr) {
-        console.warn("[Checkout] Failed to trigger Email admin notification:", emailErr);
-      }
-
-      console.log(
-        `[ORDER_EMAIL_09] CREATE ORDER FINISHED - Order Number: ${newOrder.order_number}`,
-      );
 
       return { orderNumber: newOrder.order_number, total: newOrder.total };
     }
@@ -504,8 +506,46 @@ export const createOrder = createServerFn({ method: "POST" })
     if (paymentError) throw new Error(paymentError.message);
 
     console.log(
-      `[ORDER_EMAIL_02] ORDER CREATED - Order Number: ${order.order_number}, Order ID: ${order.id}, Total: $${Number(order.total).toFixed(2)}`,
+      `[ORDER_EMAIL_01] ORDER CREATED - Order Number: ${order.order_number}, Order ID: ${order.id}, Total: $${Number(order.total).toFixed(2)}`,
     );
+
+    // Trigger Email notification to Admin (safely awaited to guarantee network transmission, non-failing)
+    try {
+      console.log(
+        `[ORDER_EMAIL_02] EMAIL EVENT CREATED - Order: ${order.order_number}, IdempotencyKey: new-order-admin-${order.id || order.order_number}`,
+      );
+      const { sendEmailNotification, getAdminEmail } = await import("./email.server");
+      await sendEmailNotification({
+        eventType: "order_created",
+        recipientType: "admin",
+        recipientEmail: getAdminEmail(),
+        orderId: order.id,
+        orderCode: order.order_number,
+        customerName:
+          `${data.customer.firstName.trim()} ${data.customer.lastName?.trim() || ""}`.trim(),
+        customerPhone: data.customer.whatsapp || null,
+        customerEmail: data.customer.email || null,
+        total: Number(order.total),
+        paymentMethod: data.paymentMethod,
+        paymentReference: data.paymentProof?.reference?.trim() || null,
+        isWholesale: order.is_wholesale || isWholesaleOrder,
+        orderType: order.is_wholesale || isWholesaleOrder ? "wholesale" : "retail",
+        items: items.map((i) => ({
+          productName: i.product_name,
+          size: i.size || null,
+          color: i.color || null,
+          quantity: i.quantity,
+          unitPrice: i.unit_price,
+          subtotal: i.subtotal,
+        })),
+        metadata: {
+          idempotencyKey: `new-order-admin-${order.id || order.order_number}`,
+          isWholesale: order.is_wholesale || isWholesaleOrder,
+        },
+      });
+    } catch (emailErr) {
+      console.warn("[Checkout] Failed to trigger Email admin notification:", emailErr);
+    }
 
     // Trigger asynchronous WhatsApp notification to Admin (non-blocking)
     try {
@@ -527,40 +567,6 @@ export const createOrder = createServerFn({ method: "POST" })
     } catch (notifErr) {
       console.warn("[Checkout] Failed to trigger WhatsApp admin notification:", notifErr);
     }
-
-    // Trigger Email notification to Admin (non-blocking)
-    try {
-      const { sendEmailNotification, getAdminEmail } = await import("./email.server");
-      sendEmailNotification({
-        eventType: "order_created",
-        recipientType: "admin",
-        recipientEmail: getAdminEmail(),
-        orderId: order.id,
-        orderCode: order.order_number,
-        customerName:
-          `${data.customer.firstName.trim()} ${data.customer.lastName?.trim() || ""}`.trim(),
-        customerPhone: data.customer.whatsapp || null,
-        customerEmail: data.customer.email || null,
-        total: Number(order.total),
-        paymentMethod: data.paymentMethod,
-        paymentReference: data.paymentProof?.reference?.trim() || null,
-        items: items.map((i) => ({
-          productName: i.product_name,
-          size: i.size || null,
-          color: i.color || null,
-          quantity: i.quantity,
-          unitPrice: i.unit_price,
-          subtotal: i.subtotal,
-        })),
-        metadata: {
-          idempotencyKey: `new-order-admin-${order.id || order.order_number}`,
-        },
-      }).catch((err) => console.warn("[Checkout] Supabase Email admin notification warning:", err));
-    } catch (emailErr) {
-      console.warn("[Checkout] Failed to trigger Email admin notification:", emailErr);
-    }
-
-    console.log(`[ORDER_EMAIL_09] CREATE ORDER FINISHED - Order Number: ${order.order_number}`);
 
     return { orderNumber: order.order_number, total: Number(order.total) };
   });
