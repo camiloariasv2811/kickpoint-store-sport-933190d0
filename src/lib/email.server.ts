@@ -20,7 +20,22 @@ export function getAdminEmail(): string {
 }
 
 export function getResendApiKey(): string {
-  return (process.env["RESEND_API_KEY"] || process.env["VITE_RESEND_API_KEY"] || "").trim();
+  return (process.env["RESEND_API_KEY"] || "").trim();
+}
+
+export function getLovableApiKey(): string {
+  return (process.env["LOVABLE_API_KEY"] || "").trim();
+}
+
+/** True when the Resend key is a direct provider key (re_...) instead of a gateway connection key. */
+export function isDirectResendKey(): boolean {
+  return getResendApiKey().startsWith("re_");
+}
+
+export const RESEND_GATEWAY_URL = "https://connector-gateway.lovable.dev/resend";
+
+export function getResendEndpoint(): string {
+  return isDirectResendKey() ? "https://api.resend.com/emails" : `${RESEND_GATEWAY_URL}/emails`;
 }
 
 export function getResendFromEmail(): string {
@@ -33,8 +48,11 @@ export function getResendFromEmail(): string {
 
 export function isResendConfigured(): boolean {
   const key = getResendApiKey();
-  return Boolean(key && key.startsWith("re_") && key.length > 8);
+  if (!key || key.length < 8) return false;
+  // Direct provider key works alone; gateway connection key also needs LOVABLE_API_KEY.
+  return isDirectResendKey() ? true : Boolean(getLovableApiKey());
 }
+
 
 export function getPublicStoreUrl(): string {
   const url =
