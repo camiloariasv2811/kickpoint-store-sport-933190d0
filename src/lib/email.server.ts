@@ -408,6 +408,11 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
  * Sends an email notification using Resend API with idempotency and audit tracking.
  * This function NEVER throws to protect the checkout / order creation flow.
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function asUuid(value?: string | null): string | null {
+  return value && UUID_RE.test(value) ? value : null;
+}
+
 export async function sendEmailNotification(
   payload: EmailNotificationPayload,
 ): Promise<EmailSendResult> {
@@ -495,7 +500,7 @@ export async function sendEmailNotification(
             event_type: payload.eventType,
             recipient_email: recipientEmail,
             recipient_type: payload.recipientType,
-            order_id: payload.orderId ?? null,
+            order_id: asUuid(payload.orderId),
             order_code: payload.orderCode ?? null,
             subject,
             body_html: html,
@@ -610,12 +615,12 @@ export async function sendEmailNotification(
   if (isSupabaseServerConfigured()) {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin.from("email_notifications").upsert(
+      const { error: auditError } = await supabaseAdmin.from("email_notifications").upsert(
         {
           event_type: payload.eventType,
           recipient_email: recipientEmail,
           recipient_type: payload.recipientType,
-          order_id: payload.orderId ?? null,
+          order_id: asUuid(payload.orderId),
           order_code: payload.orderCode ?? null,
           subject,
           body_html: html,
@@ -630,6 +635,9 @@ export async function sendEmailNotification(
         },
         { onConflict: "idempotency_key" },
       );
+      if (auditError) {
+        console.warn("[Email Resend] Supabase audit log error:", auditError.message);
+      }
     } catch (dbErr) {
       console.warn("[Email Resend] Supabase audit log error:", dbErr);
     }
