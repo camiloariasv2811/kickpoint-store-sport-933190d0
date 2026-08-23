@@ -88,6 +88,7 @@ function Catalogo() {
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products"],
+    staleTime: 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listProducts();
@@ -100,6 +101,7 @@ function Catalogo() {
   });
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listCategories();
@@ -112,6 +114,7 @@ function Catalogo() {
   });
   const { data: brands = [] } = useQuery({
     queryKey: ["brands"],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listBrands();

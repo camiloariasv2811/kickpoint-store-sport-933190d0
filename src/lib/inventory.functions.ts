@@ -63,7 +63,10 @@ export const listInventory = createServerFn({ method: "GET" })
     }
 
     try {
-      const { data, error } = await context.supabase.from("products").select(INVENTORY_SELECT);
+      const { data, error } = await context.supabase
+        .from("products")
+        .select(INVENTORY_SELECT)
+        .eq("active", true);
       if (error || !data) {
         const products = getInMemoryProducts();
         const rows: InventoryRow[] = [];

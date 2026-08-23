@@ -87,6 +87,8 @@ function AdminProductos() {
     isFetching,
   } = useQuery<AdminProductsResponse>({
     queryKey: ["admin", "products", { page, search: debouncedQ }],
+    staleTime: 30 * 1000,
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       try {
         const res = await listAdminProducts({

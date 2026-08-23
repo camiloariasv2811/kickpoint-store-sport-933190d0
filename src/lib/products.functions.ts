@@ -203,27 +203,6 @@ export const listAdminProducts = createServerFn({ method: "GET" })
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-      // Compute catalog totals (active count and total units)
-      let activeCount = 0;
-      let totalUnits = 0;
-
-      const { data: stockSummary } = await supabaseAdmin
-        .from("products")
-        .select("active, variants:product_variants ( stock, active )");
-
-      if (stockSummary) {
-        for (const p of stockSummary as any[]) {
-          if (p.active !== false) {
-            activeCount++;
-            for (const v of p.variants ?? []) {
-              if (v.active !== false) {
-                totalUnits += Number(v.stock || 0);
-              }
-            }
-          }
-        }
-      }
-
       let query = supabaseAdmin.from("products").select(PRODUCT_SELECT, { count: "exact" });
 
       if (data?.status === "active") {
@@ -255,7 +234,17 @@ export const listAdminProducts = createServerFn({ method: "GET" })
         query = query.range(from, to);
       }
 
-      const { data: rows, count, error } = await query;
+      // Execute paginated products and lightweight aggregate queries in parallel
+      const [productsRes, activeCountRes, variantsStockRes] = await Promise.all([
+        query,
+        supabaseAdmin
+          .from("products")
+          .select("id", { count: "exact", head: true })
+          .eq("active", true),
+        supabaseAdmin.from("product_variants").select("stock").eq("active", true),
+      ]);
+
+      const { data: rows, count, error } = productsRes;
       if (error || !rows) {
         const all = getInMemoryProducts();
         return {
@@ -277,6 +266,13 @@ export const listAdminProducts = createServerFn({ method: "GET" })
             ),
         } as AdminProductsResponse;
       }
+
+      const activeCount =
+        activeCountRes?.count ?? rows.filter((p: any) => p.active !== false).length;
+      const totalUnits = (variantsStockRes?.data ?? []).reduce(
+        (sum, v: any) => sum + Number(v.stock || 0),
+        0,
+      );
 
       const total = count ?? rows.length;
       return {

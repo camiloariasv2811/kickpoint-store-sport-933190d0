@@ -102,6 +102,23 @@ export interface EmailSendResult {
   idempotencyKey: string;
 }
 
+function formatPaymentMethodLabel(code?: string | null): string {
+  if (!code) return "No especificado";
+  const clean = code.trim().toLowerCase();
+  switch (clean) {
+    case "pago_movil":
+      return "Pago Móvil (Bancos Nacionales)";
+    case "zelle":
+      return "Zelle (USD)";
+    case "binance_pay":
+      return "Binance Pay / USDT";
+    case "transferencia":
+      return "Transferencia Bancaria";
+    default:
+      return code;
+  }
+}
+
 /**
  * Builds the standard subject, HTML and plain-text body based on the business event.
  */
@@ -120,7 +137,7 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
     payload.total !== undefined && payload.total !== null
       ? `$${payload.total.toFixed(2)}`
       : "$0.00";
-  const paymentMethod = payload.paymentMethod || "No especificado";
+  const paymentMethod = formatPaymentMethodLabel(payload.paymentMethod);
   const paymentRef = payload.paymentReference || "Pendiente de comprobante";
 
   switch (payload.eventType) {

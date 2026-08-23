@@ -74,6 +74,7 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
 
   const { data: brands = [] } = useQuery({
     queryKey: ["catalog", "brands"],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listBrands();
@@ -87,6 +88,7 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
 
   const { data: categories = [] } = useQuery({
     queryKey: ["catalog", "categories"],
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listCategories();
