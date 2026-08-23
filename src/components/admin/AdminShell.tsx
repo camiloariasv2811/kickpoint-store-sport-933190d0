@@ -16,7 +16,7 @@ import {
   Tags,
   Users,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 
 import { Logo } from "@/components/site/Logo";
 import { Button } from "@/components/ui/button";
@@ -95,6 +95,10 @@ export function AdminShell({
 
   const { data: badges } = useQuery({
     queryKey: ["admin", "pending-badges"],
+    staleTime: 0,
+    refetchInterval: 8000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
     queryFn: async () => {
       try {
         const res = await getPendingAdminBadges();
@@ -104,8 +108,24 @@ export function AdminShell({
         return { pendingOrders: 0, pendingPayments: 0 };
       }
     },
-    refetchInterval: 15000,
   });
+
+  // Subscribe to real-time events on orders and payments for immediate badge updates
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-shell-badges-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "payments" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   async function signOut() {
     if (typeof window !== "undefined") {

@@ -158,13 +158,9 @@ export const createOrder = createServerFn({ method: "POST" })
       0,
     );
 
-    const isOrderWholesale = Boolean(data.isWholesale && totalOrderUnits >= 8);
-
-    if (data.isWholesale && totalOrderUnits < 8) {
-      throw new Error(
-        `La compra mayorista requiere un mínimo de 8 unidades acumuladas en el carrito (actualmente tienes ${totalOrderUnits} unidades).`,
-      );
-    }
+    const isOrderWholesale = Boolean(
+      (data.isWholesale ?? (data as any).isOrderWholesale) || totalOrderUnits >= 8,
+    );
 
     const usdtRate = Number(data.exchangeRateUsed || 86.2);
 
@@ -198,7 +194,7 @@ export const createOrder = createServerFn({ method: "POST" })
         // Authoritative server-side price lookup
         const wholesalePrice = foundProduct.wholesale_price;
         const unit =
-          isOrderWholesale && wholesalePrice
+          isOrderWholesale && wholesalePrice != null && Number(wholesalePrice) > 0
             ? Number(wholesalePrice)
             : Number(foundProduct.retail_price);
 
@@ -298,11 +294,10 @@ export const createOrder = createServerFn({ method: "POST" })
         console.warn("[Checkout] Failed to trigger WhatsApp admin notification:", notifErr);
       }
 
-      // Trigger Email notification to Admin (await to ensure completion before returning)
-      console.log(`[ORDER_EMAIL_03] EMAIL NOTIFICATION START - Order: ${newOrder.order_number}`);
+      // Trigger Email notification to Admin (non-blocking)
       try {
         const { sendEmailNotification, getAdminEmail } = await import("./email.server");
-        await sendEmailNotification({
+        sendEmailNotification({
           eventType: "order_created",
           recipientType: "admin",
           recipientEmail: getAdminEmail(),
@@ -326,7 +321,7 @@ export const createOrder = createServerFn({ method: "POST" })
           metadata: {
             idempotencyKey: `new-order-admin-${newOrder.id || newOrder.order_number}`,
           },
-        });
+        }).catch((err) => console.warn("[Checkout] Demo Email admin notification warning:", err));
       } catch (emailErr) {
         console.warn("[Checkout] Failed to trigger Email admin notification:", emailErr);
       }
@@ -380,7 +375,7 @@ export const createOrder = createServerFn({ method: "POST" })
 
       const wholesalePrice = variant.product.wholesale_price;
       const unit =
-        isOrderWholesale && wholesalePrice
+        isOrderWholesale && wholesalePrice != null && Number(wholesalePrice) > 0
           ? Number(wholesalePrice)
           : Number(variant.product.retail_price);
 
@@ -533,11 +528,10 @@ export const createOrder = createServerFn({ method: "POST" })
       console.warn("[Checkout] Failed to trigger WhatsApp admin notification:", notifErr);
     }
 
-    // Trigger Email notification to Admin (await to ensure delivery completion before returning)
-    console.log(`[ORDER_EMAIL_03] EMAIL NOTIFICATION START - Order: ${order.order_number}`);
+    // Trigger Email notification to Admin (non-blocking)
     try {
       const { sendEmailNotification, getAdminEmail } = await import("./email.server");
-      await sendEmailNotification({
+      sendEmailNotification({
         eventType: "order_created",
         recipientType: "admin",
         recipientEmail: getAdminEmail(),
@@ -561,7 +555,7 @@ export const createOrder = createServerFn({ method: "POST" })
         metadata: {
           idempotencyKey: `new-order-admin-${order.id || order.order_number}`,
         },
-      });
+      }).catch((err) => console.warn("[Checkout] Supabase Email admin notification warning:", err));
     } catch (emailErr) {
       console.warn("[Checkout] Failed to trigger Email admin notification:", emailErr);
     }

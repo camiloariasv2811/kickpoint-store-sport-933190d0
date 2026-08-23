@@ -30,31 +30,26 @@ export const Route = createFileRoute("/catalogo")({
     max: search["max"] ? Number(search["max"]) : undefined,
     orden: typeof search["orden"] === "string" ? (search["orden"] as string) : undefined,
   }),
-  loader: async ({ context }) => {
-    const [products, categories, brands] = await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["products"],
-        queryFn: () => listProducts(),
-        staleTime: 60 * 1000,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["categories"],
-        queryFn: () => listCategories(),
-        staleTime: 5 * 60 * 1000,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["brands"],
-        queryFn: () => listBrands(),
-        staleTime: 5 * 60 * 1000,
-      }),
-    ]).catch((err) => {
-      console.warn("[Catalogo Loader] Failed to ensure query data:", err);
-      return [[], [], []];
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery({
+      queryKey: ["products"],
+      queryFn: () => listProducts(),
+      staleTime: 60 * 1000,
+    });
+    context.queryClient.prefetchQuery({
+      queryKey: ["categories"],
+      queryFn: () => listCategories(),
+      staleTime: 5 * 60 * 1000,
+    });
+    context.queryClient.prefetchQuery({
+      queryKey: ["brands"],
+      queryFn: () => listBrands(),
+      staleTime: 5 * 60 * 1000,
     });
     return {
-      products: (products ?? []) as typeof products,
-      categories: (categories ?? []) as typeof categories,
-      brands: (brands ?? []) as typeof brands,
+      products: context.queryClient.getQueryData<any>(["products"]) ?? [],
+      categories: context.queryClient.getQueryData<any>(["categories"]) ?? [],
+      brands: context.queryClient.getQueryData<any>(["brands"]) ?? [],
     };
   },
   head: () => ({

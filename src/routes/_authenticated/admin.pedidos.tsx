@@ -15,7 +15,7 @@ import {
   Trash2,
   XCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 import { AdminShell } from "@/components/admin/AdminShell";
@@ -46,6 +46,7 @@ import {
 } from "@/lib/orders.functions";
 import { ORDER_STATUS_LABELS, ORDER_STATUSES } from "@/lib/types";
 import { moneyExact, whatsappLink } from "@/lib/format";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin/pedidos")({
   component: AdminPedidos,
@@ -64,6 +65,10 @@ function AdminPedidos() {
 
   const { data: orders = [], isLoading } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
+    staleTime: 0,
+    refetchInterval: 5000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
     queryFn: async () => {
       try {
         const res = await listOrders();
@@ -74,6 +79,26 @@ function AdminPedidos() {
       }
     },
   });
+
+  // Realtime subscription to immediately refresh orders and pending badges on new events
+  useEffect(() => {
+    const channel = supabase
+      .channel("admin-pedidos-realtime")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] });
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "payments" }, () => {
+        queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+        queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const counts = {
     todos: orders.length,

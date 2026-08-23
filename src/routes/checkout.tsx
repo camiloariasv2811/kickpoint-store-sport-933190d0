@@ -85,12 +85,31 @@ function CheckoutPage() {
   } = useCart();
 
   const isWholesaleCheckout =
-    search.tipo === "mayorista" || (wholesaleLines.length > 0 && lines.length === 0);
+    search.tipo === "mayorista" ||
+    (wholesaleLines.length > 0 && lines.length === 0) ||
+    wholesaleCount >= WHOLESALE_MIN_ORDER_UNITS ||
+    (lines.length > 0 && count >= WHOLESALE_MIN_ORDER_UNITS);
 
-  const activeLines = isWholesaleCheckout ? wholesaleLines : lines;
-  const activeCount = isWholesaleCheckout ? wholesaleCount : count;
-  const activeSubtotal = isWholesaleCheckout ? wholesaleSubtotal : subtotal;
-  const activeSavings = isWholesaleCheckout ? wholesaleSavings : savings;
+  const activeLines = isWholesaleCheckout
+    ? wholesaleLines.length > 0
+      ? wholesaleLines
+      : lines
+    : lines;
+  const activeCount = isWholesaleCheckout
+    ? wholesaleLines.length > 0
+      ? wholesaleCount
+      : count
+    : count;
+  const activeSubtotal = isWholesaleCheckout
+    ? wholesaleLines.length > 0
+      ? wholesaleSubtotal
+      : subtotal
+    : subtotal;
+  const activeSavings = isWholesaleCheckout
+    ? wholesaleLines.length > 0
+      ? wholesaleSavings
+      : savings
+    : savings;
 
   const { data: methods = [] } = useQuery({
     queryKey: ["payment-methods"],
@@ -244,6 +263,7 @@ function CheckoutPage() {
           paymentMethod: selected,
           rateType: "USDT",
           exchangeRateUsed: usdtRate,
+          isWholesale: isWholesaleCheckout,
           isOrderWholesale: isWholesaleCheckout,
           lines: activeLines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
           paymentProof: {

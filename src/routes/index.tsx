@@ -10,25 +10,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
 
 export const Route = createFileRoute("/")({
-  loader: async ({ context }) => {
-    const [products, categories] = await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["products"],
-        queryFn: () => listProducts(),
-        staleTime: 60 * 1000,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["categories"],
-        queryFn: () => listCategories(),
-        staleTime: 5 * 60 * 1000,
-      }),
-    ]).catch((err) => {
-      console.warn("[Index Loader] Failed to ensure query data:", err);
-      return [[], []];
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery({
+      queryKey: ["products"],
+      queryFn: () => listProducts(),
+      staleTime: 60 * 1000,
+    });
+    context.queryClient.prefetchQuery({
+      queryKey: ["categories"],
+      queryFn: () => listCategories(),
+      staleTime: 5 * 60 * 1000,
     });
     return {
-      products: (products ?? []) as typeof products,
-      categories: (categories ?? []) as typeof categories,
+      products: context.queryClient.getQueryData<any>(["products"]) ?? [],
+      categories: context.queryClient.getQueryData<any>(["categories"]) ?? [],
     };
   },
   head: () => ({

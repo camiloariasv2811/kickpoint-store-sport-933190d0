@@ -32,6 +32,22 @@ import { moneyExact, whatsappLink } from "@/lib/format";
 import { totalStock, type Category, type Product } from "@/lib/types";
 
 export const Route = createFileRoute("/mayor")({
+  loader: ({ context }) => {
+    context.queryClient.prefetchQuery({
+      queryKey: ["products"],
+      queryFn: () => listProducts(),
+      staleTime: 60 * 1000,
+    });
+    context.queryClient.prefetchQuery({
+      queryKey: ["categories"],
+      queryFn: () => listCategories(),
+      staleTime: 5 * 60 * 1000,
+    });
+    return {
+      products: context.queryClient.getQueryData<any>(["products"]) ?? [],
+      categories: context.queryClient.getQueryData<any>(["categories"]) ?? [],
+    };
+  },
   head: () => ({
     meta: [
       { title: "Catálogo Mayorista | KICKPOINT Distribución Deportiva" },
