@@ -154,6 +154,66 @@ export type Database = {
         }
         Relationships: []
       }
+      email_notifications: {
+        Row: {
+          attempts: number
+          body_html: string | null
+          created_at: string
+          error_message: string | null
+          event_type: string
+          id: string
+          idempotency_key: string
+          metadata: Json
+          order_code: string | null
+          order_id: string | null
+          provider_message_id: string | null
+          recipient_email: string
+          recipient_type: string
+          sent_at: string | null
+          status: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          body_html?: string | null
+          created_at?: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          idempotency_key: string
+          metadata?: Json
+          order_code?: string | null
+          order_id?: string | null
+          provider_message_id?: string | null
+          recipient_email: string
+          recipient_type?: string
+          sent_at?: string | null
+          status?: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          body_html?: string | null
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          idempotency_key?: string
+          metadata?: Json
+          order_code?: string | null
+          order_id?: string | null
+          provider_message_id?: string | null
+          recipient_email?: string
+          recipient_type?: string
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inventory_movements: {
         Row: {
           created_at: string
