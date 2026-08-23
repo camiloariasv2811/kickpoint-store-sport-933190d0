@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
+import { invalidateServerCatalogCache } from "./catalog.functions";
 import {
   getInMemorySales,
   addInMemorySale,
@@ -93,6 +94,7 @@ export const createSale = createServerFn({ method: "POST" })
     return d;
   })
   .handler(async ({ data, context }) => {
+    invalidateServerCatalogCache();
     const total = data.items.reduce((sum, i) => sum + i.unit_price * i.quantity, 0);
     const costTotal = data.items.reduce((sum, i) => sum + i.unit_cost * i.quantity, 0);
 
@@ -261,6 +263,7 @@ export const deleteSale = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { saleId: string; restoreStock?: boolean }) => d)
   .handler(async ({ data, context }) => {
+    invalidateServerCatalogCache();
     deleteInMemorySale(data.saleId, data.restoreStock ?? true);
 
     if (!isSupabaseServerConfigured()) {

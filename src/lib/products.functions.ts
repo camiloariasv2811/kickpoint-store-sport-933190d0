@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
+import { invalidateServerCatalogCache } from "./catalog.functions";
 import { toSafeUuid } from "./types";
 import {
   DEMO_CATEGORIES,
@@ -333,6 +334,7 @@ export const createProduct = createServerFn({ method: "POST" })
   .inputValidator((d: CreateProductInput) => d)
   .handler(async ({ data, context }) => {
     await assertIsStaff(context);
+    invalidateServerCatalogCache();
 
     const name = String(data.name ?? "").trim();
     if (!name) throw new Error("El nombre del producto es obligatorio");
@@ -532,6 +534,7 @@ export const updateProduct = createServerFn({ method: "POST" })
   .inputValidator((d: UpdateProductInput) => d)
   .handler(async ({ data, context }) => {
     await assertIsStaff(context);
+    invalidateServerCatalogCache();
     if (!data.id) throw new Error("Falta id del producto");
 
     const brandObj = data.brand_id
@@ -711,6 +714,7 @@ export const setProductActive = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string; active: boolean }) => d)
   .handler(async ({ data, context }) => {
     await assertIsStaff(context);
+    invalidateServerCatalogCache();
     setInMemoryProductActive(data.id, data.active);
 
     if (isSupabaseServerConfigured()) {
@@ -729,6 +733,7 @@ export const deleteProduct = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
     await assertIsStaff(context);
+    invalidateServerCatalogCache();
     const productId = data.id;
     if (!productId) throw new Error("ID de producto no especificado");
 

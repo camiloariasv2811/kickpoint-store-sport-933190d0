@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 
 import { createPublicClient, isSupabasePublicConfigured } from "./supabase-public.server";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
+import { invalidateServerCatalogCache } from "./catalog.functions";
 import {
   addInMemoryOrder,
   getInMemoryOrderByNumber,
@@ -134,6 +135,7 @@ export const createOrder = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data }) => {
+    invalidateServerCatalogCache();
     console.log(
       `[ORDER_EMAIL_01] CREATE ORDER START - Customer: ${data.customer.firstName} ${data.customer.lastName || ""}, Total lines: ${data.lines.length}`,
     );

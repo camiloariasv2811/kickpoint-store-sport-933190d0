@@ -10,11 +10,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
 
 export const Route = createFileRoute("/")({
-  loader: async () => {
+  loader: async ({ context }) => {
     const [products, categories] = await Promise.all([
-      listProducts().catch(() => []),
-      listCategories().catch(() => []),
-    ]);
+      context.queryClient.ensureQueryData({
+        queryKey: ["products"],
+        queryFn: listProducts,
+        staleTime: 60 * 1000,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["categories"],
+        queryFn: listCategories,
+        staleTime: 5 * 60 * 1000,
+      }),
+    ]).catch(() => [[], []]);
     return {
       products: products ?? [],
       categories: categories ?? [],
@@ -125,7 +133,7 @@ function Home() {
     queryKey: ["products"],
     initialData: loaderData?.products,
     staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listProducts();

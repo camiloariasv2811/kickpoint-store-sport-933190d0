@@ -28,6 +28,24 @@ export type BenchmarkResult = {
   payload_size_approx_kb: number;
 };
 
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const SERVER_CACHE_TTL_MS = 60 * 1000; // 60 seconds
+let cachedProducts: CacheEntry<Product[]> | null = null;
+let cachedCategories: CacheEntry<Category[]> | null = null;
+let cachedBrands: CacheEntry<Brand[]> | null = null;
+const cachedSingleProduct = new Map<string, CacheEntry<Product | null>>();
+
+export function invalidateServerCatalogCache() {
+  cachedProducts = null;
+  cachedCategories = null;
+  cachedBrands = null;
+  cachedSingleProduct.clear();
+}
+
 const PRODUCT_SELECT_FULL = `
   id, name, slug, description, base_sku, retail_price, wholesale_price, wholesale_min_qty,
   images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, created_at,
@@ -327,6 +345,15 @@ export const searchProductsForSelector = createServerFn({ method: "GET" })
 
 export const listProducts = createServerFn({ method: "GET" }).handler(async () => {
   const tStart = performance.now();
+
+  // Fast path: Server in-memory cache hit
+  if (cachedProducts && Date.now() - cachedProducts.timestamp < SERVER_CACHE_TTL_MS) {
+    console.log(
+      `[PRODUCTS_QUERY_SERVER_CACHE_HIT] Resolved in ${Math.round(performance.now() - tStart)}ms`,
+    );
+    return cachedProducts.data;
+  }
+
   console.log(
     `[PRODUCTS_QUERY_START] Catalog products query started at ${new Date().toISOString()}`,
   );
@@ -337,11 +364,7 @@ export const listProducts = createServerFn({ method: "GET" }).handler(async () =
     console.log(
       `[PRODUCTS_QUERY_END] In-memory catalog query resolved in ${Math.round(performance.now() - memStart)}ms`,
     );
-    console.log(`[VARIANTS_QUERY_START] In-memory variants attached`);
-    console.log(`[VARIANTS_QUERY_END] 0ms`);
-    console.log(`[IMAGES_QUERY_START] In-memory images array`);
-    console.log(`[IMAGES_QUERY_END] 0ms`);
-    console.log(`[TOTAL_PRODUCTS_LOAD] ${Math.round(performance.now() - tStart)}ms`);
+    cachedProducts = { data: result, timestamp: Date.now() };
     return result;
   }
 
@@ -358,27 +381,36 @@ export const listProducts = createServerFn({ method: "GET" }).handler(async () =
     console.log(
       `[PRODUCTS_QUERY_END] Supabase products query finished in ${qDuration}ms (retrieved ${data?.length ?? 0} items)`,
     );
-    console.log(`[VARIANTS_QUERY_START] Variants joined in single query`);
-    console.log(`[VARIANTS_QUERY_END] 0ms (0 extra queries)`);
-    console.log(`[IMAGES_QUERY_START] First image referenced for cards`);
-    console.log(`[IMAGES_QUERY_END] 0ms`);
-    console.log(`[TOTAL_PRODUCTS_LOAD] ${Math.round(performance.now() - tStart)}ms`);
 
     if (error || !data || data.length === 0) {
-      return getInMemoryProducts().filter((p) => p.active);
+      const fallback = getInMemoryProducts().filter((p) => p.active);
+      cachedProducts = { data: fallback, timestamp: Date.now() };
+      return fallback;
     }
-    return data as unknown as Product[];
+    const finalProducts = data as unknown as Product[];
+    cachedProducts = { data: finalProducts, timestamp: Date.now() };
+    return finalProducts;
   } catch {
     console.log(`[TOTAL_PRODUCTS_LOAD] Fallback in ${Math.round(performance.now() - tStart)}ms`);
-    return getInMemoryProducts().filter((p) => p.active);
+    const fallback = getInMemoryProducts().filter((p) => p.active);
+    cachedProducts = { data: fallback, timestamp: Date.now() };
+    return fallback;
   }
 });
 
 export const getProduct = createServerFn({ method: "GET" })
   .inputValidator((data: { slug: string }) => data)
   .handler(async ({ data }) => {
+    // Fast path: Server in-memory cache hit
+    const cached = cachedSingleProduct.get(data.slug);
+    if (cached && Date.now() - cached.timestamp < SERVER_CACHE_TTL_MS) {
+      return cached.data;
+    }
+
     if (!isSupabasePublicConfigured()) {
-      return getInMemoryProducts().find((p) => p.slug === data.slug) ?? null;
+      const item = getInMemoryProducts().find((p) => p.slug === data.slug) ?? null;
+      cachedSingleProduct.set(data.slug, { data: item, timestamp: Date.now() });
+      return item;
     }
     try {
       const supabase = createPublicClient();
@@ -389,16 +421,27 @@ export const getProduct = createServerFn({ method: "GET" })
         .eq("active", true)
         .maybeSingle();
       if (error || !row) {
-        return getInMemoryProducts().find((p) => p.slug === data.slug) ?? null;
+        const item = getInMemoryProducts().find((p) => p.slug === data.slug) ?? null;
+        cachedSingleProduct.set(data.slug, { data: item, timestamp: Date.now() });
+        return item;
       }
-      return row as unknown as Product | null;
+      const finalProduct = row as unknown as Product | null;
+      cachedSingleProduct.set(data.slug, { data: finalProduct, timestamp: Date.now() });
+      return finalProduct;
     } catch {
-      return getInMemoryProducts().find((p) => p.slug === data.slug) ?? null;
+      const item = getInMemoryProducts().find((p) => p.slug === data.slug) ?? null;
+      cachedSingleProduct.set(data.slug, { data: item, timestamp: Date.now() });
+      return item;
     }
   });
 
 export const listCategories = createServerFn({ method: "GET" }).handler(async () => {
+  if (cachedCategories && Date.now() - cachedCategories.timestamp < SERVER_CACHE_TTL_MS * 5) {
+    return cachedCategories.data;
+  }
+
   if (!isSupabasePublicConfigured()) {
+    cachedCategories = { data: DEMO_CATEGORIES, timestamp: Date.now() };
     return DEMO_CATEGORIES;
   }
   try {
@@ -409,17 +452,27 @@ export const listCategories = createServerFn({ method: "GET" }).handler(async ()
       .eq("active", true)
       .order("sort_order");
     if (error || !data || data.length === 0) {
+      cachedCategories = { data: DEMO_CATEGORIES, timestamp: Date.now() };
       return DEMO_CATEGORIES;
     }
-    return data as unknown as Category[];
+    const cats = data as unknown as Category[];
+    cachedCategories = { data: cats, timestamp: Date.now() };
+    return cats;
   } catch {
+    cachedCategories = { data: DEMO_CATEGORIES, timestamp: Date.now() };
     return DEMO_CATEGORIES;
   }
 });
 
 export const listBrands = createServerFn({ method: "GET" }).handler(async () => {
+  if (cachedBrands && Date.now() - cachedBrands.timestamp < SERVER_CACHE_TTL_MS * 5) {
+    return cachedBrands.data;
+  }
+
   if (!isSupabasePublicConfigured()) {
-    return getInMemoryBrands();
+    const brands = getInMemoryBrands();
+    cachedBrands = { data: brands, timestamp: Date.now() };
+    return brands;
   }
   try {
     const supabase = createPublicClient();
@@ -429,11 +482,17 @@ export const listBrands = createServerFn({ method: "GET" }).handler(async () => 
       .eq("active", true)
       .order("name");
     if (error || !data || data.length === 0) {
-      return getInMemoryBrands();
+      const brands = getInMemoryBrands();
+      cachedBrands = { data: brands, timestamp: Date.now() };
+      return brands;
     }
-    return data as unknown as Brand[];
+    const brands = data as unknown as Brand[];
+    cachedBrands = { data: brands, timestamp: Date.now() };
+    return brands;
   } catch {
-    return getInMemoryBrands();
+    const brands = getInMemoryBrands();
+    cachedBrands = { data: brands, timestamp: Date.now() };
+    return brands;
   }
 });
 
@@ -441,6 +500,7 @@ export const createBrand = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { name: string; slug?: string | null }) => d)
   .handler(async ({ data, context }) => {
+    invalidateServerCatalogCache();
     const name = String(data.name ?? "").trim();
     if (!name) throw new Error("Nombre de marca requerido");
     const slug =

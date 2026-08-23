@@ -22,9 +22,15 @@ import { money, moneyExact, whatsappLink } from "@/lib/format";
 import { totalStock, type Product } from "@/lib/types";
 
 export const Route = createFileRoute("/producto/$slug")({
-  loader: async ({ params }) => {
-    const product = await getProduct({ data: { slug: params.slug } }).catch(() => null);
-    return { product };
+  loader: async ({ context, params }) => {
+    const product = await context.queryClient
+      .ensureQueryData({
+        queryKey: ["product", params.slug],
+        queryFn: () => getProduct({ data: { slug: params.slug } }),
+        staleTime: 60 * 1000,
+      })
+      .catch(() => null);
+    return { product: product ?? null };
   },
   head: () => ({
     meta: [
@@ -109,7 +115,7 @@ function ProductPageContainer() {
   const [navStart] = useState(() => performance.now());
 
   const {
-    data: product,
+    data: product = loaderData?.product,
     isLoading,
     isError,
   } = useQuery({

@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
+import { invalidateServerCatalogCache } from "./catalog.functions";
 import { getInMemoryKardex, getInMemoryProducts, recordInMemoryMovement } from "./demo-data";
 import { toSafeUuid } from "./uuid-utils";
 
@@ -361,6 +362,7 @@ export const recordInventoryMovement = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data, context }) => {
+    invalidateServerCatalogCache();
     if (!isSupabaseServerConfigured()) {
       const res = recordInMemoryMovement(
         data.variantId,

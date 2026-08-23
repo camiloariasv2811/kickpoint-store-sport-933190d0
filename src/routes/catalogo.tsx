@@ -30,12 +30,24 @@ export const Route = createFileRoute("/catalogo")({
     max: search["max"] ? Number(search["max"]) : undefined,
     orden: typeof search["orden"] === "string" ? (search["orden"] as string) : undefined,
   }),
-  loader: async () => {
+  loader: async ({ context }) => {
     const [products, categories, brands] = await Promise.all([
-      listProducts().catch(() => []),
-      listCategories().catch(() => []),
-      listBrands().catch(() => []),
-    ]);
+      context.queryClient.ensureQueryData({
+        queryKey: ["products"],
+        queryFn: listProducts,
+        staleTime: 60 * 1000,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["categories"],
+        queryFn: listCategories,
+        staleTime: 5 * 60 * 1000,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["brands"],
+        queryFn: listBrands,
+        staleTime: 5 * 60 * 1000,
+      }),
+    ]).catch(() => [[], [], []]);
     return {
       products: products ?? [],
       categories: categories ?? [],
@@ -111,10 +123,11 @@ function Catalogo() {
   const firstRenderLogged = useRef(false);
   const firstImageLogged = useRef(false);
 
-  const { data: products = loaderData?.products ?? [], isLoading } = useQuery({
+  const { data: products = loaderData?.products ?? [], isLoading: isLoadingProducts } = useQuery({
     queryKey: ["products"],
     initialData: loaderData?.products,
     staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       const reqStart = performance.now();
       console.log(`[CATALOG_REQUEST_START] Requesting catalog products from server`);
@@ -139,6 +152,7 @@ function Catalogo() {
     queryKey: ["categories"],
     initialData: loaderData?.categories,
     staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listCategories();
@@ -154,6 +168,7 @@ function Catalogo() {
     queryKey: ["brands"],
     initialData: loaderData?.brands,
     staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listBrands();
@@ -164,6 +179,8 @@ function Catalogo() {
       }
     },
   });
+
+  const isLoading = isLoadingProducts && (!products || products.length === 0);
 
   const sizes = useMemo(() => {
     const set = new Set<string>();
