@@ -20,7 +20,22 @@ export function getAdminEmail(): string {
 }
 
 export function getResendApiKey(): string {
-  return (process.env["RESEND_API_KEY"] || process.env["VITE_RESEND_API_KEY"] || "").trim();
+  return (process.env["RESEND_API_KEY"] || "").trim();
+}
+
+export function getLovableApiKey(): string {
+  return (process.env["LOVABLE_API_KEY"] || "").trim();
+}
+
+/** True when the Resend key is a direct provider key (re_...) instead of a gateway connection key. */
+export function isDirectResendKey(): boolean {
+  return getResendApiKey().startsWith("re_");
+}
+
+export const RESEND_GATEWAY_URL = "https://connector-gateway.lovable.dev/resend";
+
+export function getResendEndpoint(): string {
+  return isDirectResendKey() ? "https://api.resend.com/emails" : `${RESEND_GATEWAY_URL}/emails`;
 }
 
 export function getResendFromEmail(): string {
@@ -33,8 +48,11 @@ export function getResendFromEmail(): string {
 
 export function isResendConfigured(): boolean {
   const key = getResendApiKey();
-  return Boolean(key && key.startsWith("re_") && key.length > 8);
+  if (!key || key.length < 8) return false;
+  // Direct provider key works alone; gateway connection key also needs LOVABLE_API_KEY.
+  return isDirectResendKey() ? true : Boolean(getLovableApiKey());
 }
+
 
 export function getPublicStoreUrl(): string {
   const url =
@@ -43,7 +61,7 @@ export function getPublicStoreUrl(): string {
     process.env["SITE_URL"] ||
     process.env["PUBLIC_APP_URL"] ||
     process.env["VITE_APP_URL"] ||
-    "https://kickpoint-store-sport-933190d0.lovable.app";
+    "https://kickpoint-store-sport.lovable.app";
   return url.replace(/\/+$/, "");
 }
 
@@ -390,6 +408,11 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
  * Sends an email notification using Resend API with idempotency and audit tracking.
  * This function NEVER throws to protect the checkout / order creation flow.
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function asUuid(value?: string | null): string | null {
+  return value && UUID_RE.test(value) ? value : null;
+}
+
 export async function sendEmailNotification(
   payload: EmailNotificationPayload,
 ): Promise<EmailSendResult> {
@@ -399,7 +422,7 @@ export async function sendEmailNotification(
 
   // Generate unique idempotency key adhering to new-order-admin-[ORDER_ID] standard
   const idempotencyKey =
-    payload.metadata?.idempotencyKey ||
+    (payload.metadata?.["idempotencyKey"] as string | undefined) ||
     (payload.eventType === "order_created"
       ? `new-order-admin-${payload.orderId || payload.orderCode || Date.now()}`
       : `email-${payload.eventType}-${payload.orderId || payload.orderCode || Date.now()}-${payload.recipientType}`);
@@ -421,7 +444,7 @@ export async function sendEmailNotification(
         ok: true,
         status: "already_sent",
         notificationId: existing.id,
-        providerMessageId: existing.provider_message_id,
+        providerMessageId: existing.provider_message_id ?? null,
         idempotencyKey,
       };
     }
@@ -477,7 +500,7 @@ export async function sendEmailNotification(
             event_type: payload.eventType,
             recipient_email: recipientEmail,
             recipient_type: payload.recipientType,
-            order_id: payload.orderId ?? null,
+            order_id: asUuid(payload.orderId),
             order_code: payload.orderCode ?? null,
             subject,
             body_html: html,
@@ -516,13 +539,20 @@ export async function sendEmailNotification(
   for (let attempt = 1; attempt <= 2; attempt++) {
     attempts = attempt;
     try {
-      const response = await fetch("https://api.resend.com/emails", {
+      const useGateway = !isDirectResendKey();
+      const gatewayHeaders: Record<string, string> = useGateway
+        ? {
+            Authorization: `Bearer ${getLovableApiKey()}`,
+            "X-Connection-Api-Key": apiKey,
+          }
+        : { Authorization: `Bearer ${apiKey}` };
+
+      const response = await fetch(getResendEndpoint(), {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          ...gatewayHeaders,
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
-          "User-Agent": "KICKPOINT-Store/1.0",
         },
         body: JSON.stringify({
           from: fromEmail,
@@ -585,12 +615,12 @@ export async function sendEmailNotification(
   if (isSupabaseServerConfigured()) {
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      await supabaseAdmin.from("email_notifications").upsert(
+      const { error: auditError } = await supabaseAdmin.from("email_notifications").upsert(
         {
           event_type: payload.eventType,
           recipient_email: recipientEmail,
           recipient_type: payload.recipientType,
-          order_id: payload.orderId ?? null,
+          order_id: asUuid(payload.orderId),
           order_code: payload.orderCode ?? null,
           subject,
           body_html: html,
@@ -605,6 +635,9 @@ export async function sendEmailNotification(
         },
         { onConflict: "idempotency_key" },
       );
+      if (auditError) {
+        console.warn("[Email Resend] Supabase audit log error:", auditError.message);
+      }
     } catch (dbErr) {
       console.warn("[Email Resend] Supabase audit log error:", dbErr);
     }
