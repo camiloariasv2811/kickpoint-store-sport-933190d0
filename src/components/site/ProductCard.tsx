@@ -35,12 +35,15 @@ export function ProductCard({
       <Link
         to="/producto/$slug"
         params={{ slug: product.slug }}
+        preload="intent"
         className="relative block aspect-square overflow-hidden bg-surface-2"
       >
         {product.images?.[0] ? (
           <img
             src={product.images[0]}
             alt={product.name}
+            width={400}
+            height={400}
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
             decoding="async"
@@ -89,12 +92,12 @@ export function ProductCard({
 
         <div className="mt-2 flex gap-2">
           <Button asChild variant="dark" size="sm" className="flex-1 text-[0.7rem]">
-            <Link to="/producto/$slug" params={{ slug: product.slug }}>
+            <Link to="/producto/$slug" params={{ slug: product.slug }} preload="intent">
               Ver producto
             </Link>
           </Button>
           <Button asChild variant="hero" size="sm" aria-label="Ver y agregar">
-            <Link to="/producto/$slug" params={{ slug: product.slug }}>
+            <Link to="/producto/$slug" params={{ slug: product.slug }} preload="intent">
               <ShoppingCart className="size-4" />
             </Link>
           </Button>

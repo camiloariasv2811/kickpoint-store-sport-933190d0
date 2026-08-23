@@ -113,7 +113,40 @@ export const runDiagnosticsBenchmark = createServerFn({ method: "GET" }).handler
   const tests: BenchmarkResult[] = [];
   const isSb = isSupabasePublicConfigured();
 
-  // Test 1: Minimal (id, name, slug, price, main_image, active)
+  // TEST 1 — PRODUCTO MÍNIMO (solo id, name, slug, retail_price, active)
+  {
+    const t0 = performance.now();
+    let data: any[] = [];
+    if (isSb) {
+      const supabase = createPublicClient();
+      const res = await supabase
+        .from("products")
+        .select("id, name, slug, retail_price, active")
+        .eq("active", true);
+      data = res.data ?? [];
+    } else {
+      data = getInMemoryProducts().filter((p) => p.active);
+    }
+    const tSb = performance.now();
+    const items = data.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      retail_price: Number(p.retail_price || 0),
+      active: Boolean(p.active),
+    }));
+    const str = JSON.stringify(items);
+    tests.push({
+      name: "TEST 1 — Producto Mínimo (solo id, name, slug, precio, active)",
+      supabase_duration_ms: Math.round(tSb - t0),
+      transform_duration_ms: 0,
+      total_duration_ms: Math.round(performance.now() - t0),
+      item_count: items.length,
+      payload_size_approx_kb: Math.round((str.length * 2) / 1024),
+    });
+  }
+
+  // TEST 2 — PRODUCTO + IMAGEN (main image)
   {
     const t0 = performance.now();
     let data: any[] = [];
@@ -128,80 +161,26 @@ export const runDiagnosticsBenchmark = createServerFn({ method: "GET" }).handler
       data = getInMemoryProducts().filter((p) => p.active);
     }
     const tSb = performance.now();
-    const trans0 = performance.now();
     const items = data.map((p) => ({
       id: p.id,
       name: p.name,
       slug: p.slug,
-      price: p.retail_price,
+      retail_price: Number(p.retail_price || 0),
       main_image: p.images?.[0] ?? null,
-      active: p.active,
+      active: Boolean(p.active),
     }));
-    const trans1 = performance.now();
     const str = JSON.stringify(items);
     tests.push({
-      name: "1. Minimal (solo id, name, slug, price, img, active)",
+      name: "TEST 2 — Producto + Imagen Principal",
       supabase_duration_ms: Math.round(tSb - t0),
-      transform_duration_ms: Math.round(trans1 - trans0),
+      transform_duration_ms: 0,
       total_duration_ms: Math.round(performance.now() - t0),
       item_count: items.length,
       payload_size_approx_kb: Math.round((str.length * 2) / 1024),
     });
   }
 
-  // Test 2: Minimal + Brands
-  {
-    const t0 = performance.now();
-    let data: any[] = [];
-    if (isSb) {
-      const supabase = createPublicClient();
-      const res = await supabase
-        .from("products")
-        .select("id, name, slug, retail_price, images, active, brand:brands(id, name, slug)")
-        .eq("active", true);
-      data = res.data ?? [];
-    } else {
-      data = getInMemoryProducts().filter((p) => p.active);
-    }
-    const tSb = performance.now();
-    const str = JSON.stringify(data);
-    tests.push({
-      name: "2. Productos + Marcas",
-      supabase_duration_ms: Math.round(tSb - t0),
-      transform_duration_ms: 0,
-      total_duration_ms: Math.round(performance.now() - t0),
-      item_count: data.length,
-      payload_size_approx_kb: Math.round((str.length * 2) / 1024),
-    });
-  }
-
-  // Test 3: Minimal + Categories
-  {
-    const t0 = performance.now();
-    let data: any[] = [];
-    if (isSb) {
-      const supabase = createPublicClient();
-      const res = await supabase
-        .from("products")
-        .select("id, name, slug, retail_price, images, active, category:categories(id, name, slug)")
-        .eq("active", true);
-      data = res.data ?? [];
-    } else {
-      data = getInMemoryProducts().filter((p) => p.active);
-    }
-    const tSb = performance.now();
-    const str = JSON.stringify(data);
-    tests.push({
-      name: "3. Productos + Categorías",
-      supabase_duration_ms: Math.round(tSb - t0),
-      transform_duration_ms: 0,
-      total_duration_ms: Math.round(performance.now() - t0),
-      item_count: data.length,
-      payload_size_approx_kb: Math.round((str.length * 2) / 1024),
-    });
-  }
-
-  // Test 4: Minimal + Variants
+  // TEST 3 — PRODUCTO + VARIANTES (variants join)
   {
     const t0 = performance.now();
     let data: any[] = [];
@@ -210,7 +189,7 @@ export const runDiagnosticsBenchmark = createServerFn({ method: "GET" }).handler
       const res = await supabase
         .from("products")
         .select(
-          "id, name, slug, retail_price, images, active, variants:product_variants(id, size, color, stock, active)",
+          "id, name, slug, retail_price, active, variants:product_variants(id, size, color, stock, active)",
         )
         .eq("active", true);
       data = res.data ?? [];
@@ -220,7 +199,7 @@ export const runDiagnosticsBenchmark = createServerFn({ method: "GET" }).handler
     const tSb = performance.now();
     const str = JSON.stringify(data);
     tests.push({
-      name: "4. Productos + Variantes",
+      name: "TEST 3 — Producto + Variantes (tallas y stock)",
       supabase_duration_ms: Math.round(tSb - t0),
       transform_duration_ms: 0,
       total_duration_ms: Math.round(performance.now() - t0),
@@ -229,7 +208,7 @@ export const runDiagnosticsBenchmark = createServerFn({ method: "GET" }).handler
     });
   }
 
-  // Test 5: Full Catalog Query
+  // TEST 4 — PRODUCTO COMPLETO (Catálogo con marcas, categorías, variantes, imágenes)
   {
     const t0 = performance.now();
     let data: any[] = [];
@@ -243,11 +222,39 @@ export const runDiagnosticsBenchmark = createServerFn({ method: "GET" }).handler
     const tSb = performance.now();
     const str = JSON.stringify(data);
     tests.push({
-      name: "5. Catálogo Completo (Marcas + Categorías + Variantes + Tags)",
+      name: "TEST 4 — Producto Completo Catálogo (Marcas + Categorías + Variantes + Imágenes)",
       supabase_duration_ms: Math.round(tSb - t0),
       transform_duration_ms: 0,
       total_duration_ms: Math.round(performance.now() - t0),
       item_count: data.length,
+      payload_size_approx_kb: Math.round((str.length * 2) / 1024),
+    });
+  }
+
+  // TEST 5 — DETALLE DE PRODUCTO INDIVIDUAL POR SLUG (/producto/:slug)
+  {
+    const t0 = performance.now();
+    let item: any = null;
+    if (isSb) {
+      const supabase = createPublicClient();
+      const res = await supabase
+        .from("products")
+        .select(PRODUCT_SELECT_FULL)
+        .eq("active", true)
+        .limit(1)
+        .maybeSingle();
+      item = res.data ?? null;
+    } else {
+      item = getInMemoryProducts().find((p) => p.active) ?? null;
+    }
+    const tSb = performance.now();
+    const str = JSON.stringify(item);
+    tests.push({
+      name: "TEST 5 — Detalle Producto Individual por Slug (Consulta Unitaria Consolidada)",
+      supabase_duration_ms: Math.round(tSb - t0),
+      transform_duration_ms: 0,
+      total_duration_ms: Math.round(performance.now() - t0),
+      item_count: item ? 1 : 0,
       payload_size_approx_kb: Math.round((str.length * 2) / 1024),
     });
   }

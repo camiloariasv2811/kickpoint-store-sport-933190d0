@@ -1,87 +1,172 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { Check, Minus, Plus, ShieldCheck, ShoppingCart, Truck, MessageCircle } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  Check,
+  Minus,
+  Plus,
+  ShieldCheck,
+  ShoppingCart,
+  Truck,
+  MessageCircle,
+  ArrowLeft,
+} from "lucide-react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getProduct } from "@/lib/catalog.functions";
 import { useCart } from "@/lib/cart";
 import { money, moneyExact, whatsappLink } from "@/lib/format";
-import { totalStock } from "@/lib/types";
+import { totalStock, type Product } from "@/lib/types";
 
 export const Route = createFileRoute("/producto/$slug")({
-  loader: async ({ params }) => {
-    const product = await getProduct({ data: { slug: params.slug } });
-    if (!product) throw notFound();
-    return { product };
-  },
-  head: ({ loaderData }) => {
-    if (!loaderData) {
-      return {
-        meta: [
-          { title: "Producto no disponible | KICKPOINT" },
-          { name: "robots", content: "noindex" },
-        ],
-      };
-    }
-    const p = loaderData.product;
-    const description = (
-      p.description ?? `${p.name} disponible en KICKPOINT. Al mayor y al detal.`
-    ).slice(0, 155);
-    const image = p.images?.[0];
-    return {
-      meta: [
-        { title: `${p.name} | KICKPOINT` },
-        { name: "description", content: description },
-        { property: "og:title", content: `${p.name} — ${money(p.retail_price)}` },
-        { property: "og:description", content: description },
-        { property: "og:type", content: "product" },
-        { name: "twitter:card", content: "summary_large_image" },
-        ...(image?.startsWith("https://")
-          ? [
-              { property: "og:image", content: image },
-              { name: "twitter:image", content: image },
-            ]
-          : []),
-      ],
-    };
-  },
-  component: ProductPage,
-  errorComponent: () => (
+  head: () => ({
+    meta: [
+      { title: "Producto | KICKPOINT" },
+      { name: "description", content: "Ropa deportiva y calzado premium en KICKPOINT." },
+      { property: "og:type", content: "product" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: ProductPageContainer,
+});
+
+function ProductSkeleton() {
+  return (
     <SiteLayout>
-      <div className="mx-auto max-w-3xl px-4 py-20 text-center">
-        <h1 className="text-display text-3xl">No pudimos cargar el producto</h1>
-        <Button asChild variant="hero" className="mt-6">
-          <Link to="/catalogo">Volver al catálogo</Link>
-        </Button>
+      <div className="mx-auto max-w-7xl px-4 py-6">
+        <div className="mb-5 flex items-center gap-2">
+          <Skeleton className="h-4 w-16" />
+          <span>/</span>
+          <Skeleton className="h-4 w-20" />
+          <span>/</span>
+          <Skeleton className="h-4 w-32" />
+        </div>
+
+        <div className="grid gap-8 lg:grid-cols-2">
+          <div className="space-y-3">
+            <Skeleton className="aspect-square w-full rounded-2xl" />
+            <div className="flex gap-2">
+              <Skeleton className="size-16 rounded-lg" />
+              <Skeleton className="size-16 rounded-lg" />
+              <Skeleton className="size-16 rounded-lg" />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-7 w-32" />
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-20 w-full" />
+            <div className="space-y-2 pt-2">
+              <Skeleton className="h-4 w-20" />
+              <div className="flex gap-2">
+                <Skeleton className="h-10 w-16 rounded-lg" />
+                <Skeleton className="h-10 w-16 rounded-lg" />
+                <Skeleton className="h-10 w-16 rounded-lg" />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Skeleton className="h-12 flex-1 rounded-xl" />
+              <Skeleton className="h-12 w-32 rounded-xl" />
+            </div>
+          </div>
+        </div>
       </div>
     </SiteLayout>
-  ),
-  notFoundComponent: () => (
+  );
+}
+
+function ProductNotFound() {
+  return (
     <SiteLayout>
       <div className="mx-auto max-w-3xl px-4 py-20 text-center">
         <h1 className="text-display text-3xl">Producto no encontrado</h1>
-        <p className="mt-2 text-muted-foreground">Puede que ya no esté disponible.</p>
-        <Button asChild variant="hero" className="mt-6">
-          <Link to="/catalogo">Ver catálogo</Link>
+        <p className="mt-2 text-muted-foreground">
+          El producto solicitado no está disponible o ha sido retirado.
+        </p>
+        <Button asChild variant="hero" className="mt-6 gap-2">
+          <Link to="/catalogo">
+            <ArrowLeft className="size-4" /> Ver catálogo
+          </Link>
         </Button>
       </div>
     </SiteLayout>
-  ),
-});
+  );
+}
 
-function ProductPage() {
-  const { product } = Route.useLoaderData();
+function ProductPageContainer() {
+  const { slug } = Route.useParams();
+  const queryClient = useQueryClient();
+  const [navStart] = useState(() => performance.now());
+
+  const {
+    data: product,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ["product", slug],
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    initialData: () => {
+      // Instant cache seed from catalog or featured products list
+      const catalog = queryClient.getQueryData<Product[]>(["products"]);
+      return catalog?.find((p) => p.slug === slug);
+    },
+    initialDataUpdatedAt: () =>
+      queryClient.getQueryState(["products"])?.dataUpdatedAt || Date.now(),
+    queryFn: async () => {
+      const t0 = performance.now();
+      console.log(`[PRODUCT_DETAIL_FETCH_START] Requesting product: ${slug}`);
+      try {
+        const res = await getProduct({ data: { slug } });
+        console.log(
+          `[PRODUCT_DETAIL_FETCH_END] Product received in ${Math.round(performance.now() - t0)}ms`,
+        );
+        return res;
+      } catch (err) {
+        console.warn("[ProductPage] Error loading product:", err);
+        return null;
+      }
+    },
+  });
+
+  if (isLoading && !product) {
+    return <ProductSkeleton />;
+  }
+
+  if (isError || (!isLoading && !product)) {
+    return <ProductNotFound />;
+  }
+
+  return <ProductDetailView product={product!} navStart={navStart} />;
+}
+
+function ProductDetailView({ product, navStart }: { product: Product; navStart: number }) {
   const { addLine } = useCart();
+  const hasLogged = useRef(false);
+
+  useEffect(() => {
+    if (!hasLogged.current) {
+      hasLogged.current = true;
+      requestAnimationFrame(() => {
+        const elapsed = Math.round(performance.now() - navStart);
+        console.log(`[PRODUCT_DETAIL_RENDERED] Time to Product Detail (TTPD): ${elapsed}ms`);
+      });
+    }
+  }, [navStart]);
 
   const colors = useMemo(
-    () => Array.from(new Set(product.variants.map((v) => v.color).filter(Boolean))) as string[],
+    () =>
+      Array.from(new Set((product.variants ?? []).map((v) => v.color).filter(Boolean))) as string[],
     [product.variants],
   );
   const [color, setColor] = useState<string | null>(colors[0] ?? null);
   const sizes = useMemo(
-    () => product.variants.filter((v) => (color ? v.color === color : true)),
+    () => (product.variants ?? []).filter((v) => (color ? v.color === color : true)),
     [product.variants, color],
   );
   const [variantId, setVariantId] = useState<string | null>(
@@ -90,8 +175,9 @@ function ProductPage() {
   const [qty, setQty] = useState(1);
   const [imageIndex, setImageIndex] = useState(0);
 
-  const variant = product.variants.find((v) => v.id === variantId) ?? null;
-  const wholesaleActive = Boolean(product.wholesale_price) && qty >= product.wholesale_min_qty;
+  const variant = (product.variants ?? []).find((v) => v.id === variantId) ?? null;
+  const wholesaleActive =
+    Boolean(product.wholesale_price) && qty >= (product.wholesale_min_qty ?? 8);
   const unit = wholesaleActive ? Number(product.wholesale_price) : Number(product.retail_price);
   const stock = totalStock(product);
 
@@ -143,7 +229,7 @@ function ProductPage() {
             </>
           )}
           <span>/</span>
-          <span className="text-foreground">{product.name}</span>
+          <span className="text-foreground font-medium">{product.name}</span>
         </nav>
 
         <div className="grid gap-8 lg:grid-cols-2">
@@ -155,11 +241,14 @@ function ProductPage() {
                   alt={product.name}
                   width={900}
                   height={900}
+                  loading="eager"
+                  fetchPriority="high"
+                  decoding="async"
                   className="size-full object-cover"
                 />
               )}
             </div>
-            {product.images.length > 1 && (
+            {product.images && product.images.length > 1 && (
               <div className="flex gap-2">
                 {product.images.map((img, i) => (
                   <button
@@ -169,7 +258,13 @@ function ProductPage() {
                       i === imageIndex ? "border-primary" : "border-border"
                     }`}
                   >
-                    <img src={img} alt="" loading="lazy" className="size-full object-cover" />
+                    <img
+                      src={img}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      className="size-full object-cover"
+                    />
                   </button>
                 ))}
               </div>
@@ -213,7 +308,9 @@ function ProductPage() {
                       key={c}
                       onClick={() => {
                         setColor(c);
-                        const next = product.variants.find((v) => v.color === c && v.stock > 0);
+                        const next = (product.variants ?? []).find(
+                          (v) => v.color === c && v.stock > 0,
+                        );
                         setVariantId(next?.id ?? null);
                       }}
                       className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
@@ -296,7 +393,7 @@ function ProductPage() {
                 <div className="divide-y divide-border">
                   <div className="flex items-center justify-between px-4 py-2.5 text-sm">
                     <span className="text-muted-foreground">
-                      1 - {product.wholesale_min_qty - 1} unidades
+                      1 - {(product.wholesale_min_qty ?? 8) - 1} unidades
                     </span>
                     <span className="font-bold">{money(product.retail_price)} c/u</span>
                   </div>
@@ -306,7 +403,7 @@ function ProductPage() {
                     }`}
                   >
                     <span className="text-muted-foreground">
-                      {product.wholesale_min_qty}+ unidades (mayor)
+                      {product.wholesale_min_qty ?? 8}+ unidades (mayor)
                     </span>
                     <span className="font-bold text-primary">
                       {money(product.wholesale_price)} c/u
