@@ -417,7 +417,7 @@ export async function sendEmailNotification(
 
   // Generate unique idempotency key adhering to new-order-admin-[ORDER_ID] standard
   const idempotencyKey =
-    payload.metadata?.idempotencyKey ||
+    (payload.metadata?.["idempotencyKey"] as string | undefined) ||
     (payload.eventType === "order_created"
       ? `new-order-admin-${payload.orderId || payload.orderCode || Date.now()}`
       : `email-${payload.eventType}-${payload.orderId || payload.orderCode || Date.now()}-${payload.recipientType}`);
@@ -439,7 +439,7 @@ export async function sendEmailNotification(
         ok: true,
         status: "already_sent",
         notificationId: existing.id,
-        providerMessageId: existing.provider_message_id,
+        providerMessageId: existing.provider_message_id ?? null,
         idempotencyKey,
       };
     }
@@ -534,13 +534,20 @@ export async function sendEmailNotification(
   for (let attempt = 1; attempt <= 2; attempt++) {
     attempts = attempt;
     try {
-      const response = await fetch("https://api.resend.com/emails", {
+      const useGateway = !isDirectResendKey();
+      const gatewayHeaders: Record<string, string> = useGateway
+        ? {
+            Authorization: `Bearer ${getLovableApiKey()}`,
+            "X-Connection-Api-Key": apiKey,
+          }
+        : { Authorization: `Bearer ${apiKey}` };
+
+      const response = await fetch(getResendEndpoint(), {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          ...gatewayHeaders,
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
-          "User-Agent": "KICKPOINT-Store/1.0",
         },
         body: JSON.stringify({
           from: fromEmail,

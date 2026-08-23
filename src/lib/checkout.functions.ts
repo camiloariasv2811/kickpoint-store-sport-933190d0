@@ -257,7 +257,7 @@ export const createOrder = createServerFn({ method: "POST" })
           orderId: newOrder.id,
           orderCode: newOrder.order_number,
           customerName:
-            `${newOrder.customer.first_name} ${newOrder.customer.last_name || ""}`.trim(),
+            `${newOrder.customer?.first_name} ${newOrder.customer?.last_name || ""}`.trim(),
           total: newOrder.total,
           paymentMethod: data.paymentMethod,
         }).catch((err) => console.warn("[Checkout] WhatsApp admin notification warning:", err));
@@ -275,9 +275,9 @@ export const createOrder = createServerFn({ method: "POST" })
           orderId: newOrder.id,
           orderCode: newOrder.order_number,
           customerName:
-            `${newOrder.customer.first_name} ${newOrder.customer.last_name || ""}`.trim(),
-          customerPhone: newOrder.customer.whatsapp || null,
-          customerEmail: newOrder.customer.email || data.customer.email || null,
+            `${newOrder.customer?.first_name} ${newOrder.customer?.last_name || ""}`.trim(),
+          customerPhone: newOrder.customer?.whatsapp || null,
+          customerEmail: newOrder.customer?.email || data.customer.email || null,
           total: newOrder.total,
           paymentMethod: data.paymentMethod,
           paymentReference: data.paymentProof?.reference?.trim() || null,
@@ -356,12 +356,16 @@ export const createOrder = createServerFn({ method: "POST" })
     let effectiveUsdtRate = usdtRate;
     try {
       const { data: st } = await supabaseAdmin
-        .from("store_settings")
-        .select("exchange_rate_usdt")
-        .limit(1)
+        .from("settings")
+        .select("value")
+        .eq("key", "exchange_rate_usdt")
         .maybeSingle();
-      if (st?.exchange_rate_usdt) {
-        effectiveUsdtRate = Number(st.exchange_rate_usdt);
+      const rawRate =
+        st?.value && typeof st.value === "object"
+          ? (st.value as Record<string, unknown>)["rate"]
+          : st?.value;
+      if (rawRate && Number(rawRate) > 0) {
+        effectiveUsdtRate = Number(rawRate);
       }
     } catch {
       /* fallback */

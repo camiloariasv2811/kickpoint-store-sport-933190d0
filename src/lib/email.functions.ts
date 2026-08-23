@@ -74,7 +74,7 @@ export const getEmailDashboardStatus = createServerFn({ method: "GET" })
         }
 
         const { data: settingsData } = await supabaseAdmin
-          .from("store_settings")
+          .from("settings")
           .select("key, value")
           .eq("key", "email_notification_settings")
           .maybeSingle();
@@ -139,8 +139,8 @@ export const sendEmailTest = createServerFn({ method: "POST" })
       return {
         ok: result.ok,
         status: result.status,
-        providerMessageId: result.providerMessageId,
-        errorMessage: result.errorMessage,
+        providerMessageId: result.providerMessageId ?? null,
+        errorMessage: result.errorMessage ?? null,
         recipientEmail: targetEmail,
       };
     },
