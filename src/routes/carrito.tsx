@@ -186,8 +186,10 @@ function CartPage() {
             <div className="space-y-3">
               {currentLines.map((line) => {
                 const linePrice = isWholesaleTab
-                  ? line.wholesalePrice || line.retailPrice
-                  : getLineUnitPrice(line as any);
+                  ? isWholesaleValid && line.wholesalePrice
+                    ? Number(line.wholesalePrice)
+                    : Number(line.retailPrice || 0)
+                  : getLineUnitPrice(line);
 
                 return (
                   <div key={line.variantId} className="surface-card flex gap-4 p-4">

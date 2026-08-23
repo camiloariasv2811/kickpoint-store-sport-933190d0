@@ -1,14 +1,15 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+  ArrowLeft,
   Check,
+  MessageCircle,
   Minus,
   Plus,
   ShieldCheck,
   ShoppingCart,
+  Tag,
   Truck,
-  MessageCircle,
-  ArrowLeft,
 } from "lucide-react";
 import { useMemo, useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
@@ -160,7 +161,11 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
   const { addLine, addWholesaleLine, wholesaleCount } = useCart();
   const hasLogged = useRef(false);
 
+  const variants = useMemo(() => product.variants ?? [], [product.variants]);
+
   useEffect(() => {
+    console.log("[PRODUCT_SELECT_01] PRODUCT CARD MOUNT", product.name);
+    console.log("[PRODUCT_SELECT_02] VARIANTS AVAILABLE", variants.length);
     if (!hasLogged.current) {
       hasLogged.current = true;
       requestAnimationFrame(() => {
@@ -168,34 +173,60 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
         console.log(`[PRODUCT_DETAIL_RENDERED] Time to Product Detail (TTPD): ${elapsed}ms`);
       });
     }
-  }, [navStart]);
+  }, [navStart, product.name, variants.length]);
 
   const colors = useMemo(
-    () =>
-      Array.from(new Set((product.variants ?? []).map((v) => v.color).filter(Boolean))) as string[],
-    [product.variants],
+    () => Array.from(new Set(variants.map((v) => v.color).filter(Boolean))) as string[],
+    [variants],
   );
   const [color, setColor] = useState<string | null>(colors[0] ?? null);
   const sizes = useMemo(
-    () => (product.variants ?? []).filter((v) => (color ? v.color === color : true)),
-    [product.variants, color],
+    () => variants.filter((v) => (color ? v.color === color : true)),
+    [variants, color],
   );
   const [variantId, setVariantId] = useState<string | null>(
-    sizes.find((v) => v.stock > 0)?.id ?? null,
+    sizes.find((v) => v.stock > 0)?.id ?? sizes[0]?.id ?? null,
   );
   const [qty, setQty] = useState(1);
   const [imageIndex, setImageIndex] = useState(0);
 
-  const variant = (product.variants ?? []).find((v) => v.id === variantId) ?? null;
+  const variant =
+    variants.find((v) => v.id === variantId) ?? sizes.find((v) => v.stock > 0) ?? sizes[0] ?? null;
   const retailPrice = Number(product.retail_price || 0);
   const wholesalePrice = product.wholesale_price ? Number(product.wholesale_price) : retailPrice;
   const stock = totalStock(product);
 
+  function handleColorChange(c: string) {
+    console.log("[PRODUCT_SELECT_03] COLOR SELECTED", c);
+    setColor(c);
+    const nextVariant =
+      variants.find((v) => v.color === c && v.stock > 0) ??
+      variants.find((v) => v.color === c) ??
+      null;
+    setVariantId(nextVariant?.id ?? null);
+  }
+
+  function handleSizeChange(selectedVarId: string) {
+    const selectedVar = variants.find((v) => v.id === selectedVarId);
+    console.log("[PRODUCT_SELECT_04] SIZE SELECTED", selectedVar?.size, selectedVarId);
+    setVariantId(selectedVarId);
+    setQty(1);
+  }
+
+  function handleQtyChange(newQty: number) {
+    console.log("[PRODUCT_SELECT_05] QUANTITY CHANGED", newQty);
+    setQty(newQty);
+  }
+
   function handleAdd() {
+    console.log("[PRODUCT_SELECT_06] ADD TO CART START (Retail)");
     if (!variant) {
       toast.error("Selecciona una talla");
       return;
     }
+    const safeStock = Number(variant.stock) || 0;
+    const safeQty = Math.max(1, Math.min(qty, safeStock > 0 ? safeStock : 1));
+
     addLine({
       variantId: variant.id,
       productId: product.id,
@@ -207,19 +238,24 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
       retailPrice,
       wholesalePrice: product.wholesale_price ? Number(product.wholesale_price) : null,
       wholesaleMinQty: product.wholesale_min_qty || WHOLESALE_MIN_ORDER_UNITS,
-      stock: variant.stock,
-      quantity: Math.min(qty, variant.stock),
+      stock: safeStock,
+      quantity: safeQty,
     });
+    console.log("[PRODUCT_SELECT_10] SUCCESS (Retail)");
     toast.success("Agregado al carrito minorista", {
-      description: `${product.name} · Talla ${variant.size} × ${qty}`,
+      description: `${product.name} · Talla ${variant.size} × ${safeQty}`,
     });
   }
 
   function handleAddWholesale() {
+    console.log("[PRODUCT_SELECT_06] ADD TO CART START (Wholesale)");
     if (!variant) {
       toast.error("Selecciona una talla");
       return;
     }
+    const safeStock = Number(variant.stock) || 0;
+    const safeQty = Math.max(1, Math.min(qty, safeStock > 0 ? safeStock : 1));
+
     addWholesaleLine({
       variantId: variant.id,
       productId: product.id,
@@ -231,11 +267,12 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
       retailPrice,
       wholesalePrice,
       wholesaleMinQty: product.wholesale_min_qty || WHOLESALE_MIN_ORDER_UNITS,
-      stock: variant.stock,
-      quantity: Math.min(qty, variant.stock),
+      stock: safeStock,
+      quantity: safeQty,
     });
 
-    const newTotal = wholesaleCount + Math.min(qty, variant.stock);
+    console.log("[PRODUCT_SELECT_10] SUCCESS (Wholesale)");
+    const newTotal = wholesaleCount + safeQty;
     if (newTotal >= WHOLESALE_MIN_ORDER_UNITS) {
       toast.success("¡Agregado al pedido mayorista!", {
         description: `Total mayorista acumulado: ${newTotal}/${WHOLESALE_MIN_ORDER_UNITS} unidades (Precio mayorista activado).`,
@@ -358,13 +395,7 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
                   {colors.map((c) => (
                     <button
                       key={c}
-                      onClick={() => {
-                        setColor(c);
-                        const next = (product.variants ?? []).find(
-                          (v) => v.color === c && v.stock > 0,
-                        );
-                        setVariantId(next?.id ?? null);
-                      }}
+                      onClick={() => handleColorChange(c)}
                       className={`rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
                         color === c
                           ? "border-primary bg-accent text-primary"
@@ -382,16 +413,13 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
               <p className="text-eyebrow mb-2 text-[0.65rem]">Talla</p>
               <div className="flex flex-wrap gap-2">
                 {sizes.map((v) => {
-                  const disabled = v.stock <= 0;
-                  const active = variantId === v.id;
+                  const disabled = (Number(v.stock) || 0) <= 0;
+                  const active = variant?.id === v.id;
                   return (
                     <button
                       key={v.id}
                       disabled={disabled}
-                      onClick={() => {
-                        setVariantId(v.id);
-                        setQty(1);
-                      }}
+                      onClick={() => handleSizeChange(v.id)}
                       className={`min-w-14 rounded-lg border px-4 py-3 text-sm font-bold transition-colors ${
                         active
                           ? "border-primary bg-primary text-primary-foreground"
@@ -417,7 +445,7 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
                 <div className="flex items-center rounded-xl border border-border">
                   <button
                     aria-label="Disminuir"
-                    onClick={() => setQty((q) => Math.max(1, q - 1))}
+                    onClick={() => handleQtyChange(Math.max(1, qty - 1))}
                     className="flex size-12 items-center justify-center text-muted-foreground hover:text-primary"
                   >
                     <Minus className="size-4" />
@@ -425,7 +453,11 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
                   <span className="w-10 text-center text-lg font-bold">{qty}</span>
                   <button
                     aria-label="Aumentar"
-                    onClick={() => setQty((q) => Math.min(variant?.stock ?? 99, q + 1))}
+                    onClick={() =>
+                      handleQtyChange(
+                        Math.min(Number(variant?.stock) > 0 ? Number(variant?.stock) : 99, qty + 1),
+                      )
+                    }
                     className="flex size-12 items-center justify-center text-muted-foreground hover:text-primary"
                   >
                     <Plus className="size-4" />
@@ -475,7 +507,7 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
                 variant="hero"
                 size="xl"
                 className="flex-1"
-                disabled={!variant || variant.stock <= 0}
+                disabled={!variant || (Number(variant.stock) || 0) <= 0}
                 onClick={handleAdd}
               >
                 <ShoppingCart className="size-5" /> Agregar al Carrito
@@ -485,7 +517,7 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
                 <Button
                   variant="outlineGlow"
                   size="xl"
-                  disabled={!variant || variant.stock <= 0}
+                  disabled={!variant || (Number(variant.stock) || 0) <= 0}
                   onClick={handleAddWholesale}
                   className="border-amber-500/50 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold"
                 >

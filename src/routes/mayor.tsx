@@ -148,14 +148,16 @@ function WholesaleCatalogPage() {
 
         // Size
         if (selectedSize !== "todas") {
-          const hasSize = (p.variants ?? []).some((v) => v.size === selectedSize && v.stock > 0);
+          const hasSize = (p.variants ?? []).some(
+            (v) => v.size === selectedSize && (Number(v.stock) || 0) > 0,
+          );
           if (!hasSize) return false;
         }
 
         // In Stock
         if (onlyInStock) {
-          const totalStock = (p.variants ?? []).reduce((s, v) => s + (v.stock || 0), 0);
-          if (totalStock <= 0) return false;
+          const pStock = totalStock(p);
+          if (pStock <= 0) return false;
         }
 
         return true;

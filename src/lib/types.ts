@@ -61,8 +61,9 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   pedido_entregado: "Pedido entregado",
 };
 
-export function totalStock(p: Pick<Product, "variants">) {
-  return p.variants.reduce((sum, v) => sum + (v.stock ?? 0), 0);
+export function totalStock(p?: { variants?: Variant[] | null } | null) {
+  if (!p || !p.variants || !Array.isArray(p.variants)) return 0;
+  return p.variants.reduce((sum, v) => sum + (Number(v?.stock) || 0), 0);
 }
 
 export { toSafeUuid, isUuid } from "./uuid-utils";

@@ -29,24 +29,54 @@ export function WholesaleProductCard({ product }: WholesaleProductCardProps) {
   );
 
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
-    availableSizes.find((v) => v.stock > 0)?.id ?? availableSizes[0]?.id ?? null,
+    availableSizes.find((v) => (Number(v.stock) || 0) > 0)?.id ?? availableSizes[0]?.id ?? null,
   );
   const [qty, setQty] = useState(1);
 
-  const activeVariant = variants.find((v) => v.id === selectedVariantId) ?? null;
+  const activeVariant =
+    variants.find((v) => v.id === selectedVariantId) ??
+    availableSizes.find((v) => (Number(v.stock) || 0) > 0) ??
+    availableSizes[0] ??
+    variants[0] ??
+    null;
+
   const retailPrice = Number(product.retail_price || 0);
   const wholesalePrice = product.wholesale_price ? Number(product.wholesale_price) : retailPrice;
   const unitSavings = Math.max(0, retailPrice - wholesalePrice);
 
+  function handleColorSelect(c: string) {
+    console.log("[PRODUCT_SELECT_03] COLOR SELECTED (Wholesale Card)", c);
+    setSelectedColor(c);
+    const inThisColor = variants.filter((v) => v.color === c);
+    const next = inThisColor.find((v) => (Number(v.stock) || 0) > 0) ?? inThisColor[0] ?? null;
+    setSelectedVariantId(next?.id ?? null);
+  }
+
+  function handleSizeSelect(varId: string) {
+    const selectedVar = variants.find((v) => v.id === varId);
+    console.log("[PRODUCT_SELECT_04] SIZE SELECTED (Wholesale Card)", selectedVar?.size, varId);
+    setSelectedVariantId(varId);
+    setQty(1);
+  }
+
+  function handleQtyChange(newQty: number) {
+    console.log("[PRODUCT_SELECT_05] QUANTITY CHANGED (Wholesale Card)", newQty);
+    setQty(newQty);
+  }
+
   function handleAddToWholesale() {
+    console.log("[PRODUCT_SELECT_06] ADD TO CART START (Wholesale Card)");
     if (!activeVariant) {
       toast.error("Selecciona una talla para continuar");
       return;
     }
-    if (activeVariant.stock <= 0) {
+    const safeStock = Number(activeVariant.stock) || 0;
+    if (safeStock <= 0) {
       toast.error("Esta talla se encuentra agotada");
       return;
     }
+
+    const safeQty = Math.max(1, Math.min(qty, safeStock));
 
     addWholesaleLine({
       variantId: activeVariant.id,
@@ -59,18 +89,19 @@ export function WholesaleProductCard({ product }: WholesaleProductCardProps) {
       retailPrice,
       wholesalePrice,
       wholesaleMinQty: product.wholesale_min_qty || WHOLESALE_MIN_ORDER_UNITS,
-      stock: activeVariant.stock,
-      quantity: Math.min(qty, activeVariant.stock),
+      stock: safeStock,
+      quantity: safeQty,
     });
 
-    const newTotal = wholesaleCount + Math.min(qty, activeVariant.stock);
+    console.log("[PRODUCT_SELECT_10] SUCCESS (Wholesale Card)");
+    const newTotal = wholesaleCount + safeQty;
     if (newTotal >= WHOLESALE_MIN_ORDER_UNITS) {
       toast.success("¡Agregado al pedido mayorista!", {
-        description: `${product.name} (Talla ${activeVariant.size} × ${qty}). Total mayorista: ${newTotal}/${WHOLESALE_MIN_ORDER_UNITS} unidades (¡Precio mayorista activado!).`,
+        description: `${product.name} (Talla ${activeVariant.size} × ${safeQty}). Total mayorista: ${newTotal}/${WHOLESALE_MIN_ORDER_UNITS} unidades (¡Precio mayorista activado!).`,
       });
     } else {
       toast.info("Agregado al pedido mayorista", {
-        description: `${product.name} (Talla ${activeVariant.size} × ${qty}). Llevas ${newTotal}/${WHOLESALE_MIN_ORDER_UNITS} unidades (te faltan ${WHOLESALE_MIN_ORDER_UNITS - newTotal} para activar precio mayor).`,
+        description: `${product.name} (Talla ${activeVariant.size} × ${safeQty}). Llevas ${newTotal}/${WHOLESALE_MIN_ORDER_UNITS} unidades (te faltan ${WHOLESALE_MIN_ORDER_UNITS - newTotal} para activar precio mayor).`,
       });
     }
   }
@@ -169,11 +200,7 @@ export function WholesaleProductCard({ product }: WholesaleProductCardProps) {
                   <button
                     key={c}
                     type="button"
-                    onClick={() => {
-                      setSelectedColor(c);
-                      const next = variants.find((v) => v.color === c && v.stock > 0);
-                      setSelectedVariantId(next?.id ?? null);
-                    }}
+                    onClick={() => handleColorSelect(c)}
                     className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${
                       selectedColor === c
                         ? "bg-primary text-primary-foreground font-semibold"
@@ -200,17 +227,14 @@ export function WholesaleProductCard({ product }: WholesaleProductCardProps) {
             </div>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {availableSizes.map((v) => {
-                const isSelected = selectedVariantId === v.id;
-                const isOut = v.stock <= 0;
+                const isSelected = activeVariant?.id === v.id;
+                const isOut = (Number(v.stock) || 0) <= 0;
                 return (
                   <button
                     key={v.id}
                     type="button"
                     disabled={isOut}
-                    onClick={() => {
-                      setSelectedVariantId(v.id);
-                      setQty(1);
-                    }}
+                    onClick={() => handleSizeSelect(v.id)}
                     className={`min-w-8 rounded-md border px-2 py-1 text-xs font-bold transition-all ${
                       isSelected
                         ? "border-primary bg-primary text-primary-foreground shadow-xs"
@@ -236,8 +260,8 @@ export function WholesaleProductCard({ product }: WholesaleProductCardProps) {
             <button
               type="button"
               aria-label="Disminuir cantidad"
-              disabled={!activeVariant || activeVariant.stock <= 0}
-              onClick={() => setQty((q) => Math.max(1, q - 1))}
+              disabled={!activeVariant || (Number(activeVariant.stock) || 0) <= 0}
+              onClick={() => handleQtyChange(Math.max(1, qty - 1))}
               className="flex size-8 items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-40"
             >
               <Minus className="size-3.5" />
@@ -246,8 +270,15 @@ export function WholesaleProductCard({ product }: WholesaleProductCardProps) {
             <button
               type="button"
               aria-label="Aumentar cantidad"
-              disabled={!activeVariant || activeVariant.stock <= 0}
-              onClick={() => setQty((q) => Math.min(activeVariant?.stock ?? 99, q + 1))}
+              disabled={!activeVariant || (Number(activeVariant.stock) || 0) <= 0}
+              onClick={() =>
+                handleQtyChange(
+                  Math.min(
+                    Number(activeVariant?.stock) > 0 ? Number(activeVariant?.stock) : 99,
+                    qty + 1,
+                  ),
+                )
+              }
               className="flex size-8 items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-40"
             >
               <Plus className="size-3.5" />
@@ -259,7 +290,7 @@ export function WholesaleProductCard({ product }: WholesaleProductCardProps) {
             type="button"
             variant="hero"
             size="sm"
-            disabled={!activeVariant || activeVariant.stock <= 0}
+            disabled={!activeVariant || (Number(activeVariant.stock) || 0) <= 0}
             onClick={handleAddToWholesale}
             className="flex-1 gap-1.5 text-xs font-bold"
           >

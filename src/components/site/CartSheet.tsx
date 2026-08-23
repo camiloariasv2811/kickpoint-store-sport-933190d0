@@ -151,8 +151,10 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
 
           {currentLines.map((line) => {
             const lineUnitPrice = isWholesaleTab
-              ? line.wholesalePrice || line.retailPrice
-              : getLineUnitPrice(line as any);
+              ? isWholesaleValid && line.wholesalePrice
+                ? Number(line.wholesalePrice)
+                : Number(line.retailPrice || 0)
+              : getLineUnitPrice(line);
 
             return (
               <div key={line.variantId} className="surface-card flex gap-3 p-3">
