@@ -123,7 +123,21 @@ export const listAllPaymentMethods = createServerFn({ method: "GET" })
       return getInMemoryPaymentMethods() as PaymentMethodRow[];
     }
     try {
-      const { data, error } = await context.supabase
+      // Verify staff through the caller's own (RLS-scoped) client before touching
+      // the privileged client, since `details` holds bank/wallet account PII.
+      const { data: roleRows } = await context.supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", context.userId);
+      const isStaff = (roleRows ?? []).some(
+        (r: { role: string }) => r.role === "admin" || r.role === "staff",
+      );
+      if (!isStaff) {
+        return getInMemoryPaymentMethods() as PaymentMethodRow[];
+      }
+
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data, error } = await supabaseAdmin
         .from("payment_methods")
         .select("id, code, name, active, instructions, details, sort_order")
         .order("sort_order", { ascending: true });
@@ -164,6 +178,7 @@ export const updatePaymentMethod = createServerFn({ method: "POST" })
       return { ok: true as const };
     }
   });
+
 
 export const listStaffUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
