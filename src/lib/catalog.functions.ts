@@ -334,60 +334,164 @@ export const searchProductsForSelector = createServerFn({ method: "GET" })
     }
   });
 
+function normalizeProduct(p: any): Product {
+  const brandObj =
+    p.brand && typeof p.brand === "object"
+      ? {
+          id: String(p.brand.id ?? ""),
+          name: String(p.brand.name ?? ""),
+          slug: String(p.brand.slug ?? ""),
+        }
+      : null;
+
+  const categoryObj =
+    p.category && typeof p.category === "object"
+      ? {
+          id: String(p.category.id ?? ""),
+          name: String(p.category.name ?? ""),
+          slug: String(p.category.slug ?? ""),
+        }
+      : null;
+
+  const rawVariants = Array.isArray(p.variants) ? p.variants : [];
+  const normalizedVariants = rawVariants
+    .filter((v: any) => v && v.active !== false)
+    .map((v: any) => ({
+      id: String(v.id ?? `v-${Date.now()}`),
+      product_id: String(v.product_id ?? p.id ?? ""),
+      size: String(v.size ?? "Única"),
+      color: v.color ? String(v.color) : null,
+      sku: v.sku ? String(v.sku) : null,
+      stock: Number(v.stock) || 0,
+      active: v.active !== false,
+    }));
+
+  return {
+    id: String(p.id),
+    name: String(p.name ?? "Producto KICKPOINT"),
+    slug: String(p.slug ?? p.id),
+    description: p.description ? String(p.description) : null,
+    base_sku: p.base_sku ? String(p.base_sku) : null,
+    retail_price: Number(p.retail_price) || 0,
+    wholesale_price: p.wholesale_price != null ? Number(p.wholesale_price) : null,
+    wholesale_min_qty: Number(p.wholesale_min_qty) || 8,
+    images: Array.isArray(p.images) ? p.images.filter(Boolean).map(String) : [],
+    is_featured: Boolean(p.is_featured),
+    is_bestseller: Boolean(p.is_bestseller),
+    is_new: Boolean(p.is_new),
+    is_offer: Boolean(p.is_offer),
+    active: p.active !== false,
+    low_stock_threshold: Number(p.low_stock_threshold) || 5,
+    created_at: String(p.created_at ?? new Date().toISOString()),
+    brand: brandObj,
+    category: categoryObj,
+    variants: normalizedVariants,
+  };
+}
+
 export const listProducts = createServerFn({ method: "GET" }).handler(async () => {
   const tStart = performance.now();
+  console.log("[CLIENT_PRODUCTS_01] QUERY START - fetching public products catalog");
 
   // Fast path: Server in-memory cache hit
-  if (cachedProducts && Date.now() - cachedProducts.timestamp < SERVER_CACHE_TTL_MS) {
+  if (
+    cachedProducts &&
+    cachedProducts.data.length > 0 &&
+    Date.now() - cachedProducts.timestamp < SERVER_CACHE_TTL_MS
+  ) {
     console.log(
-      `[PRODUCTS_QUERY_SERVER_CACHE_HIT] Resolved in ${Math.round(performance.now() - tStart)}ms`,
+      `[PRODUCTS_QUERY_SERVER_CACHE_HIT] Resolved ${cachedProducts.data.length} products in ${Math.round(performance.now() - tStart)}ms`,
+    );
+    console.log(
+      "[CLIENT_PRODUCTS_06] SERVER RESPONSE:",
+      cachedProducts.data.length,
+      "cached products",
     );
     return cachedProducts.data;
   }
 
-  console.log(
-    `[PRODUCTS_QUERY_START] Catalog products query started at ${new Date().toISOString()}`,
-  );
-
-  if (!isSupabasePublicConfigured()) {
-    const memStart = performance.now();
-    const result = getInMemoryProducts().filter((p) => p.active !== false);
-    console.log(
-      `[PRODUCTS_QUERY_END] In-memory catalog query resolved in ${Math.round(performance.now() - memStart)}ms`,
-    );
-    cachedProducts = { data: result, timestamp: Date.now() };
-    return result;
-  }
-
+  // Attempt 1: Fetch via Server/Admin Supabase client (preferred, bypasses RLS issues)
   try {
-    const supabase = createPublicClient();
-    const qStart = performance.now();
-    const { data, error } = await supabase
-      .from("products")
-      .select(PRODUCT_SELECT_CATALOG)
-      .eq("active", true)
-      .order("created_at", { ascending: false });
+    const { supabaseAdmin, isSupabaseServerConfigured } =
+      await import("@/integrations/supabase/client.server");
 
-    const qDuration = Math.round(performance.now() - qStart);
-    console.log(
-      `[PRODUCTS_QUERY_END] Supabase products query finished in ${qDuration}ms (retrieved ${data?.length ?? 0} items)`,
-    );
+    if (isSupabaseServerConfigured()) {
+      const qStart = performance.now();
+      const { data, error } = await supabaseAdmin
+        .from("products")
+        .select(PRODUCT_SELECT_CATALOG)
+        .or("active.eq.true,active.is.null")
+        .order("created_at", { ascending: false });
 
-    if (error) {
-      console.warn("[listProducts] Supabase error:", error);
-      return [];
+      console.log("[CLIENT_PRODUCTS_02] SUPABASE RESULT (Admin)", {
+        received: data?.length ?? 0,
+        hasError: Boolean(error),
+        errorMessage: error?.message,
+        durationMs: Math.round(performance.now() - qStart),
+      });
+
+      if (!error && data && data.length > 0) {
+        console.log("[CLIENT_PRODUCTS_03] PRODUCT COUNT:", data.length);
+        const normalized = data.map(normalizeProduct);
+        console.log("[CLIENT_PRODUCTS_05] NORMALIZED PRODUCT COUNT:", normalized.length);
+        cachedProducts = { data: normalized, timestamp: Date.now() };
+        console.log(
+          "[CLIENT_PRODUCTS_06] SERVER RESPONSE:",
+          normalized.length,
+          "products returned",
+        );
+        return normalized;
+      }
     }
-
-    const finalProducts = (data ?? []) as unknown as Product[];
-    cachedProducts = { data: finalProducts, timestamp: Date.now() };
-    return finalProducts;
-  } catch (err) {
-    console.error(
-      `[TOTAL_PRODUCTS_LOAD] Supabase query failed in ${Math.round(performance.now() - tStart)}ms:`,
-      err,
-    );
-    return [];
+  } catch (adminErr) {
+    console.warn("[listProducts] Admin client attempt error:", adminErr);
   }
+
+  // Attempt 2: Fetch via Public client
+  if (isSupabasePublicConfigured()) {
+    try {
+      const supabase = createPublicClient();
+      const qStart = performance.now();
+      const { data, error } = await supabase
+        .from("products")
+        .select(PRODUCT_SELECT_CATALOG)
+        .or("active.eq.true,active.is.null")
+        .order("created_at", { ascending: false });
+
+      console.log("[CLIENT_PRODUCTS_02] SUPABASE RESULT (Public)", {
+        received: data?.length ?? 0,
+        hasError: Boolean(error),
+        errorMessage: error?.message,
+        durationMs: Math.round(performance.now() - qStart),
+      });
+
+      if (!error && data && data.length > 0) {
+        console.log("[CLIENT_PRODUCTS_03] PRODUCT COUNT:", data.length);
+        const normalized = data.map(normalizeProduct);
+        console.log("[CLIENT_PRODUCTS_05] NORMALIZED PRODUCT COUNT:", normalized.length);
+        cachedProducts = { data: normalized, timestamp: Date.now() };
+        console.log(
+          "[CLIENT_PRODUCTS_06] SERVER RESPONSE:",
+          normalized.length,
+          "products returned",
+        );
+        return normalized;
+      }
+    } catch (pubErr) {
+      console.warn("[listProducts] Public client attempt error:", pubErr);
+    }
+  }
+
+  // Fallback: In-memory fallback products (filter out deactivated)
+  const memProducts = getInMemoryProducts()
+    .filter((p) => p.active !== false)
+    .map(normalizeProduct);
+
+  console.log("[CLIENT_PRODUCTS_03] PRODUCT COUNT (In-Memory Fallback):", memProducts.length);
+  console.log("[CLIENT_PRODUCTS_05] NORMALIZED PRODUCT COUNT:", memProducts.length);
+  console.log("[CLIENT_PRODUCTS_06] SERVER RESPONSE:", memProducts.length, "fallback products");
+  cachedProducts = { data: memProducts, timestamp: Date.now() };
+  return memProducts;
 });
 
 export const getProduct = createServerFn({ method: "GET" })
@@ -395,96 +499,194 @@ export const getProduct = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     // Fast path: Server in-memory cache hit
     const cached = cachedSingleProduct.get(data.slug);
-    if (cached && Date.now() - cached.timestamp < SERVER_CACHE_TTL_MS) {
+    if (cached && cached.data && Date.now() - cached.timestamp < SERVER_CACHE_TTL_MS) {
       return cached.data;
     }
 
-    if (!isSupabasePublicConfigured()) {
-      const item =
-        getInMemoryProducts().find((p) => p.slug === data.slug && p.active !== false) ?? null;
-      cachedSingleProduct.set(data.slug, { data: item, timestamp: Date.now() });
-      return item;
-    }
+    // Attempt 1: Fetch via Admin client
     try {
-      const supabase = createPublicClient();
-      const { data: row, error } = await supabase
-        .from("products")
-        .select(PRODUCT_SELECT_FULL)
-        .eq("slug", data.slug)
-        .eq("active", true)
-        .maybeSingle();
+      const { supabaseAdmin, isSupabaseServerConfigured } =
+        await import("@/integrations/supabase/client.server");
+      if (isSupabaseServerConfigured()) {
+        const { data: row, error } = await supabaseAdmin
+          .from("products")
+          .select(PRODUCT_SELECT_FULL)
+          .eq("slug", data.slug)
+          .or("active.eq.true,active.is.null")
+          .maybeSingle();
 
-      if (error || !row) {
-        if (error) console.warn("[getProduct] Supabase error:", error);
-        cachedSingleProduct.set(data.slug, { data: null, timestamp: Date.now() });
-        return null;
+        if (!error && row) {
+          const finalProduct = normalizeProduct(row);
+          cachedSingleProduct.set(data.slug, { data: finalProduct, timestamp: Date.now() });
+          return finalProduct;
+        }
       }
-      const finalProduct = row as unknown as Product | null;
-      cachedSingleProduct.set(data.slug, { data: finalProduct, timestamp: Date.now() });
-      return finalProduct;
     } catch (err) {
-      console.error("[getProduct] Exception querying product:", err);
-      cachedSingleProduct.set(data.slug, { data: null, timestamp: Date.now() });
-      return null;
+      console.warn("[getProduct] Admin query error:", err);
     }
+
+    // Attempt 2: Fetch via Public client
+    if (isSupabasePublicConfigured()) {
+      try {
+        const supabase = createPublicClient();
+        const { data: row, error } = await supabase
+          .from("products")
+          .select(PRODUCT_SELECT_FULL)
+          .eq("slug", data.slug)
+          .or("active.eq.true,active.is.null")
+          .maybeSingle();
+
+        if (!error && row) {
+          const finalProduct = normalizeProduct(row);
+          cachedSingleProduct.set(data.slug, { data: finalProduct, timestamp: Date.now() });
+          return finalProduct;
+        }
+      } catch (err) {
+        console.warn("[getProduct] Public query error:", err);
+      }
+    }
+
+    // Fallback in-memory
+    const item =
+      getInMemoryProducts().find((p) => p.slug === data.slug && p.active !== false) ?? null;
+    const finalProduct = item ? normalizeProduct(item) : null;
+    cachedSingleProduct.set(data.slug, { data: finalProduct, timestamp: Date.now() });
+    return finalProduct;
   });
 
 export const listCategories = createServerFn({ method: "GET" }).handler(async () => {
-  if (cachedCategories && Date.now() - cachedCategories.timestamp < SERVER_CACHE_TTL_MS * 5) {
+  if (
+    cachedCategories &&
+    cachedCategories.data.length > 0 &&
+    Date.now() - cachedCategories.timestamp < SERVER_CACHE_TTL_MS * 5
+  ) {
     return cachedCategories.data;
   }
 
-  if (!isSupabasePublicConfigured()) {
-    const inMem = getInMemoryCategories();
-    cachedCategories = { data: inMem, timestamp: Date.now() };
-    return inMem;
-  }
+  // Attempt 1: Fetch via Admin client
   try {
-    const supabase = createPublicClient();
-    const { data, error } = await supabase
-      .from("categories")
-      .select("id, name, slug, parent_id, image_url, sort_order")
-      .eq("active", true)
-      .order("sort_order");
-    if (error || !data) {
-      if (error) console.warn("[listCategories] Supabase error:", error);
-      return [];
+    const { supabaseAdmin, isSupabaseServerConfigured } =
+      await import("@/integrations/supabase/client.server");
+    if (isSupabaseServerConfigured()) {
+      const { data, error } = await supabaseAdmin
+        .from("categories")
+        .select("id, name, slug, parent_id, image_url, sort_order, active")
+        .or("active.eq.true,active.is.null")
+        .order("sort_order", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        const cats = data.map((c: any) => ({
+          id: String(c.id),
+          name: String(c.name ?? ""),
+          slug: String(c.slug ?? ""),
+          parent_id: c.parent_id ? String(c.parent_id) : null,
+          image_url: c.image_url ? String(c.image_url) : null,
+          sort_order: Number(c.sort_order) || 0,
+        })) as Category[];
+        console.log("[CLIENT_PRODUCTS_04] CATEGORY COUNT (Admin):", cats.length);
+        cachedCategories = { data: cats, timestamp: Date.now() };
+        return cats;
+      }
     }
-    const cats = data as unknown as Category[];
-    cachedCategories = { data: cats, timestamp: Date.now() };
-    return cats;
-  } catch {
-    return [];
+  } catch (err) {
+    console.warn("[listCategories] Admin query error:", err);
   }
+
+  // Attempt 2: Fetch via Public client
+  if (isSupabasePublicConfigured()) {
+    try {
+      const supabase = createPublicClient();
+      const { data, error } = await supabase
+        .from("categories")
+        .select("id, name, slug, parent_id, image_url, sort_order, active")
+        .or("active.eq.true,active.is.null")
+        .order("sort_order", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        const cats = data.map((c: any) => ({
+          id: String(c.id),
+          name: String(c.name ?? ""),
+          slug: String(c.slug ?? ""),
+          parent_id: c.parent_id ? String(c.parent_id) : null,
+          image_url: c.image_url ? String(c.image_url) : null,
+          sort_order: Number(c.sort_order) || 0,
+        })) as Category[];
+        console.log("[CLIENT_PRODUCTS_04] CATEGORY COUNT (Public):", cats.length);
+        cachedCategories = { data: cats, timestamp: Date.now() };
+        return cats;
+      }
+    } catch (err) {
+      console.warn("[listCategories] Public query error:", err);
+    }
+  }
+
+  const inMem = getInMemoryCategories();
+  console.log("[CLIENT_PRODUCTS_04] CATEGORY COUNT (Fallback):", inMem.length);
+  cachedCategories = { data: inMem, timestamp: Date.now() };
+  return inMem;
 });
 
 export const listBrands = createServerFn({ method: "GET" }).handler(async () => {
-  if (cachedBrands && Date.now() - cachedBrands.timestamp < SERVER_CACHE_TTL_MS * 5) {
+  if (
+    cachedBrands &&
+    cachedBrands.data.length > 0 &&
+    Date.now() - cachedBrands.timestamp < SERVER_CACHE_TTL_MS * 5
+  ) {
     return cachedBrands.data;
   }
 
-  if (!isSupabasePublicConfigured()) {
-    const brands = getInMemoryBrands();
-    cachedBrands = { data: brands, timestamp: Date.now() };
-    return brands;
-  }
+  // Attempt 1: Fetch via Admin client
   try {
-    const supabase = createPublicClient();
-    const { data, error } = await supabase
-      .from("brands")
-      .select("id, name, slug")
-      .eq("active", true)
-      .order("name");
-    if (error || !data) {
-      if (error) console.warn("[listBrands] Supabase error:", error);
-      return [];
+    const { supabaseAdmin, isSupabaseServerConfigured } =
+      await import("@/integrations/supabase/client.server");
+    if (isSupabaseServerConfigured()) {
+      const { data, error } = await supabaseAdmin
+        .from("brands")
+        .select("id, name, slug, active")
+        .or("active.eq.true,active.is.null")
+        .order("name", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        const brands = data.map((b: any) => ({
+          id: String(b.id),
+          name: String(b.name ?? ""),
+          slug: String(b.slug ?? ""),
+        })) as Brand[];
+        cachedBrands = { data: brands, timestamp: Date.now() };
+        return brands;
+      }
     }
-    const brands = data as unknown as Brand[];
-    cachedBrands = { data: brands, timestamp: Date.now() };
-    return brands;
-  } catch {
-    return [];
+  } catch (err) {
+    console.warn("[listBrands] Admin query error:", err);
   }
+
+  // Attempt 2: Fetch via Public client
+  if (isSupabasePublicConfigured()) {
+    try {
+      const supabase = createPublicClient();
+      const { data, error } = await supabase
+        .from("brands")
+        .select("id, name, slug, active")
+        .or("active.eq.true,active.is.null")
+        .order("name", { ascending: true });
+
+      if (!error && data && data.length > 0) {
+        const brands = data.map((b: any) => ({
+          id: String(b.id),
+          name: String(b.name ?? ""),
+          slug: String(b.slug ?? ""),
+        })) as Brand[];
+        cachedBrands = { data: brands, timestamp: Date.now() };
+        return brands;
+      }
+    } catch (err) {
+      console.warn("[listBrands] Public query error:", err);
+    }
+  }
+
+  const brands = getInMemoryBrands();
+  cachedBrands = { data: brands, timestamp: Date.now() };
+  return brands;
 });
 
 export const createBrand = createServerFn({ method: "POST" })

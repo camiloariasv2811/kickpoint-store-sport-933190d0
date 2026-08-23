@@ -23,15 +23,13 @@ import { money, moneyExact, whatsappLink } from "@/lib/format";
 import { totalStock, type Product } from "@/lib/types";
 
 export const Route = createFileRoute("/producto/$slug")({
-  loader: ({ context, params }) => {
-    context.queryClient.prefetchQuery({
+  loader: async ({ context, params }) => {
+    const product = await context.queryClient.ensureQueryData({
       queryKey: ["product", params.slug],
       queryFn: () => getProduct({ data: { slug: params.slug } }),
       staleTime: 60 * 1000,
     });
-    const catalog = context.queryClient.getQueryData<Product[]>(["products"]);
-    const cached = catalog?.find((p) => p.slug === params.slug && p.active !== false) ?? null;
-    return { product: cached };
+    return { product: product ?? null };
   },
   head: () => ({
     meta: [

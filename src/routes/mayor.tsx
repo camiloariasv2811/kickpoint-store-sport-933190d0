@@ -32,20 +32,22 @@ import { moneyExact, whatsappLink } from "@/lib/format";
 import { totalStock, type Category, type Product } from "@/lib/types";
 
 export const Route = createFileRoute("/mayor")({
-  loader: ({ context }) => {
-    context.queryClient.prefetchQuery({
-      queryKey: ["products"],
-      queryFn: () => listProducts(),
-      staleTime: 60 * 1000,
-    });
-    context.queryClient.prefetchQuery({
-      queryKey: ["categories"],
-      queryFn: () => listCategories(),
-      staleTime: 5 * 60 * 1000,
-    });
+  loader: async ({ context }) => {
+    const [products, categories] = await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: ["products"],
+        queryFn: () => listProducts(),
+        staleTime: 60 * 1000,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["categories"],
+        queryFn: () => listCategories(),
+        staleTime: 5 * 60 * 1000,
+      }),
+    ]);
     return {
-      products: context.queryClient.getQueryData<any>(["products"]) ?? [],
-      categories: context.queryClient.getQueryData<any>(["categories"]) ?? [],
+      products: (products ?? []) as Product[],
+      categories: (categories ?? []) as Category[],
     };
   },
   head: () => ({
@@ -70,6 +72,7 @@ export const Route = createFileRoute("/mayor")({
 });
 
 function WholesaleCatalogPage() {
+  const loaderData = Route.useLoaderData();
   const navigate = useNavigate();
   const {
     wholesaleLines,
@@ -85,13 +88,16 @@ function WholesaleCatalogPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("todas");
   const [selectedBrand, setSelectedBrand] = useState<string>("todas");
   const [selectedSize, setSelectedSize] = useState<string>("todas");
-  const [onlyInStock, setOnlyInStock] = useState(true);
+  const [onlyInStock, setOnlyInStock] = useState(false);
   const [sortBy, setSortBy] = useState<"featured" | "discount" | "price_asc" | "price_desc">(
     "featured",
   );
 
-  const { data: products = [], isLoading: loadingProducts } = useQuery<Product[]>({
+  const { data: products = loaderData?.products ?? [], isLoading: loadingProducts } = useQuery<
+    Product[]
+  >({
     queryKey: ["products"],
+    initialData: loaderData?.products,
     queryFn: async () => {
       try {
         const res = await listProducts();
@@ -104,8 +110,9 @@ function WholesaleCatalogPage() {
     staleTime: 60 * 1000,
   });
 
-  const { data: categories = [] } = useQuery<Category[]>({
+  const { data: categories = loaderData?.categories ?? [] } = useQuery<Category[]>({
     queryKey: ["categories"],
+    initialData: loaderData?.categories,
     queryFn: async () => {
       try {
         const res = await listCategories();
@@ -141,7 +148,7 @@ function WholesaleCatalogPage() {
   const filteredProducts = useMemo(() => {
     return products
       .filter((p) => {
-        if (!p.active) return false;
+        if (p.active === false) return false;
 
         // Search query
         if (q.trim()) {

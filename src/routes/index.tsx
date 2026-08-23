@@ -10,20 +10,22 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
 
 export const Route = createFileRoute("/")({
-  loader: ({ context }) => {
-    context.queryClient.prefetchQuery({
-      queryKey: ["products"],
-      queryFn: () => listProducts(),
-      staleTime: 60 * 1000,
-    });
-    context.queryClient.prefetchQuery({
-      queryKey: ["categories"],
-      queryFn: () => listCategories(),
-      staleTime: 5 * 60 * 1000,
-    });
+  loader: async ({ context }) => {
+    const [products, categories] = await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: ["products"],
+        queryFn: () => listProducts(),
+        staleTime: 60 * 1000,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["categories"],
+        queryFn: () => listCategories(),
+        staleTime: 5 * 60 * 1000,
+      }),
+    ]);
     return {
-      products: context.queryClient.getQueryData<any>(["products"]) ?? [],
-      categories: context.queryClient.getQueryData<any>(["categories"]) ?? [],
+      products: products ?? [],
+      categories: categories ?? [],
     };
   },
   head: () => ({
@@ -159,9 +161,25 @@ function Home() {
     },
   });
 
-  const featured = products?.filter((p) => p.is_featured) ?? [];
-  const bestsellers = products?.filter((p) => p.is_bestseller) ?? [];
-  const newest = products?.filter((p) => p.is_new) ?? [];
+  const featured =
+    products?.filter((p) => p.is_featured).length > 0
+      ? products.filter((p) => p.is_featured)
+      : (products ?? []);
+
+  const bestsellers =
+    products?.filter((p) => p.is_bestseller).length > 0
+      ? products.filter((p) => p.is_bestseller)
+      : products?.slice(4, 8).length > 0
+        ? products.slice(4, 8)
+        : (products ?? []);
+
+  const newest =
+    products?.filter((p) => p.is_new).length > 0
+      ? products.filter((p) => p.is_new)
+      : products?.slice(8, 12).length > 0
+        ? products.slice(8, 12)
+        : (products ?? []);
+
   const roots = (categories ?? []).filter((c) => !c.parent_id);
 
   return (
