@@ -14,18 +14,21 @@ export const Route = createFileRoute("/")({
     const [products, categories] = await Promise.all([
       context.queryClient.ensureQueryData({
         queryKey: ["products"],
-        queryFn: listProducts,
+        queryFn: () => listProducts(),
         staleTime: 60 * 1000,
       }),
       context.queryClient.ensureQueryData({
         queryKey: ["categories"],
-        queryFn: listCategories,
+        queryFn: () => listCategories(),
         staleTime: 5 * 60 * 1000,
       }),
-    ]).catch(() => [[], []]);
+    ]).catch((err) => {
+      console.warn("[Index Loader] Failed to ensure query data:", err);
+      return [[], []];
+    });
     return {
-      products: products ?? [],
-      categories: categories ?? [],
+      products: (products ?? []) as typeof products,
+      categories: (categories ?? []) as typeof categories,
     };
   },
   head: () => ({

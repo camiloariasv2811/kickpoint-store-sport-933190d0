@@ -7,8 +7,10 @@ const FALLBACK_SUPABASE_KEY =
 export function isSupabasePublicConfigured(): boolean {
   const url = process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"];
   const key =
-    process.env["SUPABASE_PUBLISHABLE_KEY"] ?? process.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
-  return Boolean(url && key && !key.includes("dummy-anon-key"));
+    process.env["SUPABASE_PUBLISHABLE_KEY"] ??
+    process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ??
+    process.env["SUPABASE_SERVICE_ROLE_KEY"];
+  return Boolean(url && key && !key.includes("dummy-"));
 }
 
 let _publicClient: ReturnType<typeof createClient> | null = null;
@@ -22,6 +24,7 @@ export function createPublicClient() {
   const key =
     process.env["SUPABASE_PUBLISHABLE_KEY"] ??
     process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ??
+    process.env["SUPABASE_SERVICE_ROLE_KEY"] ??
     FALLBACK_SUPABASE_KEY;
 
   _publicClient = createClient(url, key, {

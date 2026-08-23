@@ -34,24 +34,27 @@ export const Route = createFileRoute("/catalogo")({
     const [products, categories, brands] = await Promise.all([
       context.queryClient.ensureQueryData({
         queryKey: ["products"],
-        queryFn: listProducts,
+        queryFn: () => listProducts(),
         staleTime: 60 * 1000,
       }),
       context.queryClient.ensureQueryData({
         queryKey: ["categories"],
-        queryFn: listCategories,
+        queryFn: () => listCategories(),
         staleTime: 5 * 60 * 1000,
       }),
       context.queryClient.ensureQueryData({
         queryKey: ["brands"],
-        queryFn: listBrands,
+        queryFn: () => listBrands(),
         staleTime: 5 * 60 * 1000,
       }),
-    ]).catch(() => [[], [], []]);
+    ]).catch((err) => {
+      console.warn("[Catalogo Loader] Failed to ensure query data:", err);
+      return [[], [], []];
+    });
     return {
-      products: products ?? [],
-      categories: categories ?? [],
-      brands: brands ?? [],
+      products: (products ?? []) as typeof products,
+      categories: (categories ?? []) as typeof categories,
+      brands: (brands ?? []) as typeof brands,
     };
   },
   head: () => ({

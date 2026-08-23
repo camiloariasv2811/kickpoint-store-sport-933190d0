@@ -126,7 +126,7 @@ function ProductPageContainer() {
     initialData: () => {
       if (loaderData?.product) return loaderData.product;
       const catalog = queryClient.getQueryData<Product[]>(["products"]);
-      return catalog?.find((p) => p.slug === slug);
+      return catalog?.find((p) => p.slug === slug && p.active !== false);
     },
     initialDataUpdatedAt: () =>
       queryClient.getQueryState(["products"])?.dataUpdatedAt || Date.now(),

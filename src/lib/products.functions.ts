@@ -268,24 +268,15 @@ export const listAdminProducts = createServerFn({ method: "GET" })
 
       const { data: rows, count, error } = productsRes;
       if (error || !rows) {
-        const all = getInMemoryProducts();
+        if (error) console.warn("[listAdminProducts] Supabase error:", error);
         return {
-          items: all,
-          total: all.length,
+          items: [],
+          total: 0,
           page: 1,
           pageSize: 20,
           totalPages: 1,
-          activeCount: all.filter((p) => p.active !== false).length,
-          totalUnits: all
-            .filter((p) => p.active !== false)
-            .reduce(
-              (acc, p) =>
-                acc +
-                (p.variants ?? [])
-                  .filter((v) => v.active !== false)
-                  .reduce((va, v) => va + Number(v.stock || 0), 0),
-              0,
-            ),
+          activeCount: 0,
+          totalUnits: 0,
         } as AdminProductsResponse;
       }
 
@@ -306,25 +297,16 @@ export const listAdminProducts = createServerFn({ method: "GET" })
         activeCount,
         totalUnits,
       } as AdminProductsResponse;
-    } catch {
-      const all = getInMemoryProducts();
+    } catch (err) {
+      console.error("[listAdminProducts] Exception querying Supabase products:", err);
       return {
-        items: all,
-        total: all.length,
+        items: [],
+        total: 0,
         page: 1,
         pageSize: 20,
         totalPages: 1,
-        activeCount: all.filter((p) => p.active !== false).length,
-        totalUnits: all
-          .filter((p) => p.active !== false)
-          .reduce(
-            (acc, p) =>
-              acc +
-              (p.variants ?? [])
-                .filter((v) => v.active !== false)
-                .reduce((va, v) => va + Number(v.stock || 0), 0),
-            0,
-          ),
+        activeCount: 0,
+        totalUnits: 0,
       } as AdminProductsResponse;
     }
   });

@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
 import {
   DEMO_CATEGORIES,
+  getInMemoryCategories,
   getInMemoryBrands,
   addInMemoryBrand,
   getInMemoryProducts,
@@ -81,10 +82,14 @@ export const getMinimalProducts = createServerFn({ method: "GET" }).handler(asyn
       if (!error && data) {
         rawItems = data;
       } else {
-        rawItems = getInMemoryProducts().filter((p) => p.active);
+        if (error) {
+          console.warn("[getMinimalProducts] Supabase query error:", error);
+        }
+        rawItems = [];
       }
-    } catch {
-      rawItems = getInMemoryProducts().filter((p) => p.active);
+    } catch (err) {
+      console.error("[getMinimalProducts] Failed to query Supabase:", err);
+      rawItems = [];
     }
   } else {
     rawItems = getInMemoryProducts().filter((p) => p.active);
@@ -319,27 +324,13 @@ export const searchProductsForSelector = createServerFn({ method: "GET" })
 
       const { data: rows, error } = await query.limit(limit);
       if (error || !rows) {
-        let list = getInMemoryProducts().filter((p) => p.active !== false);
-        if (term) {
-          list = list.filter(
-            (p) =>
-              p.name.toLowerCase().includes(term) ||
-              (p.base_sku && p.base_sku.toLowerCase().includes(term)),
-          );
-        }
-        return list.slice(0, limit);
+        if (error) console.warn("[searchProductsForSelector] Supabase error:", error);
+        return [];
       }
       return rows;
-    } catch {
-      let list = getInMemoryProducts().filter((p) => p.active !== false);
-      if (term) {
-        list = list.filter(
-          (p) =>
-            p.name.toLowerCase().includes(term) ||
-            (p.base_sku && p.base_sku.toLowerCase().includes(term)),
-        );
-      }
-      return list.slice(0, limit);
+    } catch (err) {
+      console.error("[searchProductsForSelector] Exception searching products:", err);
+      return [];
     }
   });
 
@@ -360,7 +351,7 @@ export const listProducts = createServerFn({ method: "GET" }).handler(async () =
 
   if (!isSupabasePublicConfigured()) {
     const memStart = performance.now();
-    const result = getInMemoryProducts().filter((p) => p.active);
+    const result = getInMemoryProducts().filter((p) => p.active !== false);
     console.log(
       `[PRODUCTS_QUERY_END] In-memory catalog query resolved in ${Math.round(performance.now() - memStart)}ms`,
     );
@@ -382,19 +373,20 @@ export const listProducts = createServerFn({ method: "GET" }).handler(async () =
       `[PRODUCTS_QUERY_END] Supabase products query finished in ${qDuration}ms (retrieved ${data?.length ?? 0} items)`,
     );
 
-    if (error || !data || data.length === 0) {
-      const fallback = getInMemoryProducts().filter((p) => p.active);
-      cachedProducts = { data: fallback, timestamp: Date.now() };
-      return fallback;
+    if (error) {
+      console.warn("[listProducts] Supabase error:", error);
+      return [];
     }
-    const finalProducts = data as unknown as Product[];
+
+    const finalProducts = (data ?? []) as unknown as Product[];
     cachedProducts = { data: finalProducts, timestamp: Date.now() };
     return finalProducts;
-  } catch {
-    console.log(`[TOTAL_PRODUCTS_LOAD] Fallback in ${Math.round(performance.now() - tStart)}ms`);
-    const fallback = getInMemoryProducts().filter((p) => p.active);
-    cachedProducts = { data: fallback, timestamp: Date.now() };
-    return fallback;
+  } catch (err) {
+    console.error(
+      `[TOTAL_PRODUCTS_LOAD] Supabase query failed in ${Math.round(performance.now() - tStart)}ms:`,
+      err,
+    );
+    return [];
   }
 });
 
@@ -408,7 +400,8 @@ export const getProduct = createServerFn({ method: "GET" })
     }
 
     if (!isSupabasePublicConfigured()) {
-      const item = getInMemoryProducts().find((p) => p.slug === data.slug) ?? null;
+      const item =
+        getInMemoryProducts().find((p) => p.slug === data.slug && p.active !== false) ?? null;
       cachedSingleProduct.set(data.slug, { data: item, timestamp: Date.now() });
       return item;
     }
@@ -420,18 +413,19 @@ export const getProduct = createServerFn({ method: "GET" })
         .eq("slug", data.slug)
         .eq("active", true)
         .maybeSingle();
+
       if (error || !row) {
-        const item = getInMemoryProducts().find((p) => p.slug === data.slug) ?? null;
-        cachedSingleProduct.set(data.slug, { data: item, timestamp: Date.now() });
-        return item;
+        if (error) console.warn("[getProduct] Supabase error:", error);
+        cachedSingleProduct.set(data.slug, { data: null, timestamp: Date.now() });
+        return null;
       }
       const finalProduct = row as unknown as Product | null;
       cachedSingleProduct.set(data.slug, { data: finalProduct, timestamp: Date.now() });
       return finalProduct;
-    } catch {
-      const item = getInMemoryProducts().find((p) => p.slug === data.slug) ?? null;
-      cachedSingleProduct.set(data.slug, { data: item, timestamp: Date.now() });
-      return item;
+    } catch (err) {
+      console.error("[getProduct] Exception querying product:", err);
+      cachedSingleProduct.set(data.slug, { data: null, timestamp: Date.now() });
+      return null;
     }
   });
 
@@ -441,8 +435,9 @@ export const listCategories = createServerFn({ method: "GET" }).handler(async ()
   }
 
   if (!isSupabasePublicConfigured()) {
-    cachedCategories = { data: DEMO_CATEGORIES, timestamp: Date.now() };
-    return DEMO_CATEGORIES;
+    const inMem = getInMemoryCategories();
+    cachedCategories = { data: inMem, timestamp: Date.now() };
+    return inMem;
   }
   try {
     const supabase = createPublicClient();
@@ -451,16 +446,15 @@ export const listCategories = createServerFn({ method: "GET" }).handler(async ()
       .select("id, name, slug, parent_id, image_url, sort_order")
       .eq("active", true)
       .order("sort_order");
-    if (error || !data || data.length === 0) {
-      cachedCategories = { data: DEMO_CATEGORIES, timestamp: Date.now() };
-      return DEMO_CATEGORIES;
+    if (error || !data) {
+      if (error) console.warn("[listCategories] Supabase error:", error);
+      return [];
     }
     const cats = data as unknown as Category[];
     cachedCategories = { data: cats, timestamp: Date.now() };
     return cats;
   } catch {
-    cachedCategories = { data: DEMO_CATEGORIES, timestamp: Date.now() };
-    return DEMO_CATEGORIES;
+    return [];
   }
 });
 
@@ -481,18 +475,15 @@ export const listBrands = createServerFn({ method: "GET" }).handler(async () => 
       .select("id, name, slug")
       .eq("active", true)
       .order("name");
-    if (error || !data || data.length === 0) {
-      const brands = getInMemoryBrands();
-      cachedBrands = { data: brands, timestamp: Date.now() };
-      return brands;
+    if (error || !data) {
+      if (error) console.warn("[listBrands] Supabase error:", error);
+      return [];
     }
     const brands = data as unknown as Brand[];
     cachedBrands = { data: brands, timestamp: Date.now() };
     return brands;
   } catch {
-    const brands = getInMemoryBrands();
-    cachedBrands = { data: brands, timestamp: Date.now() };
-    return brands;
+    return [];
   }
 });
 
