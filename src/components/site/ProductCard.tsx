@@ -23,9 +23,11 @@ function Tag({ children, tone }: { children: string; tone: "primary" | "warning"
 export function ProductCard({
   product,
   priority = false,
+  onImageLoad,
 }: {
   product: Product;
   priority?: boolean;
+  onImageLoad?: () => void;
 }) {
   const stock = totalStock(product);
   const soldOut = stock <= 0;
@@ -47,6 +49,7 @@ export function ProductCard({
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
             decoding="async"
+            onLoad={onImageLoad}
             className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (

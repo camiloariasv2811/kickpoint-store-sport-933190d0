@@ -50,6 +50,7 @@ export function Header() {
                 <Link
                   key={item.to}
                   to={item.to}
+                  preload="intent"
                   onClick={() => setOpen(false)}
                   activeProps={{ className: "text-primary" }}
                   className="rounded-lg px-3 py-3 text-base font-semibold transition-colors hover:bg-surface"
@@ -59,6 +60,7 @@ export function Header() {
               ))}
               <Link
                 to="/pedido"
+                preload="intent"
                 onClick={() => setOpen(false)}
                 className="rounded-lg px-3 py-3 text-base font-semibold transition-colors hover:bg-surface"
               >
@@ -75,6 +77,7 @@ export function Header() {
             <Link
               key={item.to}
               to={item.to}
+              preload="intent"
               activeProps={{ className: "text-primary" }}
               activeOptions={{ exact: item.to === "/" }}
               className="rounded-md px-3 py-2 text-eyebrow text-[0.7rem] text-foreground/80 transition-colors hover:text-primary"
@@ -84,6 +87,7 @@ export function Header() {
           ))}
           <Link
             to="/pedido"
+            preload="intent"
             activeProps={{ className: "text-primary" }}
             className="rounded-md px-3 py-2 text-eyebrow text-[0.7rem] text-foreground/80 transition-colors hover:text-primary"
           >
@@ -93,7 +97,7 @@ export function Header() {
 
         <div className="ml-auto flex items-center gap-1">
           <Button asChild variant="ghost" size="icon" aria-label="Buscar">
-            <Link to="/catalogo">
+            <Link to="/catalogo" preload="intent">
               <Search className="size-5" />
             </Link>
           </Button>

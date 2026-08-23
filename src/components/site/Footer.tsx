@@ -38,17 +38,25 @@ export function Footer() {
             <p className="text-eyebrow mb-3 text-[0.65rem]">Tienda</p>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link to="/catalogo" className="transition-colors hover:text-primary">
+                <Link
+                  to="/catalogo"
+                  preload="intent"
+                  className="transition-colors hover:text-primary"
+                >
                   Catálogo
                 </Link>
               </li>
               <li>
-                <Link to="/categorias" className="transition-colors hover:text-primary">
+                <Link
+                  to="/categorias"
+                  preload="intent"
+                  className="transition-colors hover:text-primary"
+                >
                   Categorías
                 </Link>
               </li>
               <li>
-                <Link to="/mayor" className="transition-colors hover:text-primary">
+                <Link to="/mayor" preload="intent" className="transition-colors hover:text-primary">
                   Compra al mayor
                 </Link>
               </li>
@@ -58,7 +66,11 @@ export function Footer() {
             <p className="text-eyebrow mb-3 text-[0.65rem]">Ayuda</p>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li>
-                <Link to="/pedido" className="transition-colors hover:text-primary">
+                <Link
+                  to="/pedido"
+                  preload="intent"
+                  className="transition-colors hover:text-primary"
+                >
                   Consultar mi pedido
                 </Link>
               </li>

@@ -22,6 +22,10 @@ import { money, moneyExact, whatsappLink } from "@/lib/format";
 import { totalStock, type Product } from "@/lib/types";
 
 export const Route = createFileRoute("/producto/$slug")({
+  loader: async ({ params }) => {
+    const product = await getProduct({ data: { slug: params.slug } }).catch(() => null);
+    return { product };
+  },
   head: () => ({
     meta: [
       { title: "Producto | KICKPOINT" },
@@ -100,6 +104,7 @@ function ProductNotFound() {
 
 function ProductPageContainer() {
   const { slug } = Route.useParams();
+  const loaderData = Route.useLoaderData();
   const queryClient = useQueryClient();
   const [navStart] = useState(() => performance.now());
 
@@ -112,7 +117,7 @@ function ProductPageContainer() {
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
     initialData: () => {
-      // Instant cache seed from catalog or featured products list
+      if (loaderData?.product) return loaderData.product;
       const catalog = queryClient.getQueryData<Product[]>(["products"]);
       return catalog?.find((p) => p.slug === slug);
     },

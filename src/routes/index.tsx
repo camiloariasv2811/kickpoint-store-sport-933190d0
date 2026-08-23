@@ -10,6 +10,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
 
 export const Route = createFileRoute("/")({
+  loader: async () => {
+    const [products, categories] = await Promise.all([
+      listProducts().catch(() => []),
+      listCategories().catch(() => []),
+    ]);
+    return {
+      products: products ?? [],
+      categories: categories ?? [],
+    };
+  },
   head: () => ({
     meta: [
       { title: "KICKPOINT | Ropa deportiva al mayor y al detal" },
@@ -53,6 +63,7 @@ function SectionHeader({ title, eyebrow }: { title: string; eyebrow?: string }) 
       </div>
       <Link
         to="/catalogo"
+        preload="intent"
         className="flex shrink-0 items-center gap-1 text-xs font-bold uppercase tracking-wider text-primary hover:underline"
       >
         Ver todos <ArrowRight className="size-3.5" />
@@ -109,9 +120,26 @@ function useProducts() {
 }
 
 function Home() {
-  const { data: products = [], isLoading } = useProducts();
-  const { data: categories = [] } = useQuery({
+  const loaderData = Route.useLoaderData();
+  const { data: products = loaderData?.products ?? [], isLoading } = useQuery({
+    queryKey: ["products"],
+    initialData: loaderData?.products,
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      try {
+        const res = await listProducts();
+        return res ?? [];
+      } catch (err) {
+        console.warn("[Home] Error loading products:", err);
+        return [];
+      }
+    },
+  });
+
+  const { data: categories = loaderData?.categories ?? [] } = useQuery({
     queryKey: ["categories"],
+    initialData: loaderData?.categories,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     queryFn: async () => {
@@ -156,12 +184,14 @@ function Home() {
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
             <Button asChild variant="hero" size="xl">
-              <Link to="/catalogo">
+              <Link to="/catalogo" preload="intent">
                 Ver catálogo <ArrowRight className="size-5" />
               </Link>
             </Button>
             <Button asChild variant="outlineGlow" size="xl">
-              <Link to="/mayor">Comprar al mayor</Link>
+              <Link to="/mayor" preload="intent">
+                Comprar al mayor
+              </Link>
             </Button>
           </div>
 
@@ -194,6 +224,7 @@ function Home() {
             <Link
               key={tile.slug}
               to="/catalogo"
+              preload="intent"
               search={tile.brand ? { marca: tile.slug } : { categoria: tile.slug }}
               className="surface-card group flex flex-col items-center gap-3 px-4 py-6 transition-all hover:-translate-y-1 hover:border-primary/60"
             >
@@ -203,6 +234,7 @@ function Home() {
           ))}
           <Link
             to="/catalogo"
+            preload="intent"
             search={{ orden: "nuevos" }}
             className="surface-card group flex flex-col items-center gap-3 bg-accent px-4 py-6 transition-all hover:-translate-y-1 hover:border-primary/60"
           >
@@ -216,6 +248,7 @@ function Home() {
               <Link
                 key={c.id}
                 to="/catalogo"
+                preload="intent"
                 search={{ categoria: c.slug }}
                 className="rounded-full border border-border px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:border-primary hover:text-primary"
               >

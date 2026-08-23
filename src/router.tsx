@@ -17,7 +17,7 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
-    defaultPreloadStaleTime: 0,
+    defaultPreloadStaleTime: 1000 * 60 * 2, // 2 minutes prefetch cache freshness
   });
 
   return router;

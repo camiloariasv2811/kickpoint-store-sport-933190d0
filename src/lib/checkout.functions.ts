@@ -520,7 +520,7 @@ export const createOrder = createServerFn({ method: "POST" })
         total: Number(order.total),
         paymentMethod: data.paymentMethod,
         paymentReference: data.paymentProof?.reference?.trim() || null,
-        items: orderItems.map((i) => ({
+        items: items.map((i) => ({
           productName: i.product_name,
           size: i.size || null,
           color: i.color || null,

@@ -30,6 +30,18 @@ export const Route = createFileRoute("/catalogo")({
     max: search["max"] ? Number(search["max"]) : undefined,
     orden: typeof search["orden"] === "string" ? (search["orden"] as string) : undefined,
   }),
+  loader: async () => {
+    const [products, categories, brands] = await Promise.all([
+      listProducts().catch(() => []),
+      listCategories().catch(() => []),
+      listBrands().catch(() => []),
+    ]);
+    return {
+      products: products ?? [],
+      categories: categories ?? [],
+      brands: brands ?? [],
+    };
+  },
   head: () => ({
     meta: [
       { title: "Catálogo KICKPOINT | Fútbol, gym y marcas premium" },
@@ -83,26 +95,37 @@ function Chip({
 }
 
 function Catalogo() {
-  const [routeMountTime] = useState(() => performance.now());
+  const [routeMountTime] = useState(() => {
+    const t = performance.now();
+    console.log(`[CATALOG_NAVIGATION_START] 0ms`);
+    console.log(`[CATALOG_ROUTE_READY] Route mounted`);
+    return t;
+  });
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/catalogo" });
   const setSearch = (patch: Partial<Search>) =>
     navigate({ search: (prev) => ({ ...prev, ...patch }) });
 
+  const loaderData = Route.useLoaderData();
   const [visibleLimit, setVisibleLimit] = useState(INITIAL_BATCH_SIZE);
   const firstRenderLogged = useRef(false);
+  const firstImageLogged = useRef(false);
 
-  const { data: products = [], isLoading } = useQuery({
+  const { data: products = loaderData?.products ?? [], isLoading } = useQuery({
     queryKey: ["products"],
+    initialData: loaderData?.products,
     staleTime: 60 * 1000,
     queryFn: async () => {
-      console.log(
-        `[CLIENT:ROUTE_START] Fetching products at ${Math.round(performance.now() - routeMountTime)}ms`,
-      );
+      const reqStart = performance.now();
+      console.log(`[CATALOG_REQUEST_START] Requesting catalog products from server`);
       try {
         const res = await listProducts();
+        const reqEnd = performance.now();
         console.log(
-          `[CLIENT:FIRST_PRODUCT_RECEIVED] Products received at ${Math.round(performance.now() - routeMountTime)}ms`,
+          `[CATALOG_RESPONSE_RECEIVED] Received ${res?.length ?? 0} products in ${Math.round(reqEnd - reqStart)}ms`,
+        );
+        console.log(
+          `[CATALOG_DATA_PARSED] Catalog data parsed at ${Math.round(performance.now() - routeMountTime)}ms`,
         );
         return res ?? [];
       } catch (err) {
@@ -112,8 +135,9 @@ function Catalogo() {
     },
   });
 
-  const { data: categories = [] } = useQuery({
+  const { data: categories = loaderData?.categories ?? [] } = useQuery({
     queryKey: ["categories"],
+    initialData: loaderData?.categories,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
@@ -126,8 +150,9 @@ function Catalogo() {
     },
   });
 
-  const { data: brands = [] } = useQuery({
+  const { data: brands = loaderData?.brands ?? [] } = useQuery({
     queryKey: ["brands"],
+    initialData: loaderData?.brands,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
@@ -193,21 +218,31 @@ function Catalogo() {
     setVisibleLimit(INITIAL_BATCH_SIZE);
   }, [search.q, search.categoria, search.marca, search.talla, search.max, search.orden]);
 
-  // Telemetry: measure first product rendered
+  // Telemetry: measure first product rendered & interactive
   useEffect(() => {
     if (filtered.length > 0 && !firstRenderLogged.current) {
       firstRenderLogged.current = true;
       requestAnimationFrame(() => {
         const timeToFirst = Math.round(performance.now() - routeMountTime);
+        console.log(`[FIRST_PRODUCT_RENDERED] First product rendered at ${timeToFirst}ms (TTFP)`);
         console.log(
-          `[CLIENT:FIRST_PRODUCT_RENDERED] First product rendered at ${timeToFirst}ms (TTFP)`,
+          `[CATALOG_INTERACTIVE] Filters, search and product grid interactive at ${timeToFirst}ms`,
         );
         console.log(
-          `[CLIENT:ALL_PRODUCTS_RENDERED] Initial batch of ${Math.min(filtered.length, visibleLimit)} rendered at ${timeToFirst}ms`,
+          `[CATALOG_FULLY_LOADED] Batch of ${Math.min(filtered.length, visibleLimit)} products loaded at ${timeToFirst}ms`,
         );
       });
     }
   }, [filtered, routeMountTime, visibleLimit]);
+
+  const handleFirstImageLoaded = () => {
+    if (!firstImageLogged.current) {
+      firstImageLogged.current = true;
+      console.log(
+        `[FIRST_IMAGE_RENDERED] First product image loaded at ${Math.round(performance.now() - routeMountTime)}ms`,
+      );
+    }
+  };
 
   const visibleProducts = useMemo(() => {
     return filtered.slice(0, visibleLimit);
@@ -322,7 +357,12 @@ function Catalogo() {
             ))}
           {!isLoading &&
             visibleProducts.map((p, idx) => (
-              <ProductCard key={p.id} product={p} priority={idx < 4} />
+              <ProductCard
+                key={p.id}
+                product={p}
+                priority={idx < 4}
+                onImageLoad={idx === 0 ? handleFirstImageLoaded : undefined}
+              />
             ))}
         </div>
 
