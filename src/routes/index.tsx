@@ -11,38 +11,45 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
 import { perf } from "@/lib/performance";
 import { perfMonitor, trackPerf } from "@/lib/performance-monitor";
+import type { Category, Product } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
   loader: async ({ context }) => {
     perf.log03({ route: "home" });
     trackPerf("HOME_03", "ROUTE LOADER START");
-    const [products, categories] = await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["products"],
-        queryFn: () => {
-          perf.log02({ target: "products" });
-          trackPerf("HOME_02", "SERVER REQUEST START", { target: "products" });
-          return listProducts();
-        },
-        staleTime: 60 * 1000,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["categories"],
-        queryFn: () => listCategories(),
-        staleTime: 5 * 60 * 1000,
-      }),
-    ]);
+
+    // Non-blocking prefetch in background to allow immediate visual shell rendering
+    context.queryClient.prefetchQuery({
+      queryKey: ["products"],
+      queryFn: () => {
+        perf.log02({ target: "products" });
+        trackPerf("HOME_02", "SERVER REQUEST START", { target: "products" });
+        return listProducts();
+      },
+      staleTime: 60 * 1000,
+    });
+
+    context.queryClient.prefetchQuery({
+      queryKey: ["categories"],
+      queryFn: () => listCategories(),
+      staleTime: 5 * 60 * 1000,
+    });
+
+    const cachedProducts = context.queryClient.getQueryData<any[]>(["products"]) ?? [];
+    const cachedCategories = context.queryClient.getQueryData<any[]>(["categories"]) ?? [];
+
     perf.log04({
-      productsCount: products?.length ?? 0,
-      categoriesCount: categories?.length ?? 0,
+      productsCount: cachedProducts.length,
+      categoriesCount: cachedCategories.length,
     });
     trackPerf("HOME_04", "FIRST SERVER DATA", {
-      productsCount: products?.length ?? 0,
-      categoriesCount: categories?.length ?? 0,
+      productsCount: cachedProducts.length,
+      categoriesCount: cachedCategories.length,
     });
+
     return {
-      products: products ?? [],
-      categories: categories ?? [],
+      products: cachedProducts,
+      categories: cachedCategories,
     };
   },
   head: () => ({
@@ -102,11 +109,11 @@ function ProductRow({
   loading,
   priority = false,
 }: {
-  products: ReturnType<typeof useProducts>["data"];
+  products: Product[] | undefined;
   loading: boolean;
   priority?: boolean;
 }) {
-  if (loading) {
+  if (loading && (!products || products.length === 0)) {
     return (
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         {Array.from({ length: 4 }).map((_, i) => (

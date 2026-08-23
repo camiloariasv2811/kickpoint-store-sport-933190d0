@@ -124,7 +124,16 @@ function ProductPageContainer() {
     initialData: () => {
       if (loaderData?.product) return loaderData.product;
       const catalog = queryClient.getQueryData<Product[]>(["products"]);
-      return catalog?.find((p) => p.slug === slug && p.active !== false);
+      const decoded = decodeURIComponent(slug).trim();
+      return catalog?.find(
+        (p) =>
+          (p.slug === decoded ||
+            p.slug === slug ||
+            p.id === decoded ||
+            p.id === slug ||
+            p.slug?.toLowerCase() === decoded.toLowerCase()) &&
+          p.active !== false,
+      );
     },
     initialDataUpdatedAt: () =>
       queryClient.getQueryState(["products"])?.dataUpdatedAt || Date.now(),
@@ -136,7 +145,20 @@ function ProductPageContainer() {
         console.log(
           `[PRODUCT_DETAIL_FETCH_END] Product received in ${Math.round(performance.now() - t0)}ms`,
         );
-        return res;
+        if (res) return res;
+        // Fallback from catalog cache if available
+        const catalog = queryClient.getQueryData<Product[]>(["products"]);
+        const decoded = decodeURIComponent(slug).trim();
+        const found = catalog?.find(
+          (p) =>
+            (p.slug === decoded ||
+              p.slug === slug ||
+              p.id === decoded ||
+              p.id === slug ||
+              p.slug?.toLowerCase() === decoded.toLowerCase()) &&
+            p.active !== false,
+        );
+        return found ?? null;
       } catch (err) {
         console.warn("[ProductPage] Error loading product:", err);
         return null;
@@ -177,19 +199,41 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
     () => Array.from(new Set(variants.map((v) => v.color).filter(Boolean))) as string[],
     [variants],
   );
-  const [color, setColor] = useState<string | null>(colors[0] ?? null);
+
+  const defaultColor = useMemo(() => {
+    if (colors.length === 0) return null;
+    const inStock = variants.find((v) => v.color && (Number(v.stock) || 0) > 0);
+    return inStock?.color ?? colors[0] ?? null;
+  }, [colors, variants]);
+
+  const [color, setColor] = useState<string | null>(defaultColor);
+
+  useEffect(() => {
+    if (defaultColor && !color) {
+      setColor(defaultColor);
+    }
+  }, [defaultColor, color]);
+
   const sizes = useMemo(
     () => variants.filter((v) => (color ? v.color === color : true)),
     [variants, color],
   );
   const [variantId, setVariantId] = useState<string | null>(
-    sizes.find((v) => v.stock > 0)?.id ?? sizes[0]?.id ?? null,
+    sizes.find((v) => (Number(v.stock) || 0) > 0)?.id ??
+      sizes[0]?.id ??
+      variants.find((v) => (Number(v.stock) || 0) > 0)?.id ??
+      variants[0]?.id ??
+      null,
   );
   const [qty, setQty] = useState(1);
   const [imageIndex, setImageIndex] = useState(0);
 
   const variant =
-    variants.find((v) => v.id === variantId) ?? sizes.find((v) => v.stock > 0) ?? sizes[0] ?? null;
+    variants.find((v) => v.id === variantId) ??
+    sizes.find((v) => (Number(v.stock) || 0) > 0) ??
+    sizes[0] ??
+    variants[0] ??
+    null;
   const retailPrice = Number(product.retail_price || 0);
   const wholesalePrice = product.wholesale_price ? Number(product.wholesale_price) : retailPrice;
   const stock = totalStock(product);

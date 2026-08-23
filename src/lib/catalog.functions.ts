@@ -354,10 +354,10 @@ function normalizeProduct(p: any): Product {
       : null;
 
   const rawVariants = Array.isArray(p.variants) ? p.variants : [];
-  const normalizedVariants = rawVariants
+  let normalizedVariants = rawVariants
     .filter((v: any) => v && v.active !== false)
     .map((v: any) => ({
-      id: String(v.id ?? `v-${Date.now()}`),
+      id: String(v.id ?? `v-${p.id}-${v.size || "unica"}`),
       product_id: String(v.product_id ?? p.id ?? ""),
       size: String(v.size ?? "Única"),
       color: v.color ? String(v.color) : null,
@@ -365,6 +365,21 @@ function normalizeProduct(p: any): Product {
       stock: Number(v.stock) || 0,
       active: v.active !== false,
     }));
+
+  // Defensive fallback: if product has no variant records, provide a default active variant
+  if (normalizedVariants.length === 0) {
+    normalizedVariants = [
+      {
+        id: `v-${p.id}-default`,
+        product_id: String(p.id),
+        size: "Única",
+        color: null,
+        sku: p.base_sku ? String(p.base_sku) : null,
+        stock: Number(p.stock) || 10,
+        active: true,
+      },
+    ];
+  }
 
   return {
     id: String(p.id),
@@ -497,13 +512,32 @@ export const listProducts = createServerFn({ method: "GET" }).handler(async () =
 export const getProduct = createServerFn({ method: "GET" })
   .inputValidator((data: { slug: string }) => data)
   .handler(async ({ data }) => {
-    // Fast path: Server in-memory cache hit
-    const cached = cachedSingleProduct.get(data.slug);
+    const rawSlug = data?.slug ? String(data.slug).trim() : "";
+    const decodedSlug = decodeURIComponent(rawSlug).trim();
+
+    // Fast path 1: Server in-memory single product cache hit
+    const cached = cachedSingleProduct.get(decodedSlug) || cachedSingleProduct.get(rawSlug);
     if (cached && cached.data && Date.now() - cached.timestamp < SERVER_CACHE_TTL_MS) {
       return cached.data;
     }
 
-    // Attempt 1: Fetch via Admin client
+    // Fast path 2: Check in-memory products catalog cache if warm
+    if (cachedProducts && cachedProducts.data.length > 0) {
+      const match = cachedProducts.data.find(
+        (p) =>
+          p.slug === decodedSlug ||
+          p.slug === rawSlug ||
+          p.id === decodedSlug ||
+          p.id === rawSlug ||
+          p.slug.toLowerCase() === decodedSlug.toLowerCase(),
+      );
+      if (match) {
+        cachedSingleProduct.set(decodedSlug, { data: match, timestamp: Date.now() });
+        return match;
+      }
+    }
+
+    // Attempt 1: Fetch via Admin client (preferred, handles RLS)
     try {
       const { supabaseAdmin, isSupabaseServerConfigured } =
         await import("@/integrations/supabase/client.server");
@@ -511,13 +545,13 @@ export const getProduct = createServerFn({ method: "GET" })
         const { data: row, error } = await supabaseAdmin
           .from("products")
           .select(PRODUCT_SELECT_FULL)
-          .eq("slug", data.slug)
+          .or(`slug.eq."${decodedSlug}",id.eq."${decodedSlug}",slug.ilike."${decodedSlug}"`)
           .or("active.eq.true,active.is.null")
           .maybeSingle();
 
         if (!error && row) {
           const finalProduct = normalizeProduct(row);
-          cachedSingleProduct.set(data.slug, { data: finalProduct, timestamp: Date.now() });
+          cachedSingleProduct.set(decodedSlug, { data: finalProduct, timestamp: Date.now() });
           return finalProduct;
         }
       }
@@ -532,13 +566,13 @@ export const getProduct = createServerFn({ method: "GET" })
         const { data: row, error } = await supabase
           .from("products")
           .select(PRODUCT_SELECT_FULL)
-          .eq("slug", data.slug)
+          .or(`slug.eq."${decodedSlug}",id.eq."${decodedSlug}",slug.ilike."${decodedSlug}"`)
           .or("active.eq.true,active.is.null")
           .maybeSingle();
 
         if (!error && row) {
           const finalProduct = normalizeProduct(row);
-          cachedSingleProduct.set(data.slug, { data: finalProduct, timestamp: Date.now() });
+          cachedSingleProduct.set(decodedSlug, { data: finalProduct, timestamp: Date.now() });
           return finalProduct;
         }
       } catch (err) {
@@ -546,11 +580,21 @@ export const getProduct = createServerFn({ method: "GET" })
       }
     }
 
-    // Fallback in-memory
+    // Fallback in-memory demo data
     const item =
-      getInMemoryProducts().find((p) => p.slug === data.slug && p.active !== false) ?? null;
+      getInMemoryProducts().find(
+        (p) =>
+          (p.slug === decodedSlug ||
+            p.slug === rawSlug ||
+            p.id === decodedSlug ||
+            p.id === rawSlug ||
+            p.slug?.toLowerCase() === decodedSlug.toLowerCase()) &&
+          p.active !== false,
+      ) ?? null;
     const finalProduct = item ? normalizeProduct(item) : null;
-    cachedSingleProduct.set(data.slug, { data: finalProduct, timestamp: Date.now() });
+    if (finalProduct) {
+      cachedSingleProduct.set(decodedSlug, { data: finalProduct, timestamp: Date.now() });
+    }
     return finalProduct;
   });
 

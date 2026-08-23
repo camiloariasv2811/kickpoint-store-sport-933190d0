@@ -82,6 +82,7 @@ function Page() {
 
   const inventoryQuery = useQuery({
     queryKey: ["admin", "inventory"],
+    staleTime: 30 * 1000,
     queryFn: async () => {
       try {
         const res = await listInventory();
