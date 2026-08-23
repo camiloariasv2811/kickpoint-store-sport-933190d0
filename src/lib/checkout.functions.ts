@@ -84,7 +84,6 @@ export const listPaymentMethods = createServerFn({ method: "GET" }).handler(asyn
   }
 });
 
-
 export type CheckoutInput = {
   customer: {
     firstName: string;

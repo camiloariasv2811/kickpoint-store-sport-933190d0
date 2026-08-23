@@ -110,25 +110,204 @@ const PRODUCT_SELECT = `
   variants:product_variants ( id, product_id, size, color, sku, stock, active )
 `;
 
+export type ListAdminProductsInput = {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  categoryId?: string;
+  brandId?: string;
+  status?: "all" | "active" | "inactive";
+};
+
+export type AdminProductsResponse = {
+  items: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  activeCount: number;
+  totalUnits: number;
+};
+
 export const listAdminProducts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((d?: ListAdminProductsInput) => d ?? {})
+  .handler(async ({ data, context }) => {
     await assertIsStaff(context);
+
     if (!isSupabaseServerConfigured()) {
-      return getInMemoryProducts() as any;
+      const all = getInMemoryProducts();
+      let activeCount = 0;
+      let totalUnits = 0;
+      for (const p of all) {
+        if (p.active !== false) {
+          activeCount++;
+          for (const v of p.variants ?? []) {
+            if (v.active !== false) {
+              totalUnits += Number(v.stock || 0);
+            }
+          }
+        }
+      }
+
+      let filtered = [...all];
+      if (data?.status === "active") {
+        filtered = filtered.filter((p) => p.active !== false);
+      } else if (data?.status === "inactive") {
+        filtered = filtered.filter((p) => p.active === false);
+      }
+
+      if (data?.categoryId) {
+        filtered = filtered.filter(
+          (p) => p.category?.id === data.categoryId || (p as any).category_id === data.categoryId,
+        );
+      }
+      if (data?.brandId) {
+        filtered = filtered.filter(
+          (p) => p.brand?.id === data.brandId || (p as any).brand_id === data.brandId,
+        );
+      }
+
+      if (data?.search && data.search.trim()) {
+        const term = data.search.trim().toLowerCase();
+        filtered = filtered.filter(
+          (p) =>
+            p.name.toLowerCase().includes(term) ||
+            (p.base_sku && p.base_sku.toLowerCase().includes(term)) ||
+            (p.brand?.name && p.brand.name.toLowerCase().includes(term)) ||
+            (p.variants && p.variants.some((v) => v.sku && v.sku.toLowerCase().includes(term))),
+        );
+      }
+
+      const total = filtered.length;
+      const page = Math.max(1, Number(data?.page) || 1);
+      const pageSize = data?.pageSize !== undefined ? Number(data.pageSize) : 20;
+
+      let items: any[] = filtered;
+      if (pageSize > 0) {
+        const from = (page - 1) * pageSize;
+        items = filtered.slice(from, from + pageSize);
+      }
+
+      return {
+        items,
+        total,
+        page,
+        pageSize: pageSize > 0 ? pageSize : total,
+        totalPages: pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1,
+        activeCount,
+        totalUnits,
+      } as AdminProductsResponse;
     }
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data, error } = await supabaseAdmin
+
+      // Compute catalog totals (active count and total units)
+      let activeCount = 0;
+      let totalUnits = 0;
+
+      const { data: stockSummary } = await supabaseAdmin
         .from("products")
-        .select(PRODUCT_SELECT)
-        .order("created_at", { ascending: false });
-      if (error || !data || data.length === 0) {
-        return getInMemoryProducts() as any;
+        .select("active, variants:product_variants ( stock, active )");
+
+      if (stockSummary) {
+        for (const p of stockSummary as any[]) {
+          if (p.active !== false) {
+            activeCount++;
+            for (const v of p.variants ?? []) {
+              if (v.active !== false) {
+                totalUnits += Number(v.stock || 0);
+              }
+            }
+          }
+        }
       }
-      return (data ?? []) as any;
+
+      let query = supabaseAdmin.from("products").select(PRODUCT_SELECT, { count: "exact" });
+
+      if (data?.status === "active") {
+        query = query.eq("active", true);
+      } else if (data?.status === "inactive") {
+        query = query.eq("active", false);
+      }
+
+      if (data?.categoryId) {
+        query = query.eq("category_id", data.categoryId);
+      }
+      if (data?.brandId) {
+        query = query.eq("brand_id", data.brandId);
+      }
+
+      if (data?.search && data.search.trim()) {
+        const term = data.search.trim();
+        query = query.or(`name.ilike.%${term}%,base_sku.ilike.%${term}%`);
+      }
+
+      query = query.order("created_at", { ascending: false });
+
+      const page = Math.max(1, Number(data?.page) || 1);
+      const pageSize = data?.pageSize !== undefined ? Number(data.pageSize) : 20;
+
+      if (pageSize > 0) {
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        query = query.range(from, to);
+      }
+
+      const { data: rows, count, error } = await query;
+      if (error || !rows) {
+        const all = getInMemoryProducts();
+        return {
+          items: all,
+          total: all.length,
+          page: 1,
+          pageSize: 20,
+          totalPages: 1,
+          activeCount: all.filter((p) => p.active !== false).length,
+          totalUnits: all
+            .filter((p) => p.active !== false)
+            .reduce(
+              (acc, p) =>
+                acc +
+                (p.variants ?? [])
+                  .filter((v) => v.active !== false)
+                  .reduce((va, v) => va + Number(v.stock || 0), 0),
+              0,
+            ),
+        } as AdminProductsResponse;
+      }
+
+      const total = count ?? rows.length;
+      return {
+        items: rows as any[],
+        total,
+        page,
+        pageSize: pageSize > 0 ? pageSize : total,
+        totalPages: pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1,
+        activeCount,
+        totalUnits,
+      } as AdminProductsResponse;
     } catch {
-      return getInMemoryProducts() as any;
+      const all = getInMemoryProducts();
+      return {
+        items: all,
+        total: all.length,
+        page: 1,
+        pageSize: 20,
+        totalPages: 1,
+        activeCount: all.filter((p) => p.active !== false).length,
+        totalUnits: all
+          .filter((p) => p.active !== false)
+          .reduce(
+            (acc, p) =>
+              acc +
+              (p.variants ?? [])
+                .filter((v) => v.active !== false)
+                .reduce((va, v) => va + Number(v.stock || 0), 0),
+            0,
+          ),
+      } as AdminProductsResponse;
     }
   });
 

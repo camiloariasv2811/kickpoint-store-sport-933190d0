@@ -116,6 +116,14 @@ export const createBrand = createServerFn({ method: "POST" })
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)+/g, "");
 
+    // Check duplicate in memory (case-insensitive)
+    const existingInMem = getInMemoryBrands().find(
+      (b) => b.name.trim().toLowerCase() === name.toLowerCase() || b.slug === slug,
+    );
+    if (existingInMem) {
+      throw new Error("Ya existe esta marca");
+    }
+
     const newBrand: Brand = {
       id: `brand-${Date.now()}`,
       name,
@@ -128,6 +136,17 @@ export const createBrand = createServerFn({ method: "POST" })
     }
 
     try {
+      // Check duplicate in Supabase (case-insensitive name or exact slug)
+      const { data: existingDb } = await context.supabase
+        .from("brands")
+        .select("id, name, slug")
+        .or(`name.ilike.${name},slug.eq.${slug}`)
+        .limit(1);
+
+      if (existingDb && existingDb.length > 0) {
+        throw new Error("Ya existe esta marca");
+      }
+
       const { data: inserted, error } = await context.supabase
         .from("brands")
         .insert({
@@ -138,14 +157,24 @@ export const createBrand = createServerFn({ method: "POST" })
         .select("id, name, slug")
         .single();
 
-      if (error || !inserted) {
+      if (error) {
+        if (error.code === "23505") {
+          throw new Error("Ya existe esta marca");
+        }
         console.warn("[createBrand] Supabase error, falling back to memory:", error);
+        return addInMemoryBrand(newBrand);
+      }
+
+      if (!inserted) {
         return addInMemoryBrand(newBrand);
       }
 
       addInMemoryBrand(inserted as Brand);
       return inserted as Brand;
-    } catch (err) {
+    } catch (err: any) {
+      if (err.message === "Ya existe esta marca") {
+        throw err;
+      }
       console.warn("[createBrand] Error creating brand in Supabase:", err);
       return addInMemoryBrand(newBrand);
     }

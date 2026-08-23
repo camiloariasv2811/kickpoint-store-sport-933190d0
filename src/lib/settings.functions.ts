@@ -179,7 +179,6 @@ export const updatePaymentMethod = createServerFn({ method: "POST" })
     }
   });
 
-
 export const listStaffUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

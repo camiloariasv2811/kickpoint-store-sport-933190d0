@@ -53,7 +53,6 @@ export function isResendConfigured(): boolean {
   return isDirectResendKey() ? true : Boolean(getLovableApiKey());
 }
 
-
 export function getPublicStoreUrl(): string {
   const url =
     process.env["KICKPOINT_PUBLIC_URL"] ||

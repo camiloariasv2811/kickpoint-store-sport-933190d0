@@ -85,11 +85,12 @@ function AdminVentas() {
   const [deletingSale, setDeletingSale] = useState(false);
 
   const { data: products = [], isLoading: loadingProducts } = useQuery({
-    queryKey: ["admin", "products"],
+    queryKey: ["admin", "products", "all"],
     queryFn: async () => {
       try {
-        const res = await listAdminProducts();
-        return res ?? [];
+        const res = await listAdminProducts({ data: { pageSize: 500 } });
+        if (Array.isArray(res)) return res;
+        return res?.items ?? [];
       } catch (err) {
         console.warn("[AdminVentas] Error loading products:", err);
         return [];
