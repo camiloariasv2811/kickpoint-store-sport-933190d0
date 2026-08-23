@@ -85,15 +85,15 @@ export const listOrders = createServerFn({ method: "GET" })
           .select(ORDER_SELECT)
           .order("created_at", { ascending: false })
           .limit(300);
-        if (fallback.data && fallback.data.length > 0) {
+        if (fallback.data) {
           return fallback.data as unknown as AdminOrder[];
         }
-        return getInMemoryOrders() as unknown as AdminOrder[];
+        return [];
       }
       return (data ?? []) as unknown as AdminOrder[];
     } catch (err: any) {
       console.error("[listOrders] Fatal catch:", err);
-      return getInMemoryOrders() as unknown as AdminOrder[];
+      return [];
     }
   });
 

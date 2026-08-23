@@ -271,14 +271,10 @@ export function WholesaleProductCard({ product }: WholesaleProductCardProps) {
               type="button"
               aria-label="Aumentar cantidad"
               disabled={!activeVariant || (Number(activeVariant.stock) || 0) <= 0}
-              onClick={() =>
-                handleQtyChange(
-                  Math.min(
-                    Number(activeVariant?.stock) > 0 ? Number(activeVariant?.stock) : 99,
-                    qty + 1,
-                  ),
-                )
-              }
+              onClick={() => {
+                const maxStock = Number(activeVariant?.stock) || 0;
+                handleQtyChange(maxStock > 0 ? Math.min(maxStock, qty + 1) : 1);
+              }}
               className="flex size-8 items-center justify-center text-muted-foreground hover:text-primary disabled:opacity-40"
             >
               <Plus className="size-3.5" />

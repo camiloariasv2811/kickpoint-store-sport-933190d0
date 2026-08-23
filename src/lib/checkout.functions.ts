@@ -528,8 +528,8 @@ export const createOrder = createServerFn({ method: "POST" })
         total: Number(order.total),
         paymentMethod: data.paymentMethod,
         paymentReference: data.paymentProof?.reference?.trim() || null,
-        isWholesale: order.is_wholesale || isWholesaleOrder,
-        orderType: order.is_wholesale || isWholesaleOrder ? "wholesale" : "retail",
+        isWholesale: order.is_wholesale || isOrderWholesale,
+        orderType: order.is_wholesale || isOrderWholesale ? "wholesale" : "retail",
         items: items.map((i) => ({
           productName: i.product_name,
           size: i.size || null,
@@ -540,7 +540,7 @@ export const createOrder = createServerFn({ method: "POST" })
         })),
         metadata: {
           idempotencyKey: `new-order-admin-${order.id || order.order_number}`,
-          isWholesale: order.is_wholesale || isWholesaleOrder,
+          isWholesale: order.is_wholesale || isOrderWholesale,
         },
       });
     } catch (emailErr) {

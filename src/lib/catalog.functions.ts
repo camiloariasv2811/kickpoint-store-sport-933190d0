@@ -354,7 +354,7 @@ function normalizeProduct(p: any): Product {
       : null;
 
   const rawVariants = Array.isArray(p.variants) ? p.variants : [];
-  let normalizedVariants = rawVariants
+  const normalizedVariants = rawVariants
     .filter((v: any) => v && v.active !== false)
     .map((v: any) => ({
       id: String(v.id ?? `v-${p.id}-${v.size || "unica"}`),
@@ -365,21 +365,6 @@ function normalizeProduct(p: any): Product {
       stock: Number(v.stock) || 0,
       active: v.active !== false,
     }));
-
-  // Defensive fallback: if product has no variant records, provide a default active variant
-  if (normalizedVariants.length === 0) {
-    normalizedVariants = [
-      {
-        id: `v-${p.id}-default`,
-        product_id: String(p.id),
-        size: "Única",
-        color: null,
-        sku: p.base_sku ? String(p.base_sku) : null,
-        stock: Number(p.stock) || 10,
-        active: true,
-      },
-    ];
-  }
 
   return {
     id: String(p.id),
@@ -445,16 +430,10 @@ export const listProducts = createServerFn({ method: "GET" }).handler(async () =
         durationMs: Math.round(performance.now() - qStart),
       });
 
-      if (!error && data && data.length > 0) {
-        console.log("[CLIENT_PRODUCTS_03] PRODUCT COUNT:", data.length);
+      if (!error && data) {
         const normalized = data.map(normalizeProduct);
         console.log("[CLIENT_PRODUCTS_05] NORMALIZED PRODUCT COUNT:", normalized.length);
         cachedProducts = { data: normalized, timestamp: Date.now() };
-        console.log(
-          "[CLIENT_PRODUCTS_06] SERVER RESPONSE:",
-          normalized.length,
-          "products returned",
-        );
         return normalized;
       }
     }
@@ -480,16 +459,10 @@ export const listProducts = createServerFn({ method: "GET" }).handler(async () =
         durationMs: Math.round(performance.now() - qStart),
       });
 
-      if (!error && data && data.length > 0) {
-        console.log("[CLIENT_PRODUCTS_03] PRODUCT COUNT:", data.length);
+      if (!error && data) {
         const normalized = data.map(normalizeProduct);
         console.log("[CLIENT_PRODUCTS_05] NORMALIZED PRODUCT COUNT:", normalized.length);
         cachedProducts = { data: normalized, timestamp: Date.now() };
-        console.log(
-          "[CLIENT_PRODUCTS_06] SERVER RESPONSE:",
-          normalized.length,
-          "products returned",
-        );
         return normalized;
       }
     } catch (pubErr) {
@@ -497,14 +470,17 @@ export const listProducts = createServerFn({ method: "GET" }).handler(async () =
     }
   }
 
-  // Fallback: In-memory fallback products (filter out deactivated)
+  // If Supabase is configured but returned empty or errored, return empty array (do not fabricate products)
+  if (isSupabasePublicConfigured()) {
+    return [];
+  }
+
+  // Fallback: In-memory fallback products ONLY when Supabase is completely unconfigured
   const memProducts = getInMemoryProducts()
     .filter((p) => p.active !== false)
     .map(normalizeProduct);
 
-  console.log("[CLIENT_PRODUCTS_03] PRODUCT COUNT (In-Memory Fallback):", memProducts.length);
-  console.log("[CLIENT_PRODUCTS_05] NORMALIZED PRODUCT COUNT:", memProducts.length);
-  console.log("[CLIENT_PRODUCTS_06] SERVER RESPONSE:", memProducts.length, "fallback products");
+  console.log("[CLIENT_PRODUCTS_03] PRODUCT COUNT (In-Memory Local Fallback):", memProducts.length);
   cachedProducts = { data: memProducts, timestamp: Date.now() };
   return memProducts;
 });
@@ -580,7 +556,12 @@ export const getProduct = createServerFn({ method: "GET" })
       }
     }
 
-    // Fallback in-memory demo data
+    // If Supabase is configured, return null if not found
+    if (isSupabasePublicConfigured()) {
+      return null;
+    }
+
+    // Fallback in-memory demo data ONLY when Supabase is unconfigured
     const item =
       getInMemoryProducts().find(
         (p) =>
@@ -664,6 +645,11 @@ export const listCategories = createServerFn({ method: "GET" }).handler(async ()
     }
   }
 
+  // If Supabase is configured, return empty array if no categories found
+  if (isSupabasePublicConfigured()) {
+    return [];
+  }
+
   const inMem = getInMemoryCategories();
   console.log("[CLIENT_PRODUCTS_04] CATEGORY COUNT (Fallback):", inMem.length);
   cachedCategories = { data: inMem, timestamp: Date.now() };
@@ -726,6 +712,11 @@ export const listBrands = createServerFn({ method: "GET" }).handler(async () => 
     } catch (err) {
       console.warn("[listBrands] Public query error:", err);
     }
+  }
+
+  // If Supabase is configured, return empty array if no brands found
+  if (isSupabasePublicConfigured()) {
+    return [];
   }
 
   const brands = getInMemoryBrands();

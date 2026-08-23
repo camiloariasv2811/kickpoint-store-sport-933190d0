@@ -18,38 +18,35 @@ export const Route = createFileRoute("/")({
     perf.log03({ route: "home" });
     trackPerf("HOME_03", "ROUTE LOADER START");
 
-    // Non-blocking prefetch in background to allow immediate visual shell rendering
-    context.queryClient.prefetchQuery({
-      queryKey: ["products"],
-      queryFn: () => {
-        perf.log02({ target: "products" });
-        trackPerf("HOME_02", "SERVER REQUEST START", { target: "products" });
-        return listProducts();
-      },
-      staleTime: 60 * 1000,
-    });
-
-    context.queryClient.prefetchQuery({
-      queryKey: ["categories"],
-      queryFn: () => listCategories(),
-      staleTime: 5 * 60 * 1000,
-    });
-
-    const cachedProducts = context.queryClient.getQueryData<any[]>(["products"]) ?? [];
-    const cachedCategories = context.queryClient.getQueryData<any[]>(["categories"]) ?? [];
+    const [products, categories] = await Promise.all([
+      context.queryClient.ensureQueryData({
+        queryKey: ["products"],
+        queryFn: () => {
+          perf.log02({ target: "products" });
+          trackPerf("HOME_02", "SERVER REQUEST START", { target: "products" });
+          return listProducts();
+        },
+        staleTime: 60 * 1000,
+      }),
+      context.queryClient.ensureQueryData({
+        queryKey: ["categories"],
+        queryFn: () => listCategories(),
+        staleTime: 5 * 60 * 1000,
+      }),
+    ]);
 
     perf.log04({
-      productsCount: cachedProducts.length,
-      categoriesCount: cachedCategories.length,
+      productsCount: products?.length ?? 0,
+      categoriesCount: categories?.length ?? 0,
     });
     trackPerf("HOME_04", "FIRST SERVER DATA", {
-      productsCount: cachedProducts.length,
-      categoriesCount: cachedCategories.length,
+      productsCount: products?.length ?? 0,
+      categoriesCount: categories?.length ?? 0,
     });
 
     return {
-      products: cachedProducts,
-      categories: cachedCategories,
+      products: products ?? [],
+      categories: categories ?? [],
     };
   },
   head: () => ({

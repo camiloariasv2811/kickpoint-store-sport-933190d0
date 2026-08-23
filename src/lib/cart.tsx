@@ -98,14 +98,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 !isNaN(l.quantity) &&
                 l.quantity > 0,
             )
-            .map((l) => ({
-              ...l,
-              quantity: Math.max(1, Math.floor(Number(l.quantity) || 1)),
-              stock: Math.max(1, Number(l.stock) || 99),
-              retailPrice: Math.max(0, Number(l.retailPrice) || 0),
-              wholesalePrice:
-                l.wholesalePrice != null ? Math.max(0, Number(l.wholesalePrice) || 0) : null,
-            }));
+            .map((l) => {
+              const stock = Math.max(0, Number(l.stock) || 0);
+              return {
+                ...l,
+                quantity: Math.max(
+                  1,
+                  Math.min(stock > 0 ? stock : 1, Math.floor(Number(l.quantity) || 1)),
+                ),
+                stock,
+                retailPrice: Math.max(0, Number(l.retailPrice) || 0),
+                wholesalePrice:
+                  l.wholesalePrice != null ? Math.max(0, Number(l.wholesalePrice) || 0) : null,
+              };
+            });
           setLines(sanitized);
         } else {
           localStorage.removeItem(RETAIL_STORAGE_KEY);
@@ -136,16 +142,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 !isNaN(l.quantity) &&
                 l.quantity > 0,
             )
-            .map((l) => ({
-              ...l,
-              quantity: Math.max(1, Math.floor(Number(l.quantity) || 1)),
-              stock: Math.max(1, Number(l.stock) || 99),
-              retailPrice: Math.max(0, Number(l.retailPrice) || 0),
-              wholesalePrice:
-                l.wholesalePrice != null
-                  ? Math.max(0, Number(l.wholesalePrice) || 0)
-                  : Math.max(0, Number(l.retailPrice) || 0),
-            }));
+            .map((l) => {
+              const stock = Math.max(0, Number(l.stock) || 0);
+              return {
+                ...l,
+                quantity: Math.max(
+                  1,
+                  Math.min(stock > 0 ? stock : 1, Math.floor(Number(l.quantity) || 1)),
+                ),
+                stock,
+                retailPrice: Math.max(0, Number(l.retailPrice) || 0),
+                wholesalePrice:
+                  l.wholesalePrice != null
+                    ? Math.max(0, Number(l.wholesalePrice) || 0)
+                    : Math.max(0, Number(l.retailPrice) || 0),
+              };
+            });
           setWholesaleLines(sanitized);
         } else {
           localStorage.removeItem(WHOLESALE_STORAGE_KEY);
@@ -224,7 +236,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
           console.warn("[CartProvider] Rejected invalid cart line:", line);
           return;
         }
-        const safeStock = Math.max(1, Number(line.stock) || 99);
+        const safeStock = Math.max(0, Number(line.stock) || 0);
+        if (safeStock <= 0) {
+          console.warn("[CartProvider] Cannot add out-of-stock product to cart:", line.name);
+          return;
+        }
         const safeQty = Math.max(1, Math.min(safeStock, Math.floor(Number(line.quantity) || 1)));
         const safeRetail = Math.max(0, Number(line.retailPrice) || 0);
         const safeWholesale =
@@ -252,6 +268,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             idx === existingIndex
               ? {
                   ...l,
+                  stock: safeStock,
                   quantity: Math.min(safeStock, (Number(l.quantity) || 0) + sanitizedLine.quantity),
                 }
               : l,
@@ -265,8 +282,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
               const matches = productId
                 ? l.variantId === variantId && l.productId === productId
                 : l.variantId === variantId;
+              const maxStock = Math.max(0, Number(l.stock) || 0);
               return matches
-                ? { ...l, quantity: Math.max(0, Math.min(Number(l.stock) || 99, quantity)) }
+                ? { ...l, quantity: Math.max(0, Math.min(maxStock > 0 ? maxStock : 1, quantity)) }
                 : l;
             })
             .filter((l) => (Number(l.quantity) || 0) > 0),
@@ -294,7 +312,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
           console.warn("[CartProvider] Rejected invalid wholesale line:", line);
           return;
         }
-        const safeStock = Math.max(1, Number(line.stock) || 99);
+        const safeStock = Math.max(0, Number(line.stock) || 0);
+        if (safeStock <= 0) {
+          console.warn(
+            "[CartProvider] Cannot add out-of-stock product to wholesale cart:",
+            line.name,
+          );
+          return;
+        }
         const safeQty = Math.max(1, Math.min(safeStock, Math.floor(Number(line.quantity) || 1)));
         const safeRetail = Math.max(0, Number(line.retailPrice) || 0);
         const safeWholesale =
@@ -322,6 +347,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
             idx === existingIndex
               ? {
                   ...l,
+                  stock: safeStock,
                   quantity: Math.min(safeStock, (Number(l.quantity) || 0) + sanitizedLine.quantity),
                 }
               : l,
@@ -335,8 +361,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
               const matches = productId
                 ? l.variantId === variantId && l.productId === productId
                 : l.variantId === variantId;
+              const maxStock = Math.max(0, Number(l.stock) || 0);
               return matches
-                ? { ...l, quantity: Math.max(0, Math.min(Number(l.stock) || 99, quantity)) }
+                ? { ...l, quantity: Math.max(0, Math.min(maxStock > 0 ? maxStock : 1, quantity)) }
                 : l;
             })
             .filter((l) => (Number(l.quantity) || 0) > 0),

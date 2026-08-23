@@ -495,11 +495,10 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
                   <span className="w-10 text-center text-lg font-bold">{qty}</span>
                   <button
                     aria-label="Aumentar"
-                    onClick={() =>
-                      handleQtyChange(
-                        Math.min(Number(variant?.stock) > 0 ? Number(variant?.stock) : 99, qty + 1),
-                      )
-                    }
+                    onClick={() => {
+                      const maxStock = Number(variant?.stock) || 0;
+                      handleQtyChange(maxStock > 0 ? Math.min(maxStock, qty + 1) : 1);
+                    }}
                     className="flex size-12 items-center justify-center text-muted-foreground hover:text-primary"
                   >
                     <Plus className="size-4" />
