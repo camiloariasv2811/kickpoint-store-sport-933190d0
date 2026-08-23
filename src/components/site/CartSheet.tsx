@@ -149,15 +149,17 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
-          {currentLines.map((line) => {
+          {currentLines.map((line, idx) => {
             const lineUnitPrice = isWholesaleTab
-              ? isWholesaleValid && line.wholesalePrice
+              ? isWholesaleValid && line.wholesalePrice != null
                 ? Number(line.wholesalePrice)
                 : Number(line.retailPrice || 0)
               : getLineUnitPrice(line);
 
+            const safeKey = `${line.productId}_${line.variantId}_${line.size}_${line.color || ""}_${idx}`;
+
             return (
-              <div key={line.variantId} className="surface-card flex gap-3 p-3">
+              <div key={safeKey} className="surface-card flex gap-3 p-3">
                 <div className="size-20 shrink-0 overflow-hidden rounded-lg bg-surface-2">
                   {line.image && (
                     <img
@@ -181,8 +183,12 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
                         aria-label="Disminuir"
                         onClick={() =>
                           isWholesaleTab
-                            ? setWholesaleQuantity(line.variantId, line.quantity - 1)
-                            : setQuantity(line.variantId, line.quantity - 1)
+                            ? setWholesaleQuantity(
+                                line.variantId,
+                                line.quantity - 1,
+                                line.productId,
+                              )
+                            : setQuantity(line.variantId, line.quantity - 1, line.productId)
                         }
                         className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-primary"
                       >
@@ -194,8 +200,12 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
                         aria-label="Aumentar"
                         onClick={() =>
                           isWholesaleTab
-                            ? setWholesaleQuantity(line.variantId, line.quantity + 1)
-                            : setQuantity(line.variantId, line.quantity + 1)
+                            ? setWholesaleQuantity(
+                                line.variantId,
+                                line.quantity + 1,
+                                line.productId,
+                              )
+                            : setQuantity(line.variantId, line.quantity + 1, line.productId)
                         }
                         className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-primary"
                       >
@@ -215,8 +225,8 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
                       aria-label="Eliminar"
                       onClick={() =>
                         isWholesaleTab
-                          ? removeWholesaleLine(line.variantId)
-                          : removeLine(line.variantId)
+                          ? removeWholesaleLine(line.variantId, line.productId)
+                          : removeLine(line.variantId, line.productId)
                       }
                       className="text-muted-foreground transition-colors hover:text-destructive"
                     >

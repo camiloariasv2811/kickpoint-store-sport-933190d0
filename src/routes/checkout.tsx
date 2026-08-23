@@ -780,13 +780,17 @@ function CheckoutPage() {
             </div>
 
             <ul className="mt-4 space-y-3 text-sm">
-              {activeLines.map((l) => {
+              {activeLines.map((l, idx) => {
                 const linePrice = isWholesaleCheckout
-                  ? l.wholesalePrice || l.retailPrice
+                  ? isWholesaleValid && l.wholesalePrice != null
+                    ? Number(l.wholesalePrice)
+                    : Number(l.retailPrice || 0)
                   : getLineUnitPrice(l as any);
 
+                const safeKey = `${l.productId}_${l.variantId}_${l.size}_${l.color || ""}_${idx}`;
+
                 return (
-                  <li key={l.variantId} className="flex justify-between gap-3">
+                  <li key={safeKey} className="flex justify-between gap-3">
                     <span className="min-w-0">
                       <span className="block truncate font-medium">{l.name}</span>
                       <span className="text-xs text-muted-foreground">
@@ -794,7 +798,9 @@ function CheckoutPage() {
                         {isWholesaleCheckout && " · mayor"}
                       </span>
                     </span>
-                    <span className="font-semibold">{moneyExact(linePrice * l.quantity)}</span>
+                    <span className="font-semibold">
+                      {moneyExact(linePrice * (Number(l.quantity) || 0))}
+                    </span>
                   </li>
                 );
               })}

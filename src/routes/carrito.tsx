@@ -184,15 +184,17 @@ function CartPage() {
         ) : (
           <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
             <div className="space-y-3">
-              {currentLines.map((line) => {
+              {currentLines.map((line, idx) => {
                 const linePrice = isWholesaleTab
-                  ? isWholesaleValid && line.wholesalePrice
+                  ? isWholesaleValid && line.wholesalePrice != null
                     ? Number(line.wholesalePrice)
                     : Number(line.retailPrice || 0)
                   : getLineUnitPrice(line);
 
+                const safeKey = `${line.productId}_${line.variantId}_${line.size}_${line.color || ""}_${idx}`;
+
                 return (
-                  <div key={line.variantId} className="surface-card flex gap-4 p-4">
+                  <div key={safeKey} className="surface-card flex gap-4 p-4">
                     <Link
                       to="/producto/$slug"
                       params={{ slug: line.slug }}
@@ -232,8 +234,8 @@ function CartPage() {
                           aria-label="Eliminar"
                           onClick={() =>
                             isWholesaleTab
-                              ? removeWholesaleLine(line.variantId)
-                              : removeLine(line.variantId)
+                              ? removeWholesaleLine(line.variantId, line.productId)
+                              : removeLine(line.variantId, line.productId)
                           }
                           className="text-muted-foreground transition-colors hover:text-destructive"
                         >
@@ -248,8 +250,12 @@ function CartPage() {
                             aria-label="Disminuir"
                             onClick={() =>
                               isWholesaleTab
-                                ? setWholesaleQuantity(line.variantId, line.quantity - 1)
-                                : setQuantity(line.variantId, line.quantity - 1)
+                                ? setWholesaleQuantity(
+                                    line.variantId,
+                                    line.quantity - 1,
+                                    line.productId,
+                                  )
+                                : setQuantity(line.variantId, line.quantity - 1, line.productId)
                             }
                             className="flex size-10 items-center justify-center text-muted-foreground hover:text-primary"
                           >
@@ -261,8 +267,12 @@ function CartPage() {
                             aria-label="Aumentar"
                             onClick={() =>
                               isWholesaleTab
-                                ? setWholesaleQuantity(line.variantId, line.quantity + 1)
-                                : setQuantity(line.variantId, line.quantity + 1)
+                                ? setWholesaleQuantity(
+                                    line.variantId,
+                                    line.quantity + 1,
+                                    line.productId,
+                                  )
+                                : setQuantity(line.variantId, line.quantity + 1, line.productId)
                             }
                             className="flex size-10 items-center justify-center text-muted-foreground hover:text-primary"
                           >

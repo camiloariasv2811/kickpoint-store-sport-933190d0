@@ -19,6 +19,15 @@ export type CartLine = {
 
 export type CartType = "retail" | "wholesale";
 
+export function getCartLineKey(line: {
+  productId?: string | null;
+  variantId: string;
+  size?: string | null;
+  color?: string | null;
+}): string {
+  return `${line.productId || "p"}_${line.variantId}_${line.size || ""}_${line.color || ""}`;
+}
+
 type CartContextValue = {
   // Retail cart
   lines: CartLine[];
@@ -28,8 +37,8 @@ type CartContextValue = {
   isWholesale: boolean;
   getLineUnitPrice: (line: CartLine) => number;
   addLine: (line: CartLine) => void;
-  setQuantity: (variantId: string, quantity: number) => void;
-  removeLine: (variantId: string) => void;
+  setQuantity: (variantId: string, quantity: number, productId?: string) => void;
+  removeLine: (variantId: string, productId?: string) => void;
   clear: () => void;
 
   // Wholesale cart
@@ -41,8 +50,8 @@ type CartContextValue = {
   isWholesaleValid: boolean;
   wholesaleUnitsNeeded: number;
   addWholesaleLine: (line: CartLine) => void;
-  setWholesaleQuantity: (variantId: string, quantity: number) => void;
-  removeWholesaleLine: (variantId: string) => void;
+  setWholesaleQuantity: (variantId: string, quantity: number, productId?: string) => void;
+  removeWholesaleLine: (variantId: string, productId?: string) => void;
   clearWholesale: () => void;
 
   // Active view
@@ -55,11 +64,12 @@ const WHOLESALE_STORAGE_KEY = "kickpoint.cart.wholesale.v1";
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function unitPrice(line: CartLine, _totalUnits?: number) {
-  return Number(line.retailPrice || 0);
+  return Number(line?.retailPrice || 0);
 }
 
 export function wholesaleUnitPrice(line: CartLine, wholesaleCount: number) {
-  if (wholesaleCount >= WHOLESALE_MIN_ORDER_UNITS && line.wholesalePrice) {
+  if (!line) return 0;
+  if (wholesaleCount >= WHOLESALE_MIN_ORDER_UNITS && line.wholesalePrice != null) {
     return Number(line.wholesalePrice);
   }
   return Number(line.retailPrice || 0);
@@ -77,15 +87,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (rawRetail) {
         const parsed = JSON.parse(rawRetail);
         if (Array.isArray(parsed)) {
-          const sanitized = parsed.filter(
-            (l): l is CartLine =>
-              Boolean(l) &&
-              typeof l === "object" &&
-              typeof l.variantId === "string" &&
-              typeof l.quantity === "number" &&
-              !isNaN(l.quantity) &&
-              l.quantity > 0,
-          );
+          const sanitized = parsed
+            .filter(
+              (l): l is CartLine =>
+                Boolean(l) &&
+                typeof l === "object" &&
+                typeof l.variantId === "string" &&
+                typeof l.productId === "string" &&
+                typeof l.quantity === "number" &&
+                !isNaN(l.quantity) &&
+                l.quantity > 0,
+            )
+            .map((l) => ({
+              ...l,
+              quantity: Math.max(1, Math.floor(Number(l.quantity) || 1)),
+              stock: Math.max(1, Number(l.stock) || 99),
+              retailPrice: Math.max(0, Number(l.retailPrice) || 0),
+              wholesalePrice:
+                l.wholesalePrice != null ? Math.max(0, Number(l.wholesalePrice) || 0) : null,
+            }));
           setLines(sanitized);
         } else {
           localStorage.removeItem(RETAIL_STORAGE_KEY);
@@ -105,15 +125,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
       if (rawWholesale) {
         const parsed = JSON.parse(rawWholesale);
         if (Array.isArray(parsed)) {
-          const sanitized = parsed.filter(
-            (l): l is CartLine =>
-              Boolean(l) &&
-              typeof l === "object" &&
-              typeof l.variantId === "string" &&
-              typeof l.quantity === "number" &&
-              !isNaN(l.quantity) &&
-              l.quantity > 0,
-          );
+          const sanitized = parsed
+            .filter(
+              (l): l is CartLine =>
+                Boolean(l) &&
+                typeof l === "object" &&
+                typeof l.variantId === "string" &&
+                typeof l.productId === "string" &&
+                typeof l.quantity === "number" &&
+                !isNaN(l.quantity) &&
+                l.quantity > 0,
+            )
+            .map((l) => ({
+              ...l,
+              quantity: Math.max(1, Math.floor(Number(l.quantity) || 1)),
+              stock: Math.max(1, Number(l.stock) || 99),
+              retailPrice: Math.max(0, Number(l.retailPrice) || 0),
+              wholesalePrice:
+                l.wholesalePrice != null
+                  ? Math.max(0, Number(l.wholesalePrice) || 0)
+                  : Math.max(0, Number(l.retailPrice) || 0),
+            }));
           setWholesaleLines(sanitized);
         } else {
           localStorage.removeItem(WHOLESALE_STORAGE_KEY);
@@ -149,29 +181,31 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [wholesaleLines, hydrated]);
 
   const value = useMemo<CartContextValue>(() => {
-    // Retail Calculations (Always standard retail price)
-    const retailTotalCount = lines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+    // Retail Calculations (Always standard retail price per item)
+    const retailTotalCount = lines.reduce((sum, l) => sum + (Number(l?.quantity) || 0), 0);
     const retailSubtotal = lines.reduce(
-      (sum, l) => sum + (Number(l.retailPrice) || 0) * (Number(l.quantity) || 0),
+      (sum, l) => sum + (Number(l?.retailPrice) || 0) * (Number(l?.quantity) || 0),
       0,
     );
 
-    // Wholesale Calculations (Wholesale price active only when wholesaleCount >= 8)
-    const wholesaleCount = wholesaleLines.reduce((sum, l) => sum + (Number(l.quantity) || 0), 0);
+    // Wholesale Calculations (Wholesale price active only when wholesaleCount >= 8 across all lines)
+    const wholesaleCount = wholesaleLines.reduce((sum, l) => sum + (Number(l?.quantity) || 0), 0);
     const isWholesaleValid = wholesaleCount >= WHOLESALE_MIN_ORDER_UNITS;
-    const wholesaleSubtotal = wholesaleLines.reduce(
-      (sum, l) =>
-        sum +
-        (isWholesaleValid
-          ? Number(l.wholesalePrice ?? l.retailPrice ?? 0)
-          : Number(l.retailPrice ?? 0)) *
-          (Number(l.quantity) || 0),
-      0,
-    );
-    const wholesaleRetailEquivalent = wholesaleLines.reduce(
-      (sum, l) => sum + (Number(l.retailPrice) || 0) * (Number(l.quantity) || 0),
-      0,
-    );
+
+    const wholesaleSubtotal = wholesaleLines.reduce((sum, l) => {
+      const unitCost = isWholesaleValid
+        ? Number(l?.wholesalePrice ?? l?.retailPrice ?? 0)
+        : Number(l?.retailPrice ?? 0);
+      const qty = Number(l?.quantity) || 0;
+      return sum + unitCost * qty;
+    }, 0);
+
+    const wholesaleRetailEquivalent = wholesaleLines.reduce((sum, l) => {
+      const normalPrice = Number(l?.retailPrice ?? 0);
+      const qty = Number(l?.quantity) || 0;
+      return sum + normalPrice * qty;
+    }, 0);
+
     const wholesaleUnitsNeeded = Math.max(0, WHOLESALE_MIN_ORDER_UNITS - wholesaleCount);
     const wholesaleSavings = isWholesaleValid
       ? Math.max(0, wholesaleRetailEquivalent - wholesaleSubtotal)
@@ -184,10 +218,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       subtotal: retailSubtotal,
       savings: 0,
       isWholesale: false,
-      getLineUnitPrice: (line: CartLine) => Number(line.retailPrice || 0),
+      getLineUnitPrice: (line: CartLine) => Number(line?.retailPrice || 0),
       addLine: (line) => {
-        if (!line || !line.variantId || typeof line.variantId !== "string") {
-          console.warn("[CartProvider] Rejected invalid cart line without variantId:", line);
+        if (!line || !line.variantId || !line.productId) {
+          console.warn("[CartProvider] Rejected invalid cart line:", line);
           return;
         }
         const safeStock = Math.max(1, Number(line.stock) || 99);
@@ -206,40 +240,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
           wholesalePrice: safeWholesale,
         };
 
-        console.log("[PRODUCT_SELECT_07] CART STATE UPDATE (Retail)", sanitizedLine);
         setLines((prev) => {
-          const existing = prev.find((l) => l.variantId === sanitizedLine.variantId);
-          let nextState: CartLine[];
-          if (!existing) {
-            nextState = [...prev, sanitizedLine];
-          } else {
-            nextState = prev.map((l) =>
-              l.variantId === sanitizedLine.variantId
-                ? {
-                    ...l,
-                    quantity: Math.min(
-                      safeStock,
-                      (Number(l.quantity) || 0) + sanitizedLine.quantity,
-                    ),
-                  }
-                : l,
-            );
+          const existingIndex = prev.findIndex(
+            (l) =>
+              l.variantId === sanitizedLine.variantId && l.productId === sanitizedLine.productId,
+          );
+          if (existingIndex === -1) {
+            return [...prev, sanitizedLine];
           }
-          console.log("[PRODUCT_SELECT_08] CART STATE UPDATED (Retail)", nextState);
-          return nextState;
+          return prev.map((l, idx) =>
+            idx === existingIndex
+              ? {
+                  ...l,
+                  quantity: Math.min(safeStock, (Number(l.quantity) || 0) + sanitizedLine.quantity),
+                }
+              : l,
+          );
         });
       },
-      setQuantity: (variantId, quantity) =>
+      setQuantity: (variantId, quantity, productId) =>
         setLines((prev) =>
           prev
-            .map((l) =>
-              l.variantId === variantId
+            .map((l) => {
+              const matches = productId
+                ? l.variantId === variantId && l.productId === productId
+                : l.variantId === variantId;
+              return matches
                 ? { ...l, quantity: Math.max(0, Math.min(Number(l.stock) || 99, quantity)) }
-                : l,
-            )
-            .filter((l) => l.quantity > 0),
+                : l;
+            })
+            .filter((l) => (Number(l.quantity) || 0) > 0),
         ),
-      removeLine: (variantId) => setLines((prev) => prev.filter((l) => l.variantId !== variantId)),
+      removeLine: (variantId, productId) =>
+        setLines((prev) =>
+          prev.filter((l) =>
+            productId
+              ? !(l.variantId === variantId && l.productId === productId)
+              : l.variantId !== variantId,
+          ),
+        ),
       clear: () => setLines([]),
 
       // Wholesale
@@ -251,8 +290,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       isWholesaleValid,
       wholesaleUnitsNeeded,
       addWholesaleLine: (line) => {
-        if (!line || !line.variantId || typeof line.variantId !== "string") {
-          console.warn("[CartProvider] Rejected invalid wholesale line without variantId:", line);
+        if (!line || !line.variantId || !line.productId) {
+          console.warn("[CartProvider] Rejected invalid wholesale line:", line);
           return;
         }
         const safeStock = Math.max(1, Number(line.stock) || 99);
@@ -271,41 +310,45 @@ export function CartProvider({ children }: { children: ReactNode }) {
           wholesalePrice: safeWholesale,
         };
 
-        console.log("[PRODUCT_SELECT_07] CART STATE UPDATE (Wholesale)", sanitizedLine);
         setWholesaleLines((prev) => {
-          const existing = prev.find((l) => l.variantId === sanitizedLine.variantId);
-          let nextState: CartLine[];
-          if (!existing) {
-            nextState = [...prev, sanitizedLine];
-          } else {
-            nextState = prev.map((l) =>
-              l.variantId === sanitizedLine.variantId
-                ? {
-                    ...l,
-                    quantity: Math.min(
-                      safeStock,
-                      (Number(l.quantity) || 0) + sanitizedLine.quantity,
-                    ),
-                  }
-                : l,
-            );
+          const existingIndex = prev.findIndex(
+            (l) =>
+              l.variantId === sanitizedLine.variantId && l.productId === sanitizedLine.productId,
+          );
+          if (existingIndex === -1) {
+            return [...prev, sanitizedLine];
           }
-          console.log("[PRODUCT_SELECT_08] CART STATE UPDATED (Wholesale)", nextState);
-          return nextState;
+          return prev.map((l, idx) =>
+            idx === existingIndex
+              ? {
+                  ...l,
+                  quantity: Math.min(safeStock, (Number(l.quantity) || 0) + sanitizedLine.quantity),
+                }
+              : l,
+          );
         });
       },
-      setWholesaleQuantity: (variantId, quantity) =>
+      setWholesaleQuantity: (variantId, quantity, productId) =>
         setWholesaleLines((prev) =>
           prev
-            .map((l) =>
-              l.variantId === variantId
+            .map((l) => {
+              const matches = productId
+                ? l.variantId === variantId && l.productId === productId
+                : l.variantId === variantId;
+              return matches
                 ? { ...l, quantity: Math.max(0, Math.min(Number(l.stock) || 99, quantity)) }
-                : l,
-            )
-            .filter((l) => l.quantity > 0),
+                : l;
+            })
+            .filter((l) => (Number(l.quantity) || 0) > 0),
         ),
-      removeWholesaleLine: (variantId) =>
-        setWholesaleLines((prev) => prev.filter((l) => l.variantId !== variantId)),
+      removeWholesaleLine: (variantId, productId) =>
+        setWholesaleLines((prev) =>
+          prev.filter((l) =>
+            productId
+              ? !(l.variantId === variantId && l.productId === productId)
+              : l.variantId !== variantId,
+          ),
+        ),
       clearWholesale: () => setWholesaleLines([]),
 
       activeCartType,
