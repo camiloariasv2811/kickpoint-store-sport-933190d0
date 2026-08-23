@@ -242,16 +242,20 @@ export function CartSheet({ children }: { children: React.ReactNode }) {
         {/* Footer & Checkout Action */}
         {currentLines.length > 0 && (
           <SheetFooter className="gap-3 border-t border-border px-5 py-4">
-            <div className="w-full space-y-1 text-sm">
+            <div className="w-full space-y-2">
               {currentSavings > 0 && (
-                <div className="flex justify-between text-primary font-semibold">
-                  <span>Descuento al mayor</span>
-                  <span>-{moneyExact(currentSavings)}</span>
+                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs sm:text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-xs sm:text-sm">Descuento al mayor</span>
+                  <span className="text-xs sm:text-sm font-bold tabular-nums whitespace-nowrap">
+                    -{moneyExact(currentSavings)}
+                  </span>
                 </div>
               )}
-              <div className="flex justify-between text-base font-bold">
-                <span>Subtotal</span>
-                <span className="text-primary">{moneyExact(currentSubtotal)}</span>
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border/60 pt-2 text-xs sm:text-sm font-bold">
+                <span className="text-xs sm:text-sm text-foreground">Subtotal</span>
+                <span className="text-xs sm:text-sm text-primary tabular-nums whitespace-nowrap">
+                  {moneyExact(currentSubtotal)}
+                </span>
               </div>
             </div>
 

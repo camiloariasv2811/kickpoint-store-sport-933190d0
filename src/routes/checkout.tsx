@@ -827,15 +827,18 @@ function CheckoutPage() {
             </ul>
 
             {activeSavings > 0 && (
-              <p className="mt-4 text-sm font-semibold text-primary">
-                Ahorro al mayor ({activeCount} uds.): -{moneyExact(activeSavings)}
-              </p>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs sm:text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                <span className="text-xs sm:text-sm">Descuento al mayor ({activeCount} uds.)</span>
+                <span className="text-xs sm:text-sm font-bold tabular-nums whitespace-nowrap">
+                  -{moneyExact(activeSavings)}
+                </span>
+              </div>
             )}
 
             {/* Total USD */}
-            <div className="mt-4 flex items-baseline justify-between border-t border-border pt-4">
-              <span className="text-sm text-muted-foreground">Total USD</span>
-              <span className="text-display text-2xl text-primary">
+            <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-border pt-4">
+              <span className="min-w-0 text-xs sm:text-sm text-muted-foreground">Total USD</span>
+              <span className="ml-auto text-right text-display text-xl sm:text-2xl text-primary tabular-nums whitespace-nowrap">
                 {moneyExact(activeSubtotal)}
               </span>
             </div>

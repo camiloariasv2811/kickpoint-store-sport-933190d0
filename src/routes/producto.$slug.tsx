@@ -500,36 +500,43 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
               </div>
             )}
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Button
-                variant="hero"
-                size="xl"
-                className="flex-1"
-                disabled={!variant || (Number(variant.stock) || 0) <= 0}
-                onClick={handleAdd}
+            <div className="mt-6 space-y-3">
+              {/* Primary Actions Block */}
+              <div
+                className={`grid gap-3 ${product.wholesale_price ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}
               >
-                <ShoppingCart className="size-5" /> Agregar al Carrito
-              </Button>
-
-              {product.wholesale_price && (
                 <Button
-                  variant="outlineGlow"
+                  variant="hero"
                   size="xl"
+                  className="w-full"
                   disabled={!variant || (Number(variant.stock) || 0) <= 0}
-                  onClick={handleAddWholesale}
-                  className="border-amber-500/50 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold"
+                  onClick={handleAdd}
                 >
-                  <Tag className="size-5" /> Agregar al Pedido Mayor
+                  <ShoppingCart className="size-5" /> Agregar al Carrito
                 </Button>
-              )}
 
-              <Button asChild variant="dark" size="xl">
+                {product.wholesale_price && (
+                  <Button
+                    variant="outlineGlow"
+                    size="xl"
+                    disabled={!variant || (Number(variant.stock) || 0) <= 0}
+                    onClick={handleAddWholesale}
+                    className="w-full border-amber-500/50 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold"
+                  >
+                    <Tag className="size-5" /> Agregar al Pedido Mayor
+                  </Button>
+                )}
+              </div>
+
+              {/* Secondary WhatsApp Action */}
+              <Button asChild variant="dark" size="lg" className="w-full justify-center">
                 <a
                   href={whatsappLink(`Hola KICKPOINT, quiero información de: ${product.name}`)}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  <MessageCircle className="size-5" /> Consultar
+                  <MessageCircle className="size-5 text-emerald-500" /> Consultar disponibilidad o
+                  detalles por WhatsApp
                 </a>
               </Button>
             </div>

@@ -303,22 +303,28 @@ function CartPage() {
               <h2 className="text-display text-xl">
                 {isWholesaleTab ? "Resumen Mayorista" : "Resumen"}
               </h2>
-              <div className="mt-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Productos</span>
-                  <span className="font-semibold">{currentCount} unidades</span>
+              <div className="mt-4 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs sm:text-sm">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Productos</span>
+                  <span className="text-xs sm:text-sm font-semibold tabular-nums">
+                    {currentCount} unidades
+                  </span>
                 </div>
                 {currentSavings > 0 && (
-                  <div className="flex justify-between text-primary font-semibold">
-                    <span>Descuento al mayor</span>
-                    <span>-{moneyExact(currentSavings)}</span>
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs sm:text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span className="text-xs sm:text-sm">Descuento al mayor</span>
+                    <span className="text-xs sm:text-sm font-bold tabular-nums whitespace-nowrap">
+                      -{moneyExact(currentSavings)}
+                    </span>
                   </div>
                 )}
-                <div className="flex justify-between border-t border-border pt-3 text-lg font-bold">
-                  <span>Total</span>
-                  <span className="text-primary">{moneyExact(currentSubtotal)}</span>
+                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-border pt-3 text-sm sm:text-base font-bold">
+                  <span className="text-sm sm:text-base text-foreground">Subtotal</span>
+                  <span className="text-sm sm:text-base text-primary tabular-nums whitespace-nowrap">
+                    {moneyExact(currentSubtotal)}
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground">
+                <p className="pt-1 text-xs text-muted-foreground">
                   El envío se calcula en el checkout según tu ciudad (TEALCA o MRW).
                 </p>
               </div>
