@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { UploadCloud, Trash, Plus, X, Loader2 } from "lucide-react";
 import { createProduct, updateProduct, uploadProductImage } from "@/lib/products.functions";
-import { listBrands, listCategories } from "@/lib/catalog.functions";
+import { createBrand, listBrands, listCategories } from "@/lib/catalog.functions";
 import { toast } from "sonner";
 import VariantTable, { type Variant } from "./VariantTable";
 
@@ -42,6 +42,9 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
   const [slug, setSlug] = useState(product?.slug ?? "");
   const [baseSku, setBaseSku] = useState(product?.base_sku ?? "");
   const [brandId, setBrandId] = useState(product?.brand?.id ?? "");
+  const [isCreatingBrand, setIsCreatingBrand] = useState(false);
+  const [newBrandName, setNewBrandName] = useState("");
+  const [savingBrand, setSavingBrand] = useState(false);
   const [categoryId, setCategoryId] = useState(product?.category?.id ?? "");
   const [description, setDescription] = useState(product?.description ?? "");
   const [cost, setCost] = useState(product?.cost ?? 0);
@@ -296,6 +299,27 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
     setImages((prev) => prev.filter((_, i) => i !== index));
   }
 
+  async function handleCreateBrandSubmit() {
+    const trimmed = newBrandName.trim();
+    if (!trimmed) {
+      toast.error("Ingresa el nombre de la nueva marca");
+      return;
+    }
+    setSavingBrand(true);
+    try {
+      const created = await createBrand({ data: { name: trimmed } });
+      toast.success(`Marca "${created.name}" creada exitosamente`);
+      await queryClient.invalidateQueries({ queryKey: ["catalog", "brands"] });
+      setBrandId(created.id);
+      setIsCreatingBrand(false);
+      setNewBrandName("");
+    } catch (err: any) {
+      toast.error(`Error al crear marca: ${err.message || "Error desconocido"}`);
+    } finally {
+      setSavingBrand(false);
+    }
+  }
+
   async function handleSave() {
     if (!name.trim()) {
       toast.error("El nombre del producto es obligatorio");
@@ -408,23 +432,110 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
           {/* Marca y Categoría */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <Label>Marca</Label>
-              <Select
-                value={brandId || "none"}
-                onValueChange={(v) => setBrandId(v === "none" ? "" : v)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una marca" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin marca</SelectItem>
-                  {brands.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name}
+              <div className="flex items-center justify-between">
+                <Label>Marca</Label>
+                {!isCreatingBrand && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingBrand(true);
+                      setNewBrandName("");
+                    }}
+                    className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+                  >
+                    <Plus className="h-3 w-3" /> Crear marca
+                  </button>
+                )}
+              </div>
+
+              {isCreatingBrand ? (
+                <div className="mt-1.5 p-2.5 rounded-lg border border-primary/40 bg-surface-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-foreground">Nueva Marca</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsCreatingBrand(false);
+                        setNewBrandName("");
+                      }}
+                      className="text-muted-foreground hover:text-foreground text-xs"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      autoFocus
+                      value={newBrandName}
+                      placeholder="Nombre de la nueva marca"
+                      onChange={(e) => setNewBrandName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleCreateBrandSubmit();
+                        } else if (e.key === "Escape") {
+                          setIsCreatingBrand(false);
+                          setNewBrandName("");
+                        }
+                      }}
+                      className="h-8 text-sm"
+                      disabled={savingBrand}
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={handleCreateBrandSubmit}
+                      disabled={savingBrand || !newBrandName.trim()}
+                      className="h-8 px-3 text-xs shrink-0"
+                    >
+                      {savingBrand ? <Loader2 className="h-3 w-3 animate-spin" /> : "Guardar"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setIsCreatingBrand(false);
+                        setNewBrandName("");
+                      }}
+                      disabled={savingBrand}
+                      className="h-8 px-2 text-xs shrink-0"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Select
+                  value={brandId || "none"}
+                  onValueChange={(v) => {
+                    if (v === "__CREATE_NEW_BRAND__") {
+                      setIsCreatingBrand(true);
+                      setNewBrandName("");
+                    } else {
+                      setBrandId(v === "none" ? "" : v);
+                    }
+                  }}
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Selecciona una marca" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin marca</SelectItem>
+                    {brands.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}
+                      </SelectItem>
+                    ))}
+                    <SelectItem
+                      value="__CREATE_NEW_BRAND__"
+                      className="font-semibold text-primary focus:text-primary cursor-pointer border-t border-border/40 mt-1 pt-1.5"
+                    >
+                      + Crear nueva marca
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div>
               <Label>Categoría</Label>
@@ -432,7 +543,7 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
                 value={categoryId || "none"}
                 onValueChange={(v) => setCategoryId(v === "none" ? "" : v)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Selecciona una categoría" />
                 </SelectTrigger>
                 <SelectContent>

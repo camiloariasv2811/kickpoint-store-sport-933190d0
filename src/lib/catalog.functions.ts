@@ -1,6 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createPublicClient, isSupabasePublicConfigured } from "./supabase-public.server";
-import { DEMO_BRANDS, DEMO_CATEGORIES, getInMemoryProducts } from "./demo-data";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
+import {
+  DEMO_CATEGORIES,
+  getInMemoryBrands,
+  addInMemoryBrand,
+  getInMemoryProducts,
+} from "./demo-data";
 import type { Brand, Category, Product } from "./types";
 
 const PRODUCT_SELECT = `
@@ -76,7 +83,7 @@ export const listCategories = createServerFn({ method: "GET" }).handler(async ()
 
 export const listBrands = createServerFn({ method: "GET" }).handler(async () => {
   if (!isSupabasePublicConfigured()) {
-    return DEMO_BRANDS;
+    return getInMemoryBrands();
   }
   try {
     const supabase = createPublicClient();
@@ -86,10 +93,60 @@ export const listBrands = createServerFn({ method: "GET" }).handler(async () => 
       .eq("active", true)
       .order("name");
     if (error || !data || data.length === 0) {
-      return DEMO_BRANDS;
+      return getInMemoryBrands();
     }
     return data as unknown as Brand[];
   } catch {
-    return DEMO_BRANDS;
+    return getInMemoryBrands();
   }
 });
+
+export const createBrand = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { name: string; slug?: string | null }) => d)
+  .handler(async ({ data, context }) => {
+    const name = String(data.name ?? "").trim();
+    if (!name) throw new Error("Nombre de marca requerido");
+    const slug =
+      data.slug?.trim() ||
+      name
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)+/g, "");
+
+    const newBrand: Brand = {
+      id: `brand-${Date.now()}`,
+      name,
+      slug,
+    };
+
+    if (!isSupabaseServerConfigured()) {
+      const added = addInMemoryBrand(newBrand);
+      return added;
+    }
+
+    try {
+      const { data: inserted, error } = await context.supabase
+        .from("brands")
+        .insert({
+          name,
+          slug,
+          active: true,
+        })
+        .select("id, name, slug")
+        .single();
+
+      if (error || !inserted) {
+        console.warn("[createBrand] Supabase error, falling back to memory:", error);
+        return addInMemoryBrand(newBrand);
+      }
+
+      addInMemoryBrand(inserted as Brand);
+      return inserted as Brand;
+    } catch (err) {
+      console.warn("[createBrand] Error creating brand in Supabase:", err);
+      return addInMemoryBrand(newBrand);
+    }
+  });

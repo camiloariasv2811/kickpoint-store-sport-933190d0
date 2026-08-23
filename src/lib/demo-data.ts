@@ -699,6 +699,34 @@ let _inMemoryPaymentMethods: any[] = [
   },
 ];
 
+let _inMemoryBrands: Brand[] = [...DEMO_BRANDS];
+
+export function getInMemoryBrands(): Brand[] {
+  return _inMemoryBrands;
+}
+
+export function addInMemoryBrand(brand: Brand): Brand {
+  const existing = _inMemoryBrands.find(
+    (b) => b.name.toLowerCase() === brand.name.toLowerCase() || b.id === brand.id,
+  );
+  if (existing) return existing;
+  _inMemoryBrands = [..._inMemoryBrands, brand];
+  return brand;
+}
+
+export function updateInMemoryBrand(id: string, patch: Partial<Brand>): boolean {
+  const idx = _inMemoryBrands.findIndex((b) => b.id === id);
+  if (idx === -1) return false;
+  _inMemoryBrands[idx] = { ..._inMemoryBrands[idx], ...patch };
+  return true;
+}
+
+export function deleteInMemoryBrand(id: string): boolean {
+  const len = _inMemoryBrands.length;
+  _inMemoryBrands = _inMemoryBrands.filter((b) => b.id !== id);
+  return _inMemoryBrands.length < len;
+}
+
 let _inMemoryCategories: Category[] = [...DEMO_CATEGORIES];
 
 export function getInMemoryCategories(): Category[] {

@@ -3,10 +3,10 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
 import { toSafeUuid } from "./types";
 import {
-  DEMO_BRANDS,
   DEMO_CATEGORIES,
   addInMemoryProduct,
   deleteInMemoryProduct,
+  getInMemoryBrands,
   getInMemoryOrders,
   getInMemoryProducts,
   getInMemorySales,
@@ -144,7 +144,9 @@ export const createProduct = createServerFn({ method: "POST" })
     const slug = data.slug?.trim() || generateSlug(name);
     const productId = `prod-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-    const brandObj = data.brand_id ? DEMO_BRANDS.find((b) => b.id === data.brand_id) || null : null;
+    const brandObj = data.brand_id
+      ? getInMemoryBrands().find((b) => b.id === data.brand_id) || null
+      : null;
     const categoryObj = data.category_id
       ? DEMO_CATEGORIES.find((c) => c.id === data.category_id) || null
       : null;
@@ -337,7 +339,7 @@ export const updateProduct = createServerFn({ method: "POST" })
     if (!data.id) throw new Error("Falta id del producto");
 
     const brandObj = data.brand_id
-      ? DEMO_BRANDS.find((b) => b.id === data.brand_id) || null
+      ? getInMemoryBrands().find((b) => b.id === data.brand_id) || null
       : undefined;
     const categoryObj = data.category_id
       ? DEMO_CATEGORIES.find((c) => c.id === data.category_id) || null
