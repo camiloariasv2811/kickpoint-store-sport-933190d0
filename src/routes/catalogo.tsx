@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Search, SlidersHorizontal, X } from "lucide-react";
-import { useMemo } from "react";
+import { Search, SlidersHorizontal, X, ArrowDown } from "lucide-react";
+import { useMemo, useState, useEffect, useRef } from "react";
 
 import { ProductCard } from "@/components/site/ProductCard";
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -57,6 +57,8 @@ const ORDERS = [
   { value: "vendidos", label: "Más vendidos" },
 ];
 
+const INITIAL_BATCH_SIZE = 20;
+
 function Chip({
   active,
   children,
@@ -81,17 +83,27 @@ function Chip({
 }
 
 function Catalogo() {
+  const [routeMountTime] = useState(() => performance.now());
   const search = Route.useSearch();
   const navigate = useNavigate({ from: "/catalogo" });
   const setSearch = (patch: Partial<Search>) =>
     navigate({ search: (prev) => ({ ...prev, ...patch }) });
 
+  const [visibleLimit, setVisibleLimit] = useState(INITIAL_BATCH_SIZE);
+  const firstRenderLogged = useRef(false);
+
   const { data: products = [], isLoading } = useQuery({
     queryKey: ["products"],
     staleTime: 60 * 1000,
     queryFn: async () => {
+      console.log(
+        `[CLIENT:ROUTE_START] Fetching products at ${Math.round(performance.now() - routeMountTime)}ms`,
+      );
       try {
         const res = await listProducts();
+        console.log(
+          `[CLIENT:FIRST_PRODUCT_RECEIVED] Products received at ${Math.round(performance.now() - routeMountTime)}ms`,
+        );
         return res ?? [];
       } catch (err) {
         console.warn("[Catalogo] Error loading products:", err);
@@ -99,6 +111,7 @@ function Catalogo() {
       }
     },
   });
+
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
     staleTime: 5 * 60 * 1000,
@@ -112,6 +125,7 @@ function Catalogo() {
       }
     },
   });
+
   const { data: brands = [] } = useQuery({
     queryKey: ["brands"],
     staleTime: 5 * 60 * 1000,
@@ -128,7 +142,7 @@ function Catalogo() {
 
   const sizes = useMemo(() => {
     const set = new Set<string>();
-    products?.forEach((p) => p.variants.forEach((v) => set.add(v.size)));
+    products?.forEach((p) => p.variants?.forEach((v) => set.add(v.size)));
     return Array.from(set);
   }, [products]);
 
@@ -148,14 +162,14 @@ function Catalogo() {
         (p) =>
           p.name.toLowerCase().includes(q) ||
           (p.brand?.name ?? "").toLowerCase().includes(q) ||
-          (p.description ?? "").toLowerCase().includes(q),
+          (p.base_sku ?? "").toLowerCase().includes(q),
       );
     }
     if (categorySlugs)
       list = list.filter((p) => p.category && categorySlugs.includes(p.category.slug));
     if (search.marca) list = list.filter((p) => p.brand?.slug === search.marca);
     if (search.talla)
-      list = list.filter((p) => p.variants.some((v) => v.size === search.talla && v.stock > 0));
+      list = list.filter((p) => p.variants?.some((v) => v.size === search.talla && v.stock > 0));
     if (search.max) list = list.filter((p) => Number(p.retail_price) <= Number(search.max));
 
     switch (search.orden) {
@@ -173,6 +187,31 @@ function Catalogo() {
     }
     return list;
   }, [products, search, categorySlugs]);
+
+  // Reset pagination when search filter changes
+  useEffect(() => {
+    setVisibleLimit(INITIAL_BATCH_SIZE);
+  }, [search.q, search.categoria, search.marca, search.talla, search.max, search.orden]);
+
+  // Telemetry: measure first product rendered
+  useEffect(() => {
+    if (filtered.length > 0 && !firstRenderLogged.current) {
+      firstRenderLogged.current = true;
+      requestAnimationFrame(() => {
+        const timeToFirst = Math.round(performance.now() - routeMountTime);
+        console.log(
+          `[CLIENT:FIRST_PRODUCT_RENDERED] First product rendered at ${timeToFirst}ms (TTFP)`,
+        );
+        console.log(
+          `[CLIENT:ALL_PRODUCTS_RENDERED] Initial batch of ${Math.min(filtered.length, visibleLimit)} rendered at ${timeToFirst}ms`,
+        );
+      });
+    }
+  }, [filtered, routeMountTime, visibleLimit]);
+
+  const visibleProducts = useMemo(() => {
+    return filtered.slice(0, visibleLimit);
+  }, [filtered, visibleLimit]);
 
   const hasFilters = Boolean(
     search.q || search.categoria || search.marca || search.talla || search.max || search.orden,
@@ -281,8 +320,26 @@ function Catalogo() {
             Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="aspect-[3/4] rounded-xl" />
             ))}
-          {!isLoading && filtered.map((p) => <ProductCard key={p.id} product={p} />)}
+          {!isLoading &&
+            visibleProducts.map((p, idx) => (
+              <ProductCard key={p.id} product={p} priority={idx < 4} />
+            ))}
         </div>
+
+        {!isLoading && filtered.length > visibleLimit && (
+          <div className="mt-8 flex flex-col items-center justify-center gap-2 text-center">
+            <p className="text-xs text-muted-foreground">
+              Mostrando {visibleProducts.length} de {filtered.length} productos
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => setVisibleLimit((prev) => prev + INITIAL_BATCH_SIZE)}
+              className="gap-2"
+            >
+              <ArrowDown className="size-4" /> Cargar más productos
+            </Button>
+          </div>
+        )}
 
         {!isLoading && filtered.length === 0 && (
           <div className="surface-card mt-6 p-10 text-center">

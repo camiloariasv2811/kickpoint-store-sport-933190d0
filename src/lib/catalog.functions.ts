@@ -10,6 +10,24 @@ import {
 } from "./demo-data";
 import type { Brand, Category, Product } from "./types";
 
+export type MinimalProduct = {
+  id: string;
+  name: string;
+  slug: string;
+  retail_price: number;
+  main_image: string | null;
+  active: boolean;
+};
+
+export type BenchmarkResult = {
+  name: string;
+  supabase_duration_ms: number;
+  transform_duration_ms: number;
+  total_duration_ms: number;
+  item_count: number;
+  payload_size_approx_kb: number;
+};
+
 const PRODUCT_SELECT_FULL = `
   id, name, slug, description, base_sku, retail_price, wholesale_price, wholesale_min_qty,
   images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, created_at,
@@ -25,6 +43,280 @@ const PRODUCT_SELECT_CATALOG = `
   category:categories ( id, name, slug ),
   variants:product_variants ( id, product_id, size, color, sku, stock, active )
 `;
+
+/** Minimal Query: Only id, name, slug, price, main_image, active */
+export const getMinimalProducts = createServerFn({ method: "GET" }).handler(async () => {
+  const requestStart = performance.now();
+  console.log(`[REQUEST_START] getMinimalProducts at ${new Date().toISOString()}`);
+
+  const supabaseStart = performance.now();
+  let rawItems: any[] = [];
+
+  if (isSupabasePublicConfigured()) {
+    try {
+      const supabase = createPublicClient();
+      const { data, error } = await supabase
+        .from("products")
+        .select("id, name, slug, retail_price, images, active")
+        .eq("active", true)
+        .order("created_at", { ascending: false });
+      if (!error && data) {
+        rawItems = data;
+      } else {
+        rawItems = getInMemoryProducts().filter((p) => p.active);
+      }
+    } catch {
+      rawItems = getInMemoryProducts().filter((p) => p.active);
+    }
+  } else {
+    rawItems = getInMemoryProducts().filter((p) => p.active);
+  }
+
+  const supabaseEnd = performance.now();
+  console.log(`[SUPABASE_END] Query completed in ${Math.round(supabaseEnd - supabaseStart)}ms`);
+
+  const transformStart = performance.now();
+  const minimalProducts: MinimalProduct[] = rawItems.map((p) => ({
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    retail_price: Number(p.retail_price || 0),
+    main_image: Array.isArray(p.images) && p.images.length > 0 ? p.images[0] : null,
+    active: Boolean(p.active),
+  }));
+  const transformEnd = performance.now();
+
+  const responseStart = performance.now();
+  console.log(
+    `[TRANSFORM_END] Transform in ${Math.round(transformEnd - transformStart)}ms | Response starting at ${Math.round(responseStart - requestStart)}ms total`,
+  );
+
+  return {
+    items: minimalProducts,
+    metrics: {
+      request_start: requestStart,
+      supabase_start: supabaseStart,
+      supabase_end: supabaseEnd,
+      supabase_duration_ms: Math.round(supabaseEnd - supabaseStart),
+      transform_start: transformStart,
+      transform_end: transformEnd,
+      transform_duration_ms: Math.round(transformEnd - transformStart),
+      response_start: responseStart,
+      total_duration_ms: Math.round(responseStart - requestStart),
+      items_count: minimalProducts.length,
+    },
+  };
+});
+
+/** Full diagnostic test suite to measure every component */
+export const runDiagnosticsBenchmark = createServerFn({ method: "GET" }).handler(async () => {
+  const tests: BenchmarkResult[] = [];
+  const isSb = isSupabasePublicConfigured();
+
+  // Test 1: Minimal (id, name, slug, price, main_image, active)
+  {
+    const t0 = performance.now();
+    let data: any[] = [];
+    if (isSb) {
+      const supabase = createPublicClient();
+      const res = await supabase
+        .from("products")
+        .select("id, name, slug, retail_price, images, active")
+        .eq("active", true);
+      data = res.data ?? [];
+    } else {
+      data = getInMemoryProducts().filter((p) => p.active);
+    }
+    const tSb = performance.now();
+    const trans0 = performance.now();
+    const items = data.map((p) => ({
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      price: p.retail_price,
+      main_image: p.images?.[0] ?? null,
+      active: p.active,
+    }));
+    const trans1 = performance.now();
+    const str = JSON.stringify(items);
+    tests.push({
+      name: "1. Minimal (solo id, name, slug, price, img, active)",
+      supabase_duration_ms: Math.round(tSb - t0),
+      transform_duration_ms: Math.round(trans1 - trans0),
+      total_duration_ms: Math.round(performance.now() - t0),
+      item_count: items.length,
+      payload_size_approx_kb: Math.round((str.length * 2) / 1024),
+    });
+  }
+
+  // Test 2: Minimal + Brands
+  {
+    const t0 = performance.now();
+    let data: any[] = [];
+    if (isSb) {
+      const supabase = createPublicClient();
+      const res = await supabase
+        .from("products")
+        .select("id, name, slug, retail_price, images, active, brand:brands(id, name, slug)")
+        .eq("active", true);
+      data = res.data ?? [];
+    } else {
+      data = getInMemoryProducts().filter((p) => p.active);
+    }
+    const tSb = performance.now();
+    const str = JSON.stringify(data);
+    tests.push({
+      name: "2. Productos + Marcas",
+      supabase_duration_ms: Math.round(tSb - t0),
+      transform_duration_ms: 0,
+      total_duration_ms: Math.round(performance.now() - t0),
+      item_count: data.length,
+      payload_size_approx_kb: Math.round((str.length * 2) / 1024),
+    });
+  }
+
+  // Test 3: Minimal + Categories
+  {
+    const t0 = performance.now();
+    let data: any[] = [];
+    if (isSb) {
+      const supabase = createPublicClient();
+      const res = await supabase
+        .from("products")
+        .select("id, name, slug, retail_price, images, active, category:categories(id, name, slug)")
+        .eq("active", true);
+      data = res.data ?? [];
+    } else {
+      data = getInMemoryProducts().filter((p) => p.active);
+    }
+    const tSb = performance.now();
+    const str = JSON.stringify(data);
+    tests.push({
+      name: "3. Productos + Categorías",
+      supabase_duration_ms: Math.round(tSb - t0),
+      transform_duration_ms: 0,
+      total_duration_ms: Math.round(performance.now() - t0),
+      item_count: data.length,
+      payload_size_approx_kb: Math.round((str.length * 2) / 1024),
+    });
+  }
+
+  // Test 4: Minimal + Variants
+  {
+    const t0 = performance.now();
+    let data: any[] = [];
+    if (isSb) {
+      const supabase = createPublicClient();
+      const res = await supabase
+        .from("products")
+        .select(
+          "id, name, slug, retail_price, images, active, variants:product_variants(id, size, color, stock, active)",
+        )
+        .eq("active", true);
+      data = res.data ?? [];
+    } else {
+      data = getInMemoryProducts().filter((p) => p.active);
+    }
+    const tSb = performance.now();
+    const str = JSON.stringify(data);
+    tests.push({
+      name: "4. Productos + Variantes",
+      supabase_duration_ms: Math.round(tSb - t0),
+      transform_duration_ms: 0,
+      total_duration_ms: Math.round(performance.now() - t0),
+      item_count: data.length,
+      payload_size_approx_kb: Math.round((str.length * 2) / 1024),
+    });
+  }
+
+  // Test 5: Full Catalog Query
+  {
+    const t0 = performance.now();
+    let data: any[] = [];
+    if (isSb) {
+      const supabase = createPublicClient();
+      const res = await supabase.from("products").select(PRODUCT_SELECT_CATALOG).eq("active", true);
+      data = res.data ?? [];
+    } else {
+      data = getInMemoryProducts().filter((p) => p.active);
+    }
+    const tSb = performance.now();
+    const str = JSON.stringify(data);
+    tests.push({
+      name: "5. Catálogo Completo (Marcas + Categorías + Variantes + Tags)",
+      supabase_duration_ms: Math.round(tSb - t0),
+      transform_duration_ms: 0,
+      total_duration_ms: Math.round(performance.now() - t0),
+      item_count: data.length,
+      payload_size_approx_kb: Math.round((str.length * 2) / 1024),
+    });
+  }
+
+  return {
+    is_supabase_connected: isSb,
+    timestamp: new Date().toISOString(),
+    tests,
+  };
+});
+
+/** Incremental Selector Search (for POS / Ventas / Order creators) */
+export const searchProductsForSelector = createServerFn({ method: "GET" })
+  .inputValidator((d: { q?: string; limit?: number }) => d)
+  .handler(async ({ data }) => {
+    const term = (data?.q ?? "").trim().toLowerCase();
+    const limit = Math.min(50, Math.max(1, data?.limit ?? 20));
+
+    if (!isSupabasePublicConfigured()) {
+      let list = getInMemoryProducts().filter((p) => p.active !== false);
+      if (term) {
+        list = list.filter(
+          (p) =>
+            p.name.toLowerCase().includes(term) ||
+            (p.base_sku && p.base_sku.toLowerCase().includes(term)) ||
+            (p.brand?.name && p.brand.name.toLowerCase().includes(term)),
+        );
+      }
+      return list.slice(0, limit);
+    }
+
+    try {
+      const supabase = createPublicClient();
+      let query = supabase
+        .from("products")
+        .select(
+          "id, name, slug, base_sku, retail_price, wholesale_price, images, active, variants:product_variants(id, product_id, size, color, sku, stock, active)",
+        )
+        .eq("active", true);
+
+      if (term) {
+        query = query.or(`name.ilike.%${term}%,base_sku.ilike.%${term}%`);
+      }
+
+      const { data: rows, error } = await query.limit(limit);
+      if (error || !rows) {
+        let list = getInMemoryProducts().filter((p) => p.active !== false);
+        if (term) {
+          list = list.filter(
+            (p) =>
+              p.name.toLowerCase().includes(term) ||
+              (p.base_sku && p.base_sku.toLowerCase().includes(term)),
+          );
+        }
+        return list.slice(0, limit);
+      }
+      return rows;
+    } catch {
+      let list = getInMemoryProducts().filter((p) => p.active !== false);
+      if (term) {
+        list = list.filter(
+          (p) =>
+            p.name.toLowerCase().includes(term) ||
+            (p.base_sku && p.base_sku.toLowerCase().includes(term)),
+        );
+      }
+      return list.slice(0, limit);
+    }
+  });
 
 export const listProducts = createServerFn({ method: "GET" }).handler(async () => {
   const tStart = performance.now();

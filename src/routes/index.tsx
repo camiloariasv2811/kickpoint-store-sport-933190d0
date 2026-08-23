@@ -64,9 +64,11 @@ function SectionHeader({ title, eyebrow }: { title: string; eyebrow?: string }) 
 function ProductRow({
   products,
   loading,
+  priority = false,
 }: {
   products: ReturnType<typeof useProducts>["data"];
   loading: boolean;
+  priority?: boolean;
 }) {
   if (loading) {
     return (
@@ -82,8 +84,8 @@ function ProductRow({
   }
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-      {products.slice(0, 4).map((p) => (
-        <ProductCard key={p.id} product={p} />
+      {products.slice(0, 4).map((p, idx) => (
+        <ProductCard key={p.id} product={p} priority={priority && idx < 4} />
       ))}
     </div>
   );
@@ -227,7 +229,7 @@ function Home() {
       {/* FEATURED */}
       <section className="mx-auto max-w-7xl px-4 py-8">
         <SectionHeader eyebrow="Selección Kickpoint" title="Productos destacados" />
-        <ProductRow products={featured} loading={isLoading} />
+        <ProductRow products={featured} loading={isLoading} priority={true} />
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-8">

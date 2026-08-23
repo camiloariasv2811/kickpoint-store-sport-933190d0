@@ -31,6 +31,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { listAdminProducts } from "@/lib/products.functions";
+import { searchProductsForSelector } from "@/lib/catalog.functions";
 import { listCustomers } from "@/lib/customers.functions";
 import {
   listSales,
@@ -85,14 +86,13 @@ function AdminVentas() {
   const [deletingSale, setDeletingSale] = useState(false);
 
   const { data: products = [], isLoading: loadingProducts } = useQuery({
-    queryKey: ["admin", "products", "all"],
+    queryKey: ["admin", "products-selector", searchProd],
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
-        const res = await listAdminProducts({ data: { pageSize: 500 } });
-        if (Array.isArray(res)) return res;
-        return res?.items ?? [];
+        const res = await searchProductsForSelector({ data: { q: searchProd, limit: 30 } });
+        return res ?? [];
       } catch (err) {
         console.warn("[AdminVentas] Error loading products:", err);
         return [];
