@@ -59,7 +59,7 @@ async function runEmailVerification() {
   console.log(" - KICKPOINT_PUBLIC_URL:", publicUrl);
 
   // 2. Test Message Builder Template
-  console.log("\n2. VERIFICACIÓN DE PLANTILLA Y BOTÓN:");
+  console.log("\n2. VERIFICACIÓN DE PLANTILLA, TABLA DE PRODUCTOS Y BOTÓN:");
   const testPayload = {
     eventType: "order_created" as const,
     recipientEmail: adminEmail,
@@ -72,6 +72,24 @@ async function runEmailVerification() {
     total: 75.5,
     paymentMethod: "Pago Móvil (0102 Banco de Venezuela)",
     paymentReference: "REF-88997766",
+    items: [
+      {
+        productName: "Camiseta Deportiva Kickpoint",
+        size: "M",
+        color: "Negro",
+        quantity: 2,
+        unitPrice: 25.0,
+        subtotal: 50.0,
+      },
+      {
+        productName: "Shorts Kickpoint Pro",
+        size: "L",
+        color: "Azul",
+        quantity: 1,
+        unitPrice: 25.5,
+        subtotal: 25.5,
+      },
+    ],
   };
 
   const { subject, text, html } = buildEmailMessage(testPayload);
@@ -79,14 +97,29 @@ async function runEmailVerification() {
   console.log(" - Botón URL:", `${publicUrl}/admin/pedidos`);
   console.log(
     " - Contiene '🚨 TIENES UN NUEVO PEDIDO':",
-    text.includes("🚨 TIENES UN NUEVO PEDIDO"),
+    text.includes("🚨 TIENES UN NUEVO PEDIDO") || html.includes("TIENES UN NUEVO PEDIDO"),
   );
   console.log(
     " - Contiene 'Pendiente de verificación':",
-    text.includes("Pendiente de verificación"),
+    text.includes("Pendiente de verificación") || html.includes("Pendiente de verificación"),
   );
   console.log(" - Contiene 'VERIFICAR PEDIDO':", html.includes("VERIFICAR PEDIDO"));
-  console.log(" - Contiene correo del cliente:", text.includes("carlos.perez@example.com"));
+  console.log(
+    " - Contiene correo del cliente:",
+    text.includes("carlos.perez@example.com") && html.includes("carlos.perez@example.com"),
+  );
+  console.log(
+    " - Contiene producto 1 (Camiseta Deportiva Kickpoint):",
+    html.includes("Camiseta Deportiva Kickpoint"),
+  );
+  console.log(
+    " - Contiene producto 2 (Shorts Kickpoint Pro):",
+    html.includes("Shorts Kickpoint Pro"),
+  );
+  console.log(
+    " - Contiene talla y color en tabla:",
+    html.includes("Talla: <strong>M</strong>") && html.includes("Color: Negro"),
+  );
 
   // 3. Test sendEmailNotification function
   console.log("\n3. EJECUCIÓN DE sendEmailNotification():");

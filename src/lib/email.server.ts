@@ -74,6 +74,15 @@ export type EmailEventType =
   | "pedido_cancelado"
   | "test_message";
 
+export interface EmailOrderItem {
+  productName: string;
+  size?: string | null;
+  color?: string | null;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+}
+
 export interface EmailNotificationPayload {
   eventType: EmailEventType;
   recipientEmail: string;
@@ -88,6 +97,7 @@ export interface EmailNotificationPayload {
   paymentReference?: string | null;
   shippingCarrier?: string | null;
   trackingNumber?: string | null;
+  items?: EmailOrderItem[];
   customSubject?: string | null;
   customMessage?: string | null;
   metadata?: Record<string, any>;
@@ -139,24 +149,83 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
       : "$0.00";
   const paymentMethod = formatPaymentMethodLabel(payload.paymentMethod);
   const paymentRef = payload.paymentReference || "Pendiente de comprobante";
+  const now = new Date();
+  const formattedDate = now.toLocaleDateString("es-VE", {
+    timeZone: "America/Caracas",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   switch (payload.eventType) {
     case "order_created": {
-      const subject = payload.customSubject || `🚨 Nuevo pedido recibido — KICKPOINT`;
+      const subject =
+        payload.customSubject || `🚨 Nuevo pedido recibido — KICKPOINT (#${orderCode})`;
+
+      const itemsListText =
+        payload.items && payload.items.length > 0
+          ? payload.items
+              .map(
+                (item) =>
+                  `  - ${item.productName}${item.size ? ` (Talla: ${item.size})` : ""}${item.color ? ` (Color: ${item.color})` : ""} x${item.quantity} — $${item.unitPrice.toFixed(2)} c/u ($${item.subtotal.toFixed(2)})`,
+              )
+              .join("\n")
+          : "  (Detalles de productos en panel administrativo)";
+
+      const itemsHtmlRows =
+        payload.items && payload.items.length > 0
+          ? payload.items
+              .map(
+                (item) => `
+                <tr>
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #f8fafc; font-size: 13px;">
+                    <div style="font-weight: 700; color: #ffffff;">${item.productName}</div>
+                    <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">
+                      ${item.size ? `Talla: <strong>${item.size}</strong>` : ""}${item.size && item.color ? " | " : ""}${item.color ? `Color: ${item.color}` : ""}
+                    </div>
+                  </td>
+                  <td align="center" style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #94a3b8; font-size: 13px; font-weight: 600;">
+                    ${item.quantity}
+                  </td>
+                  <td align="right" style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #cbd5e1; font-size: 13px; font-family: monospace;">
+                    $${item.unitPrice.toFixed(2)}
+                  </td>
+                  <td align="right" style="padding: 12px 16px; border-bottom: 1px solid #1e293b; color: #38bdf8; font-size: 13px; font-weight: 700; font-family: monospace;">
+                    $${item.subtotal.toFixed(2)}
+                  </td>
+                </tr>
+              `,
+              )
+              .join("")
+          : `
+            <tr>
+              <td colspan="4" style="padding: 16px; text-align: center; color: #94a3b8; font-size: 13px;">
+                Ver detalle de ítems en el panel de pedidos
+              </td>
+            </tr>
+          `;
+
       const text =
         `KICKPOINT\n\n` +
-        `🚨 TIENES UN NUEVO PEDIDO\n\n` +
+        `🚨 TIENES UN NUEVO PEDIDO (#${orderCode})\n\n` +
         `Se ha recibido un nuevo pedido en KICKPOINT.\n\n` +
-        `Información del pedido\n\n` +
+        `Información del pedido:\n` +
+        `----------------------------------------\n` +
         `Pedido: #${orderCode}\n` +
+        `Fecha/Hora: ${formattedDate}\n` +
         `Cliente: ${customerName}\n` +
         `Teléfono: ${phone}\n` +
         `Correo: ${customerEmail}\n` +
-        `Total: ${totalStr}\n` +
         `Método de pago: ${paymentMethod}\n` +
-        `Referencia: ${paymentRef}\n` +
-        `Estado: Pendiente de verificación\n\n` +
-        `Verificar pedido:\n${adminUrl}\n\n` +
+        `Referencia de pago: ${paymentRef}\n` +
+        `Estado: Pendiente de verificación\n` +
+        `Total: ${totalStr}\n\n` +
+        `Productos comprados:\n` +
+        `${itemsListText}\n\n` +
+        `----------------------------------------\n` +
+        `VERIFICAR PEDIDO EN EL PANEL:\n${adminUrl}\n\n` +
         `KICKPOINT Store System`;
 
       const html = `
@@ -171,7 +240,7 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
   <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0b0f17; padding: 32px 16px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; background-color: #131b2e; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #131b2e; border: 1px solid #1e293b; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
           
           <!-- Header -->
           <tr>
@@ -203,9 +272,9 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
               </p>
 
               <!-- Order Details Card -->
-              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0b0f17; border: 1px solid #1e293b; border-radius: 10px; margin-bottom: 28px; overflow: hidden;">
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0b0f17; border: 1px solid #1e293b; border-radius: 10px; margin-bottom: 24px; overflow: hidden;">
                 <tr>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
                         <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Número de Pedido</td>
@@ -215,7 +284,17 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #1e293b;">
+                    <table width="100%">
+                      <tr>
+                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Fecha / Hora</td>
+                        <td align="right" style="font-size: 13px; color: #f8fafc; font-weight: 600;">${formattedDate}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
                         <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Cliente</td>
@@ -225,7 +304,7 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
                         <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Teléfono</td>
@@ -235,17 +314,17 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
-                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Correo</td>
+                        <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Correo del Cliente</td>
                         <td align="right" style="font-size: 14px; color: #f8fafc; font-weight: 600;">${customerEmail}</td>
                       </tr>
                     </table>
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
                         <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Método de Pago</td>
@@ -255,7 +334,7 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
                         <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Referencia de Pago</td>
@@ -265,7 +344,7 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 16px 20px; border-bottom: 1px solid #1e293b;">
+                  <td style="padding: 14px 20px; border-bottom: 1px solid #1e293b;">
                     <table width="100%">
                       <tr>
                         <td style="font-size: 12px; color: #64748b; font-weight: 700; text-transform: uppercase;">Estado</td>
@@ -279,15 +358,33 @@ export function buildEmailMessage(payload: EmailNotificationPayload): {
                   </td>
                 </tr>
                 <tr>
-                  <td style="padding: 18px 20px; background-color: rgba(56, 189, 248, 0.08);">
+                  <td style="padding: 16px 20px; background-color: rgba(56, 189, 248, 0.08);">
                     <table width="100%">
                       <tr>
-                        <td style="font-size: 14px; color: #ffffff; font-weight: 800; text-transform: uppercase;">Total</td>
+                        <td style="font-size: 14px; color: #ffffff; font-weight: 800; text-transform: uppercase;">Total del Pedido</td>
                         <td align="right" style="font-size: 20px; color: #38bdf8; font-weight: 900; font-family: monospace;">${totalStr}</td>
                       </tr>
                     </table>
                   </td>
                 </tr>
+              </table>
+
+              <!-- Purchased Products Table -->
+              <h2 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 800; color: #f8fafc; text-transform: uppercase; letter-spacing: 0.5px;">
+                📦 Productos Comprados
+              </h2>
+              <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #0b0f17; border: 1px solid #1e293b; border-radius: 10px; margin-bottom: 28px; overflow: hidden; border-collapse: collapse;">
+                <thead>
+                  <tr style="background-color: #0f172a;">
+                    <th align="left" style="padding: 10px 16px; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; border-bottom: 1px solid #1e293b;">Producto</th>
+                    <th align="center" style="padding: 10px 16px; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; border-bottom: 1px solid #1e293b;">Cant.</th>
+                    <th align="right" style="padding: 10px 16px; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; border-bottom: 1px solid #1e293b;">Precio</th>
+                    <th align="right" style="padding: 10px 16px; font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 700; border-bottom: 1px solid #1e293b;">Subtotal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsHtmlRows}
+                </tbody>
               </table>
 
               <!-- CTA Button -->
@@ -448,6 +545,10 @@ export async function sendEmailNotification(
     recipientEmail,
   });
 
+  console.log(
+    `[ORDER_EMAIL_04] EMAIL PAYLOAD CREATED - Recipient: ${recipientEmail}, Subject: ${subject}, IdempotencyKey: ${idempotencyKey}`,
+  );
+
   const isConfigured = isResendConfigured();
 
   // 1. Check idempotency in In-Memory / Supabase
@@ -456,6 +557,9 @@ export async function sendEmailNotification(
       (n) => n.idempotency_key === idempotencyKey && n.status === "sent",
     );
     if (existing) {
+      console.log(
+        `[ORDER_EMAIL_08] EMAIL NOTIFICATION FINISHED - Status: already_sent, ProviderMsgId: ${existing.provider_message_id || "N/A"}`,
+      );
       return {
         ok: true,
         status: "already_sent",
@@ -475,6 +579,9 @@ export async function sendEmailNotification(
         .maybeSingle();
 
       if (existing) {
+        console.log(
+          `[ORDER_EMAIL_08] EMAIL NOTIFICATION FINISHED - Status: already_sent, ProviderMsgId: ${existing.provider_message_id || "N/A"}`,
+        );
         return {
           ok: true,
           status: "already_sent",
@@ -538,6 +645,10 @@ export async function sendEmailNotification(
       `[Email Resend] Notification queued (${payload.eventType} -> ${recipientEmail}). Set RESEND_API_KEY to deliver real inbox emails.`,
     );
 
+    console.log(
+      `[ORDER_EMAIL_08] EMAIL NOTIFICATION FINISHED - Status: pending (RESEND_API_KEY unconfigured), ProviderMsgId: N/A`,
+    );
+
     return {
       ok: false,
       status: "pending",
@@ -551,6 +662,10 @@ export async function sendEmailNotification(
   let lastError: string | null = null;
   let providerMessageId: string | null = null;
   let isSuccess = false;
+
+  console.log(
+    `[ORDER_EMAIL_05] RESEND REQUEST START - Endpoint: ${getResendEndpoint()}, From: ${fromEmail}, To: ${recipientEmail}`,
+  );
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     attempts = attempt;
@@ -584,9 +699,14 @@ export async function sendEmailNotification(
 
       const resData = await response.json().catch(() => ({}));
 
+      console.log(
+        `[ORDER_EMAIL_06] RESEND RESPONSE RECEIVED - Status: ${response.status}, OK: ${response.ok}, Attempt: ${attempt}`,
+      );
+
       if (response.ok && (resData?.id || resData?.data?.id)) {
         isSuccess = true;
         providerMessageId = String(resData.id || resData?.data?.id);
+        console.log(`[ORDER_EMAIL_07] PROVIDER MESSAGE ID - ID: ${providerMessageId}`);
         break;
       } else {
         lastError =
@@ -595,9 +715,11 @@ export async function sendEmailNotification(
           (typeof resData?.error === "string" ? resData.error : null) ||
           resData?.name ||
           `HTTP ${response.status}: ${response.statusText || "Resend dispatch rejected"}`;
+        console.warn(`[ORDER_EMAIL_06] Resend attempt ${attempt} failed: ${lastError}`);
       }
     } catch (err: any) {
       lastError = err.message || "Network timeout connecting to Resend API";
+      console.warn(`[ORDER_EMAIL_06] Resend attempt ${attempt} exception: ${lastError}`);
     }
 
     if (attempt < 2) {
@@ -607,6 +729,10 @@ export async function sendEmailNotification(
 
   const status: "sent" | "failed" = isSuccess ? "sent" : "failed";
   const sentAt = isSuccess ? new Date().toISOString() : null;
+
+  console.log(
+    `[ORDER_EMAIL_08] EMAIL NOTIFICATION FINISHED - Status: ${status}, ProviderMsgId: ${providerMessageId || "N/A"}`,
+  );
 
   // 4. Log in In-Memory / Supabase
   const logRecord: InMemoryEmailNotification = {

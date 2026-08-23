@@ -134,6 +134,10 @@ export const createOrder = createServerFn({ method: "POST" })
     return data;
   })
   .handler(async ({ data }) => {
+    console.log(
+      `[ORDER_EMAIL_01] CREATE ORDER START - Customer: ${data.customer.firstName} ${data.customer.lastName || ""}, Total lines: ${data.lines.length}`,
+    );
+
     const totalOrderUnits = data.lines.reduce(
       (sum, l) => sum + Math.max(1, Math.floor(l.quantity)),
       0,
@@ -245,6 +249,10 @@ export const createOrder = createServerFn({ method: "POST" })
 
       addInMemoryOrder(newOrder);
 
+      console.log(
+        `[ORDER_EMAIL_02] ORDER CREATED - Order Number: ${newOrder.order_number}, Order ID: ${newOrder.id}, Total: $${newOrder.total}`,
+      );
+
       // Trigger asynchronous WhatsApp notification to Admin (non-blocking)
       try {
         const { sendWhatsAppNotification, getAdminWhatsAppNumber } =
@@ -264,7 +272,8 @@ export const createOrder = createServerFn({ method: "POST" })
         console.warn("[Checkout] Failed to trigger WhatsApp admin notification:", notifErr);
       }
 
-      // Trigger Email notification to Admin (non-blocking for checkout error handling)
+      // Trigger Email notification to Admin (await to ensure completion before returning)
+      console.log(`[ORDER_EMAIL_03] EMAIL NOTIFICATION START - Order: ${newOrder.order_number}`);
       try {
         const { sendEmailNotification, getAdminEmail } = await import("./email.server");
         await sendEmailNotification({
@@ -280,6 +289,14 @@ export const createOrder = createServerFn({ method: "POST" })
           total: newOrder.total,
           paymentMethod: data.paymentMethod,
           paymentReference: data.paymentProof?.reference?.trim() || null,
+          items: newOrder.items.map((i) => ({
+            productName: i.product_name,
+            size: i.size || null,
+            color: i.color || null,
+            quantity: i.quantity,
+            unitPrice: i.unit_price,
+            subtotal: i.subtotal,
+          })),
           metadata: {
             idempotencyKey: `new-order-admin-${newOrder.id || newOrder.order_number}`,
           },
@@ -287,6 +304,10 @@ export const createOrder = createServerFn({ method: "POST" })
       } catch (emailErr) {
         console.warn("[Checkout] Failed to trigger Email admin notification:", emailErr);
       }
+
+      console.log(
+        `[ORDER_EMAIL_09] CREATE ORDER FINISHED - Order Number: ${newOrder.order_number}`,
+      );
 
       return { orderNumber: newOrder.order_number, total: newOrder.total };
     }
@@ -457,6 +478,10 @@ export const createOrder = createServerFn({ method: "POST" })
     });
     if (paymentError) throw new Error(paymentError.message);
 
+    console.log(
+      `[ORDER_EMAIL_02] ORDER CREATED - Order Number: ${order.order_number}, Order ID: ${order.id}, Total: $${Number(order.total).toFixed(2)}`,
+    );
+
     // Trigger asynchronous WhatsApp notification to Admin (non-blocking)
     try {
       const { sendWhatsAppNotification, getAdminWhatsAppNumber } =
@@ -478,7 +503,8 @@ export const createOrder = createServerFn({ method: "POST" })
       console.warn("[Checkout] Failed to trigger WhatsApp admin notification:", notifErr);
     }
 
-    // Trigger Email notification to Admin (non-blocking for checkout error handling)
+    // Trigger Email notification to Admin (await to ensure delivery completion before returning)
+    console.log(`[ORDER_EMAIL_03] EMAIL NOTIFICATION START - Order: ${order.order_number}`);
     try {
       const { sendEmailNotification, getAdminEmail } = await import("./email.server");
       await sendEmailNotification({
@@ -494,6 +520,14 @@ export const createOrder = createServerFn({ method: "POST" })
         total: Number(order.total),
         paymentMethod: data.paymentMethod,
         paymentReference: data.paymentProof?.reference?.trim() || null,
+        items: orderItems.map((i) => ({
+          productName: i.product_name,
+          size: i.size || null,
+          color: i.color || null,
+          quantity: i.quantity,
+          unitPrice: i.unit_price,
+          subtotal: i.subtotal,
+        })),
         metadata: {
           idempotencyKey: `new-order-admin-${order.id || order.order_number}`,
         },
@@ -501,6 +535,8 @@ export const createOrder = createServerFn({ method: "POST" })
     } catch (emailErr) {
       console.warn("[Checkout] Failed to trigger Email admin notification:", emailErr);
     }
+
+    console.log(`[ORDER_EMAIL_09] CREATE ORDER FINISHED - Order Number: ${order.order_number}`);
 
     return { orderNumber: order.order_number, total: Number(order.total) };
   });
