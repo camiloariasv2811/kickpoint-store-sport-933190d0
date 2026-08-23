@@ -61,7 +61,7 @@ export function getPublicStoreUrl(): string {
     process.env["SITE_URL"] ||
     process.env["PUBLIC_APP_URL"] ||
     process.env["VITE_APP_URL"] ||
-    "https://kickpoint-store-sport-933190d0.lovable.app";
+    "https://kickpoint-store-sport.lovable.app";
   return url.replace(/\/+$/, "");
 }
 
