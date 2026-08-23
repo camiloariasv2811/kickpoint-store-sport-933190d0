@@ -75,23 +75,30 @@ function AdminPedidos() {
     },
   });
 
+  const counts = {
+    todos: orders.length,
+    mayoristas: orders.filter((o) => o.is_wholesale).length,
+    pago_pendiente: orders.filter((o) => o.status === "pago_pendiente").length,
+    pago_verificado: orders.filter((o) => o.status === "pago_verificado").length,
+    preparando_pedido: orders.filter((o) => o.status === "preparando_pedido").length,
+    pedido_enviado: orders.filter((o) => o.status === "pedido_enviado").length,
+  };
+
   const filteredOrders = orders.filter((o) => {
     const matchesSearch =
       o.order_number.toLowerCase().includes(q.toLowerCase()) ||
       (o.customer?.first_name && o.customer.first_name.toLowerCase().includes(q.toLowerCase())) ||
       (o.customer?.whatsapp && o.customer.whatsapp.includes(q));
 
-    const matchesStatus = statusFilter === "todos" || o.status === statusFilter;
+    let matchesStatus = true;
+    if (statusFilter === "mayoristas") {
+      matchesStatus = Boolean(o.is_wholesale);
+    } else if (statusFilter !== "todos") {
+      matchesStatus = o.status === statusFilter;
+    }
+
     return matchesSearch && matchesStatus;
   });
-
-  const counts = {
-    todos: orders.length,
-    pago_pendiente: orders.filter((o) => o.status === "pago_pendiente").length,
-    pago_verificado: orders.filter((o) => o.status === "pago_verificado").length,
-    preparando_pedido: orders.filter((o) => o.status === "preparando_pedido").length,
-    pedido_enviado: orders.filter((o) => o.status === "pedido_enviado").length,
-  };
 
   async function handleStatusChange(orderId: string, newStatus: string) {
     setChangingStatus(true);
@@ -184,6 +191,17 @@ function AdminPedidos() {
           }`}
         >
           Todos ({counts.todos})
+        </button>
+        <button
+          type="button"
+          onClick={() => setStatusFilter("mayoristas")}
+          className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+            statusFilter === "mayoristas"
+              ? "bg-amber-600 text-white"
+              : "bg-amber-500/15 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25"
+          }`}
+        >
+          ★ Mayoristas ({counts.mayoristas})
         </button>
         <button
           type="button"
@@ -365,9 +383,16 @@ function AdminPedidos() {
             <>
               <DialogHeader>
                 <div className="flex items-center justify-between">
-                  <DialogTitle className="font-mono text-xl">
-                    Pedido {selectedOrder.order_number}
-                  </DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <DialogTitle className="font-mono text-xl">
+                      Pedido {selectedOrder.order_number}
+                    </DialogTitle>
+                    {selectedOrder.is_wholesale && (
+                      <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-700 dark:text-amber-300">
+                        MAYORISTA (8+ uds)
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs text-muted-foreground">
                     {new Date(selectedOrder.created_at).toLocaleString("es-VE")}
                   </span>

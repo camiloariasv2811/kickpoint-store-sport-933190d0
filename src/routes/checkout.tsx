@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
+  AlertCircle,
   ArrowRight,
   Check,
   CheckCircle2,
@@ -9,6 +10,7 @@ import {
   Loader2,
   Package,
   ShoppingBag,
+  Tag,
   Truck,
   Upload,
   X,
@@ -21,10 +23,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createOrder, listPaymentMethods } from "@/lib/checkout.functions";
 import { getPublicStoreSettings } from "@/lib/settings.functions";
-import { unitPrice, useCart } from "@/lib/cart";
-import { moneyExact } from "@/lib/format";
+import { useCart, WHOLESALE_MIN_ORDER_UNITS } from "@/lib/cart";
+import { money, moneyExact } from "@/lib/format";
 
 export const Route = createFileRoute("/checkout")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tipo: typeof search.tipo === "string" ? search.tipo : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Finalizar compra | KICKPOINT" },
@@ -62,7 +67,30 @@ const FIELDS: readonly {
 
 function CheckoutPage() {
   const navigate = useNavigate();
-  const { lines, count, subtotal, savings, getLineUnitPrice, clear } = useCart();
+  const search = Route.useSearch();
+  const {
+    lines,
+    count,
+    subtotal,
+    savings,
+    getLineUnitPrice,
+    clear,
+    wholesaleLines,
+    wholesaleCount,
+    wholesaleSubtotal,
+    wholesaleSavings,
+    isWholesaleValid,
+    wholesaleUnitsNeeded,
+    clearWholesale,
+  } = useCart();
+
+  const isWholesaleCheckout =
+    search.tipo === "mayorista" || (wholesaleLines.length > 0 && lines.length === 0);
+
+  const activeLines = isWholesaleCheckout ? wholesaleLines : lines;
+  const activeCount = isWholesaleCheckout ? wholesaleCount : count;
+  const activeSubtotal = isWholesaleCheckout ? wholesaleSubtotal : subtotal;
+  const activeSavings = isWholesaleCheckout ? wholesaleSavings : savings;
 
   const { data: methods = [] } = useQuery({
     queryKey: ["payment-methods"],
@@ -115,13 +143,14 @@ function CheckoutPage() {
     orderNumber: string;
     total: number;
     shippingMethod: string;
+    isWholesale?: boolean;
   } | null>(null);
 
   const selected = method || methods?.[0]?.code || "";
   const activeMethod = methods?.find((m) => m.code === selected);
 
   const usdtRate = Number(storeSettings?.exchange_rate_usdt || 86.2);
-  const totalBs = subtotal * usdtRate;
+  const totalBs = activeSubtotal * usdtRate;
 
   function handleFileSelect(selectedFile: File | null) {
     if (!selectedFile) {
@@ -157,6 +186,13 @@ function CheckoutPage() {
   }
 
   async function submit() {
+    if (isWholesaleCheckout && !isWholesaleValid) {
+      toast.error(
+        `El pedido mayorista requiere mínimo ${WHOLESALE_MIN_ORDER_UNITS} unidades (actualmente tienes ${wholesaleCount}).`,
+      );
+      return;
+    }
+
     if (!shippingMethod) {
       toast.error("Por favor selecciona una empresa de envío (TEALCA o MRW)");
       return;
@@ -208,7 +244,8 @@ function CheckoutPage() {
           paymentMethod: selected,
           rateType: "USDT",
           exchangeRateUsed: usdtRate,
-          lines: lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
+          isOrderWholesale: isWholesaleCheckout,
+          lines: activeLines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
           paymentProof: {
             reference: reference.trim(),
             fileName: proofFile.name,
@@ -218,14 +255,20 @@ function CheckoutPage() {
         },
       });
 
-      clear();
+      if (isWholesaleCheckout) {
+        clearWholesale();
+      } else {
+        clear();
+      }
+
       setSuccessOrder({
         orderNumber: result.orderNumber,
-        total: Number(result.total || subtotal),
+        total: Number(result.total || activeSubtotal),
         shippingMethod,
+        isWholesale: isWholesaleCheckout,
       });
       toast.success("¡Pedido y comprobante registrados con éxito!", {
-        description: `Orden ${result.orderNumber}`,
+        description: `Orden ${result.orderNumber}${isWholesaleCheckout ? " (Mayorista)" : ""}`,
       });
     } catch (error) {
       console.error("Error al crear el pedido:", error);
@@ -264,8 +307,14 @@ function CheckoutPage() {
                 ¡Pedido Realizado Exitosamente!
               </h1>
 
+              {successOrder.isWholesale && (
+                <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-500/20 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300">
+                  <Tag className="size-3.5" /> Pedido Registrado con Tarifa Mayorista
+                </div>
+              )}
+
               <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-                Tu orden ha sido registrada en nuestro sistema.
+                Tu orden ha sido registrada en nuestro sistema y está lista para ser procesada.
               </p>
             </div>
 
@@ -345,7 +394,9 @@ function CheckoutPage() {
               </Button>
 
               <Button asChild variant="outline" size="lg" className="w-full sm:w-auto">
-                <Link to="/catalogo">Volver al catálogo</Link>
+                <Link to={successOrder.isWholesale ? "/mayor" : "/catalogo"}>
+                  {successOrder.isWholesale ? "Volver al catálogo mayorista" : "Volver al catálogo"}
+                </Link>
               </Button>
             </div>
 
@@ -359,16 +410,62 @@ function CheckoutPage() {
     );
   }
 
-  if (lines.length === 0) {
+  if (activeLines.length === 0) {
     return (
       <SiteLayout>
         <div className="mx-auto max-w-3xl px-4 py-16">
           <div className="surface-card flex flex-col items-center gap-4 p-14 text-center">
             <ShoppingBag className="size-12 text-muted-foreground" />
-            <h1 className="text-display text-2xl">No hay productos por pagar</h1>
+            <h1 className="text-display text-2xl">
+              {isWholesaleCheckout
+                ? "No hay productos en el carrito mayorista"
+                : "No hay productos por pagar"}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {isWholesaleCheckout
+                ? "Selecciona al menos 8 unidades en el catálogo mayorista para continuar."
+                : "Explora nuestro catálogo y agrega productos a tu pedido."}
+            </p>
             <Button asChild variant="hero" size="lg">
-              <Link to="/catalogo">Ver catálogo</Link>
+              <Link to={isWholesaleCheckout ? "/mayor" : "/catalogo"}>
+                {isWholesaleCheckout ? "Ver Catálogo Mayorista" : "Ver Catálogo"}
+              </Link>
             </Button>
+          </div>
+        </div>
+      </SiteLayout>
+    );
+  }
+
+  if (isWholesaleCheckout && !isWholesaleValid) {
+    return (
+      <SiteLayout>
+        <div className="mx-auto max-w-3xl px-4 py-16">
+          <div className="surface-card flex flex-col items-center gap-4 p-10 text-center border-amber-500/30 bg-amber-500/5">
+            <AlertCircle className="size-12 text-amber-500" />
+            <h1 className="text-display text-2xl font-bold text-foreground">
+              Mínimo de Compra Mayorista No Alcanzado
+            </h1>
+            <p className="text-sm text-muted-foreground max-w-md">
+              Actualmente tienes{" "}
+              <strong className="text-foreground">{wholesaleCount} unidades</strong> en tu carrito.
+              La compra al mayor requiere un mínimo de{" "}
+              <strong className="text-primary">
+                {WHOLESALE_MIN_ORDER_UNITS} unidades acumuladas
+              </strong>{" "}
+              (puedes combinar libremente productos, tallas y modelos).
+            </p>
+            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+              Te faltan {wholesaleUnitsNeeded} unidades para desbloquear el checkout mayorista.
+            </p>
+            <div className="flex gap-3 mt-2">
+              <Button asChild variant="hero" size="lg">
+                <Link to="/mayor">Completar Pedido en Catálogo Mayorista</Link>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <Link to="/carrito">Ver Carrito</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </SiteLayout>
@@ -382,7 +479,8 @@ function CheckoutPage() {
     form.address.trim() &&
     Boolean(shippingMethod) &&
     Boolean(selected) &&
-    Boolean(proofFile);
+    Boolean(proofFile) &&
+    (!isWholesaleCheckout || isWholesaleValid);
 
   return (
     <SiteLayout>
@@ -672,32 +770,48 @@ function CheckoutPage() {
 
           {/* Resumen Lateral */}
           <aside className="surface-card h-fit p-5 lg:sticky lg:top-24">
-            <h2 className="text-display text-lg">Resumen del Pedido</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-display text-lg">Resumen del Pedido</h2>
+              {isWholesaleCheckout && (
+                <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 dark:text-amber-300">
+                  MAYORISTA ({activeCount} uds.)
+                </span>
+              )}
+            </div>
+
             <ul className="mt-4 space-y-3 text-sm">
-              {lines.map((l) => (
-                <li key={l.variantId} className="flex justify-between gap-3">
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium">{l.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      Talla {l.size} × {l.quantity}
+              {activeLines.map((l) => {
+                const linePrice = isWholesaleCheckout
+                  ? l.wholesalePrice || l.retailPrice
+                  : getLineUnitPrice(l as any);
+
+                return (
+                  <li key={l.variantId} className="flex justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{l.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Talla {l.size} × {l.quantity}
+                        {isWholesaleCheckout && " · mayor"}
+                      </span>
                     </span>
-                  </span>
-                  <span className="font-semibold">
-                    {moneyExact(getLineUnitPrice(l) * l.quantity)}
-                  </span>
-                </li>
-              ))}
+                    <span className="font-semibold">{moneyExact(linePrice * l.quantity)}</span>
+                  </li>
+                );
+              })}
             </ul>
-            {savings > 0 && (
+
+            {activeSavings > 0 && (
               <p className="mt-4 text-sm font-semibold text-primary">
-                Ahorro al mayor ({count} uds.): -{moneyExact(savings)}
+                Ahorro al mayor ({activeCount} uds.): -{moneyExact(activeSavings)}
               </p>
             )}
 
             {/* Total USD */}
             <div className="mt-4 flex items-baseline justify-between border-t border-border pt-4">
               <span className="text-sm text-muted-foreground">Total USD</span>
-              <span className="text-display text-2xl text-primary">{moneyExact(subtotal)}</span>
+              <span className="text-display text-2xl text-primary">
+                {moneyExact(activeSubtotal)}
+              </span>
             </div>
 
             {/* Conversión a Bolívares usando exclusivamente la Tasa USDT */}

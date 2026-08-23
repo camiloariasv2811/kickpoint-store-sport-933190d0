@@ -16,8 +16,9 @@ const NAV = [
 ] as const;
 
 export function Header() {
-  const { count } = useCart();
+  const { count, wholesaleCount } = useCart();
   const [open, setOpen] = useState(false);
+  const totalCartUnits = count + wholesaleCount;
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur-xl">
@@ -104,9 +105,9 @@ export function Header() {
           <CartSheet>
             <Button variant="ghost" size="icon" className="relative" aria-label="Carrito">
               <ShoppingCart className="size-5" />
-              {count > 0 && (
+              {totalCartUnits > 0 && (
                 <span className="absolute -right-0.5 -top-0.5 flex size-5 items-center justify-center rounded-full bg-primary text-[0.65rem] font-bold text-primary-foreground">
-                  {count}
+                  {totalCartUnits}
                 </span>
               )}
             </Button>

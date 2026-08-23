@@ -100,6 +100,7 @@ export type CheckoutInput = {
   paymentMethod: string;
   rateType?: "BCV" | "USDT";
   exchangeRateUsed?: number;
+  isWholesale?: boolean;
   lines: { variantId: string; quantity: number }[];
   paymentProof?: {
     reference?: string;
@@ -120,6 +121,18 @@ export const createOrder = createServerFn({ method: "POST" })
     if (!Array.isArray(data.lines) || data.lines.length === 0) throw new Error("Carrito vacío");
     if (data.lines.length > 60) throw new Error("Demasiados productos");
     if (!data.paymentMethod) throw new Error("Selecciona un método de pago");
+
+    // Strict wholesale validation
+    const totalOrderUnits = data.lines.reduce(
+      (sum, l) => sum + Math.max(1, Math.floor(l.quantity)),
+      0,
+    );
+    if (data.isWholesale && totalOrderUnits < 8) {
+      throw new Error(
+        `La compra mayorista requiere un mínimo de 8 unidades acumuladas en el carrito (actualmente tienes ${totalOrderUnits} unidades). Agrega más productos para continuar.`,
+      );
+    }
+
     if (data.paymentProof) {
       if (!data.paymentProof.dataBase64) throw new Error("Falta el comprobante de pago");
       if (data.paymentProof.dataBase64.length > 8_000_000) {
@@ -137,13 +150,21 @@ export const createOrder = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     invalidateServerCatalogCache();
     console.log(
-      `[ORDER_EMAIL_01] CREATE ORDER START - Customer: ${data.customer.firstName} ${data.customer.lastName || ""}, Total lines: ${data.lines.length}`,
+      `[ORDER_EMAIL_01] CREATE ORDER START - Customer: ${data.customer.firstName} ${data.customer.lastName || ""}, Total lines: ${data.lines.length}, isWholesale: ${Boolean(data.isWholesale)}`,
     );
 
     const totalOrderUnits = data.lines.reduce(
       (sum, l) => sum + Math.max(1, Math.floor(l.quantity)),
       0,
     );
+
+    const isOrderWholesale = Boolean(data.isWholesale && totalOrderUnits >= 8);
+
+    if (data.isWholesale && totalOrderUnits < 8) {
+      throw new Error(
+        `La compra mayorista requiere un mínimo de 8 unidades acumuladas en el carrito (actualmente tienes ${totalOrderUnits} unidades).`,
+      );
+    }
 
     const usdtRate = Number(data.exchangeRateUsed || 86.2);
 
@@ -170,14 +191,16 @@ export const createOrder = createServerFn({ method: "POST" })
         const quantity = Math.max(1, Math.floor(line.quantity));
         if (quantity > (foundVariant.stock ?? 0)) {
           throw new Error(
-            `Stock insuficiente para ${foundProduct.name} talla ${foundVariant.size}`,
+            `Stock insuficiente para ${foundProduct.name} talla ${foundVariant.size} (Stock disponible: ${foundVariant.stock})`,
           );
         }
 
-        const wholesale = foundProduct.wholesale_price;
-        const minQty = foundProduct.wholesale_min_qty || 6;
-        const isItemWholesale = Boolean(wholesale && totalOrderUnits >= minQty);
-        const unit = isItemWholesale ? Number(wholesale) : Number(foundProduct.retail_price);
+        // Authoritative server-side price lookup
+        const wholesalePrice = foundProduct.wholesale_price;
+        const unit =
+          isOrderWholesale && wholesalePrice
+            ? Number(wholesalePrice)
+            : Number(foundProduct.retail_price);
 
         return {
           id: `item-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -191,7 +214,7 @@ export const createOrder = createServerFn({ method: "POST" })
           unit_cost: Number(foundProduct.retail_price ? foundProduct.retail_price * 0.6 : 14),
           quantity,
           subtotal: Number((unit * quantity).toFixed(2)),
-          isWholesale: isItemWholesale,
+          isWholesale: isOrderWholesale,
         };
       });
 
@@ -199,6 +222,7 @@ export const createOrder = createServerFn({ method: "POST" })
       const totalBs = Number((subtotal * usdtRate).toFixed(2));
 
       const formattedNotes = [
+        isOrderWholesale ? `[VENTA MAYORISTA - ${totalOrderUnits} Unidades]` : null,
         `[Envío: ${data.shippingMethod}]`,
         `[Cotización: Tasa USDT a Bs. ${usdtRate.toFixed(2)} / USD | Total Bs. ${totalBs.toLocaleString("es-VE", { minimumFractionDigits: 2 })}]`,
         data.customer.notes?.trim() ? `Nota cliente: ${data.customer.notes.trim()}` : "",
@@ -220,7 +244,7 @@ export const createOrder = createServerFn({ method: "POST" })
         payment_method_code: data.paymentMethod,
         subtotal,
         total: subtotal,
-        is_wholesale: items.some((i) => i.isWholesale),
+        is_wholesale: isOrderWholesale,
         inventory_applied: false,
         notes: formattedNotes,
         created_at: new Date().toISOString(),
@@ -350,12 +374,15 @@ export const createOrder = createServerFn({ method: "POST" })
 
       const quantity = Math.max(1, Math.floor(line.quantity));
       if (quantity > variant.stock)
-        throw new Error(`Stock insuficiente para ${variant.product.name} talla ${variant.size}`);
+        throw new Error(
+          `Stock insuficiente para ${variant.product.name} talla ${variant.size} (Stock disponible: ${variant.stock})`,
+        );
 
-      const wholesale = variant.product.wholesale_price;
-      const minQty = variant.product.wholesale_min_qty || 6;
-      const isItemWholesale = Boolean(wholesale && totalOrderUnits >= minQty);
-      const unit = isItemWholesale ? Number(wholesale) : Number(variant.product.retail_price);
+      const wholesalePrice = variant.product.wholesale_price;
+      const unit =
+        isOrderWholesale && wholesalePrice
+          ? Number(wholesalePrice)
+          : Number(variant.product.retail_price);
 
       return {
         variant_id: variant.id,
@@ -368,7 +395,7 @@ export const createOrder = createServerFn({ method: "POST" })
         unit_cost: Number(variant.product.cost ?? 0),
         quantity,
         subtotal: Number((unit * quantity).toFixed(2)),
-        isWholesale: isItemWholesale,
+        isWholesale: isOrderWholesale,
       };
     });
 
@@ -396,6 +423,7 @@ export const createOrder = createServerFn({ method: "POST" })
     const totalBs = Number((subtotal * effectiveUsdtRate).toFixed(2));
 
     const formattedNotes = [
+      isOrderWholesale ? `[VENTA MAYORISTA - ${totalOrderUnits} Unidades]` : null,
       `[Envío: ${data.shippingMethod}]`,
       `[Cotización: Tasa USDT a Bs. ${effectiveUsdtRate.toFixed(2)} / USD | Total Bs. ${totalBs.toLocaleString("es-VE", { minimumFractionDigits: 2 })}]`,
       data.customer.notes?.trim() ? `Nota cliente: ${data.customer.notes.trim()}` : "",
@@ -431,7 +459,7 @@ export const createOrder = createServerFn({ method: "POST" })
         payment_method_code: data.paymentMethod,
         subtotal,
         total: subtotal,
-        is_wholesale: items.some((i) => i.isWholesale),
+        is_wholesale: isOrderWholesale,
         notes: formattedNotes.slice(0, 500),
       })
       .select("id, order_number, total")

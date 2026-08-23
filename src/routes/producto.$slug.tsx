@@ -157,7 +157,7 @@ function ProductPageContainer() {
 }
 
 function ProductDetailView({ product, navStart }: { product: Product; navStart: number }) {
-  const { addLine } = useCart();
+  const { addLine, addWholesaleLine, wholesaleCount } = useCart();
   const hasLogged = useRef(false);
 
   useEffect(() => {
@@ -187,9 +187,8 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
   const [imageIndex, setImageIndex] = useState(0);
 
   const variant = (product.variants ?? []).find((v) => v.id === variantId) ?? null;
-  const wholesaleActive =
-    Boolean(product.wholesale_price) && qty >= (product.wholesale_min_qty ?? 8);
-  const unit = wholesaleActive ? Number(product.wholesale_price) : Number(product.retail_price);
+  const retailPrice = Number(product.retail_price || 0);
+  const wholesalePrice = product.wholesale_price ? Number(product.wholesale_price) : retailPrice;
   const stock = totalStock(product);
 
   function handleAdd() {
@@ -205,15 +204,47 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
       image: product.images?.[0] ?? null,
       size: variant.size,
       color: variant.color,
-      retailPrice: Number(product.retail_price),
+      retailPrice,
       wholesalePrice: product.wholesale_price ? Number(product.wholesale_price) : null,
-      wholesaleMinQty: product.wholesale_min_qty,
+      wholesaleMinQty: product.wholesale_min_qty || WHOLESALE_MIN_ORDER_UNITS,
       stock: variant.stock,
       quantity: Math.min(qty, variant.stock),
     });
-    toast.success("Agregado al carrito", {
+    toast.success("Agregado al carrito minorista", {
       description: `${product.name} · Talla ${variant.size} × ${qty}`,
     });
+  }
+
+  function handleAddWholesale() {
+    if (!variant) {
+      toast.error("Selecciona una talla");
+      return;
+    }
+    addWholesaleLine({
+      variantId: variant.id,
+      productId: product.id,
+      slug: product.slug,
+      name: product.name,
+      image: product.images?.[0] ?? null,
+      size: variant.size,
+      color: variant.color,
+      retailPrice,
+      wholesalePrice,
+      wholesaleMinQty: product.wholesale_min_qty || WHOLESALE_MIN_ORDER_UNITS,
+      stock: variant.stock,
+      quantity: Math.min(qty, variant.stock),
+    });
+
+    const newTotal = wholesaleCount + Math.min(qty, variant.stock);
+    if (newTotal >= WHOLESALE_MIN_ORDER_UNITS) {
+      toast.success("¡Agregado al pedido mayorista!", {
+        description: `Total mayorista acumulado: ${newTotal}/${WHOLESALE_MIN_ORDER_UNITS} unidades (Precio mayorista activado).`,
+      });
+    } else {
+      toast.info("Agregado al pedido mayorista", {
+        description: `Llevas ${newTotal}/${WHOLESALE_MIN_ORDER_UNITS} unidades acumuladas (te faltan ${WHOLESALE_MIN_ORDER_UNITS - newTotal} para activar precio mayor).`,
+      });
+    }
   }
 
   return (
@@ -283,20 +314,30 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
           </div>
 
           <div>
-            <p className="text-eyebrow text-primary">{product.brand?.name ?? "KICKPOINT"}</p>
-            <h1 className="text-display mt-1 text-3xl sm:text-4xl">{product.name}</h1>
-
-            <div className="mt-4 flex items-end gap-3">
-              <span className="text-3xl font-bold text-primary">{money(unit)}</span>
-              {wholesaleActive && (
-                <span className="text-sm text-muted-foreground line-through">
-                  {money(product.retail_price)}
+            <div className="flex items-center justify-between">
+              <p className="text-eyebrow text-primary">{product.brand?.name ?? "KICKPOINT"}</p>
+              {product.base_sku && (
+                <span className="font-mono text-xs text-muted-foreground">
+                  SKU: {product.base_sku}
                 </span>
               )}
             </div>
-            <p className="mt-1 flex items-center gap-1.5 text-sm">
+            <h1 className="text-display mt-1 text-3xl sm:text-4xl">{product.name}</h1>
+
+            <div className="mt-4 flex flex-wrap items-baseline gap-3">
+              <span className="text-3xl font-bold text-primary">{money(retailPrice)}</span>
+              {product.wholesale_price && (
+                <div className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  <Tag className="size-3.5" /> Precio Mayorista: {moneyExact(wholesalePrice)}
+                  <span className="font-normal text-[11px] text-muted-foreground">
+                    (desde {product.wholesale_min_qty || WHOLESALE_MIN_ORDER_UNITS} uds. acumuladas)
+                  </span>
+                </div>
+              )}
+            </div>
+            <p className="mt-2 flex items-center gap-1.5 text-sm">
               <span
-                className={`size-2 rounded-full ${stock > 0 ? "bg-primary" : "bg-destructive"}`}
+                className={`size-2 rounded-full ${stock > 0 ? "bg-emerald-500" : "bg-destructive"}`}
                 aria-hidden
               />
               <span className="text-muted-foreground">
@@ -391,35 +432,40 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Total: <span className="font-bold text-primary">{moneyExact(unit * qty)}</span>
+                  Total normal:{" "}
+                  <span className="font-bold text-foreground">{moneyExact(retailPrice * qty)}</span>
+                  {product.wholesale_price && (
+                    <span className="ml-2 font-bold text-amber-600 dark:text-amber-400">
+                      (Mayor: {moneyExact(wholesalePrice * qty)})
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
 
+            {/* Wholesale Information Box */}
             {product.wholesale_price && (
-              <div className="surface-card mt-6 overflow-hidden">
-                <p className="text-eyebrow border-b border-border bg-accent px-4 py-2.5 text-[0.65rem]">
-                  Precios por cantidad
-                </p>
-                <div className="divide-y divide-border">
-                  <div className="flex items-center justify-between px-4 py-2.5 text-sm">
-                    <span className="text-muted-foreground">
-                      1 - {(product.wholesale_min_qty ?? 8) - 1} unidades
-                    </span>
-                    <span className="font-bold">{money(product.retail_price)} c/u</span>
-                  </div>
-                  <div
-                    className={`flex items-center justify-between px-4 py-2.5 text-sm ${
-                      wholesaleActive ? "bg-accent" : ""
-                    }`}
+              <div className="surface-card mt-6 overflow-hidden border border-amber-500/30 bg-amber-500/5">
+                <div className="flex items-center justify-between border-b border-amber-500/20 px-4 py-2.5">
+                  <span className="text-xs font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
+                    <Tag className="size-3.5" /> Compra al Mayor Disponible
+                  </span>
+                  <Link
+                    to="/mayor"
+                    className="text-[11px] font-semibold text-primary hover:underline"
                   >
-                    <span className="text-muted-foreground">
-                      {product.wholesale_min_qty ?? 8}+ unidades (mayor)
-                    </span>
-                    <span className="font-bold text-primary">
-                      {money(product.wholesale_price)} c/u
-                    </span>
-                  </div>
+                    Ver catálogo mayorista →
+                  </Link>
+                </div>
+                <div className="p-3 text-xs text-muted-foreground space-y-1">
+                  <p>
+                    • Precio unitario al mayor:{" "}
+                    <strong className="text-foreground">{moneyExact(wholesalePrice)}</strong>
+                  </p>
+                  <p>
+                    • Regla: Mínimo <strong>8 unidades acumuladas</strong> en tu pedido mayorista
+                    (puedes mezclar modelos y tallas).
+                  </p>
                 </div>
               </div>
             )}
@@ -432,8 +478,21 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
                 disabled={!variant || variant.stock <= 0}
                 onClick={handleAdd}
               >
-                <ShoppingCart className="size-5" /> Agregar al carrito
+                <ShoppingCart className="size-5" /> Agregar al Carrito
               </Button>
+
+              {product.wholesale_price && (
+                <Button
+                  variant="outlineGlow"
+                  size="xl"
+                  disabled={!variant || variant.stock <= 0}
+                  onClick={handleAddWholesale}
+                  className="border-amber-500/50 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold"
+                >
+                  <Tag className="size-5" /> Agregar al Pedido Mayor
+                </Button>
+              )}
+
               <Button asChild variant="dark" size="xl">
                 <a
                   href={whatsappLink(`Hola KICKPOINT, quiero información de: ${product.name}`)}
