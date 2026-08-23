@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Trash2,
   XCircle,
+  Mail,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -47,6 +48,7 @@ import {
 import { ORDER_STATUS_LABELS, ORDER_STATUSES } from "@/lib/types";
 import { moneyExact, whatsappLink } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
+import { resendOrderEmailNotification } from "@/lib/email.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/pedidos")({
   component: AdminPedidos,
@@ -60,6 +62,7 @@ function AdminPedidos() {
   const [changingStatus, setChangingStatus] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [loadingProof, setLoadingProof] = useState(false);
 
@@ -183,6 +186,28 @@ function AdminPedidos() {
       toast.error(`Error: ${err.message}`);
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function handleResendEmail(order: AdminOrder) {
+    setResendingEmail(true);
+    try {
+      const res = await resendOrderEmailNotification({
+        data: { orderId: order.id, orderNumber: order.order_number },
+      });
+      if (res.ok) {
+        toast.success(`Notificación enviada a administración`, {
+          description: `ID de entrega: ${res.providerMessageId || "OK"}`,
+        });
+      } else {
+        toast.error(`No se pudo enviar el correo`, {
+          description: res.errorMessage || "Verifique la clave de Resend en configuración",
+        });
+      }
+    } catch (err: any) {
+      toast.error(`Error al reenviar correo: ${err.message}`);
+    } finally {
+      setResendingEmail(false);
     }
   }
 
@@ -600,25 +625,39 @@ function AdminPedidos() {
                 </div>
               )}
 
-              {/* Botones de Acción Crítica: Cancelar / Eliminar Orden */}
+              {/* Botones de Acción Crítica: Cancelar / Eliminar Orden / Reenviar Email */}
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
-                {selectedOrder.status !== "cancelado" ? (
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="border-amber-500/30 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400 gap-1 text-xs"
-                    onClick={() => handleCancelOrder(selectedOrder)}
-                    disabled={canceling || deleting}
+                    className="gap-1 text-xs"
+                    onClick={() => handleResendEmail(selectedOrder)}
+                    disabled={resendingEmail}
                   >
-                    <XCircle className="size-4" />
-                    {canceling ? "Cancelando..." : "Cancelar Pedido (Reintegrar Stock)"}
+                    {resendingEmail ? (
+                      <Loader2 className="size-3.5 animate-spin" />
+                    ) : (
+                      <Mail className="size-3.5" />
+                    )}
+                    {resendingEmail ? "Enviando..." : "Reenviar Notificación por Email"}
                   </Button>
-                ) : (
-                  <span className="text-xs text-muted-foreground italic">
-                    Este pedido se encuentra cancelado.
-                  </span>
-                )}
+
+                  {selectedOrder.status !== "cancelado" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-amber-500/30 text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400 gap-1 text-xs"
+                      onClick={() => handleCancelOrder(selectedOrder)}
+                      disabled={canceling || deleting}
+                    >
+                      <XCircle className="size-4" />
+                      {canceling ? "Cancelando..." : "Cancelar Pedido (Reintegrar Stock)"}
+                    </Button>
+                  )}
+                </div>
 
                 <Button
                   type="button"
