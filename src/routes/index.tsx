@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Flame, Medal, Sparkles, Store, Truck, Users } from "lucide-react";
@@ -8,13 +9,21 @@ import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
+import { perf } from "@/lib/performance";
+import { perfMonitor, trackPerf } from "@/lib/performance-monitor";
 
 export const Route = createFileRoute("/")({
   loader: async ({ context }) => {
+    perf.log03({ route: "home" });
+    trackPerf("HOME_03", "ROUTE LOADER START");
     const [products, categories] = await Promise.all([
       context.queryClient.ensureQueryData({
         queryKey: ["products"],
-        queryFn: () => listProducts(),
+        queryFn: () => {
+          perf.log02({ target: "products" });
+          trackPerf("HOME_02", "SERVER REQUEST START", { target: "products" });
+          return listProducts();
+        },
         staleTime: 60 * 1000,
       }),
       context.queryClient.ensureQueryData({
@@ -23,6 +32,14 @@ export const Route = createFileRoute("/")({
         staleTime: 5 * 60 * 1000,
       }),
     ]);
+    perf.log04({
+      productsCount: products?.length ?? 0,
+      categoriesCount: categories?.length ?? 0,
+    });
+    trackPerf("HOME_04", "FIRST SERVER DATA", {
+      productsCount: products?.length ?? 0,
+      categoriesCount: categories?.length ?? 0,
+    });
     return {
       products: products ?? [],
       categories: categories ?? [],
@@ -129,14 +146,32 @@ function useProducts() {
 
 function Home() {
   const loaderData = Route.useLoaderData();
+  const hasMountedRef = useRef(false);
+
+  useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      perf.log07({
+        hasLoaderProducts: (loaderData?.products?.length ?? 0) > 0,
+      });
+      trackPerf("HOME_07", "HOME SHELL VISIBLE", {
+        hasLoaderProducts: (loaderData?.products?.length ?? 0) > 0,
+      });
+    }
+  }, [loaderData]);
+
   const { data: products = loaderData?.products ?? [], isLoading } = useQuery({
     queryKey: ["products"],
     initialData: loaderData?.products,
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
     queryFn: async () => {
+      perf.log08({ queryKey: "products" });
+      trackPerf("HOME_08", "PRODUCTS REQUEST START");
       try {
         const res = await listProducts();
+        perf.log09({ count: res?.length ?? 0 });
+        trackPerf("HOME_09", "PRODUCTS RECEIVED", { count: res?.length ?? 0 });
         return res ?? [];
       } catch (err) {
         console.warn("[Home] Error loading products:", err);
@@ -144,6 +179,21 @@ function Home() {
       }
     },
   });
+
+  useEffect(() => {
+    if (products && products.length > 0) {
+      perf.log09({ count: products.length });
+      trackPerf("HOME_09", "PRODUCTS RECEIVED", { count: products.length });
+    }
+    // Mark interactive after initial layout stabilizes
+    const timer = setTimeout(() => {
+      perf.log10({ status: "interactive" });
+      trackPerf("HOME_10", "HOME INTERACTIVE");
+      perf.printSummary();
+      perfMonitor.printSummary();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [products]);
 
   const { data: categories = loaderData?.categories ?? [] } = useQuery({
     queryKey: ["categories"],

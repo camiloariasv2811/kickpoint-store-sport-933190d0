@@ -13,6 +13,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 import { CartProvider } from "@/lib/cart";
+import { perf } from "@/lib/performance";
 
 function NotFoundComponent() {
   return (
@@ -79,6 +80,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  loader: async () => {
+    perf.log01({
+      url: typeof window !== "undefined" ? window.location.href : "server",
+      referrer: typeof document !== "undefined" ? document.referrer || "direct" : "server",
+    });
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -135,6 +142,25 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    perf.log05({ readyState: typeof document !== "undefined" ? document.readyState : "unknown" });
+
+    if (typeof window !== "undefined" && "PerformanceObserver" in window) {
+      try {
+        const observer = new PerformanceObserver((list) => {
+          for (const entry of list.getEntries()) {
+            if (entry.name === "first-contentful-paint") {
+              perf.log06({ fcpMs: Math.round(entry.startTime) });
+            }
+          }
+        });
+        observer.observe({ type: "paint", buffered: true });
+      } catch {
+        // observer not supported
+      }
+    }
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
