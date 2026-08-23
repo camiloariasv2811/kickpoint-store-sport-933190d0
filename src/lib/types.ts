@@ -61,9 +61,13 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   pedido_entregado: "Pedido entregado",
 };
 
-export function totalStock(p?: { variants?: Variant[] | null } | null) {
+export function totalStock(p?: { variants?: Variant[] | null } | null): number {
   if (!p || !p.variants || !Array.isArray(p.variants)) return 0;
-  return p.variants.reduce((sum, v) => sum + (Number(v?.stock) || 0), 0);
+  return p.variants.reduce((sum, v) => {
+    if (!v || v.active === false) return sum;
+    const s = Number(v.stock);
+    return sum + (Number.isFinite(s) && s > 0 ? s : 0);
+  }, 0);
 }
 
 export { toSafeUuid, isUuid } from "./uuid-utils";
