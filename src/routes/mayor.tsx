@@ -341,8 +341,9 @@ function WholesaleCatalogPage() {
                   }
                   className={!isWholesaleValid ? "pointer-events-none cursor-not-allowed" : ""}
                 >
-                  Continuar al Checkout Mayorista
-                  <ArrowRight className="size-4" />
+                  <span className="hidden sm:inline">Continuar al Checkout Mayorista</span>
+                  <span className="sm:hidden">Ir a Checkout Mayorista</span>
+                  <ArrowRight className="size-4 shrink-0" />
                 </Link>
               </Button>
             </div>
