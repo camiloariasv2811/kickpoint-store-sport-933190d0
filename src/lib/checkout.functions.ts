@@ -66,8 +66,11 @@ export const listPaymentMethods = createServerFn({ method: "GET" }).handler(asyn
     return DEFAULT_PAYMENT_METHODS;
   }
   try {
-    const supabase = createPublicClient();
-    const { data, error } = await supabase
+    // SECURITY: `details` holds bank/wallet account PII and is not readable by the
+    // anon/authenticated API roles. It is only read here, server-side, so the payment
+    // instructions can be rendered for the checkout step.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
       .from("payment_methods")
       .select("code, name, instructions, details")
       .eq("active", true)
@@ -80,6 +83,7 @@ export const listPaymentMethods = createServerFn({ method: "GET" }).handler(asyn
     return DEFAULT_PAYMENT_METHODS;
   }
 });
+
 
 export type CheckoutInput = {
   customer: {
