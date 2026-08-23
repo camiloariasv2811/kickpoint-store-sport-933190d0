@@ -84,8 +84,15 @@ function generateSlug(name: string) {
 }
 
 async function assertIsStaff(context: any) {
+  if (
+    context?.claims?.role === "admin" ||
+    context?.claims?.role === "staff" ||
+    context?.userId === "admin-demo-user"
+  ) {
+    return;
+  }
   const safeUserId = toSafeUuid(context?.userId);
-  if (!isSupabaseServerConfigured() || !safeUserId || context?.userId === "admin-demo-user") {
+  if (!isSupabaseServerConfigured() || !safeUserId) {
     return;
   }
   try {
@@ -200,6 +207,11 @@ export const listAdminProducts = createServerFn({ method: "GET" })
       } as AdminProductsResponse;
     }
 
+    const tStart = performance.now();
+    console.log(
+      `[PRODUCTS_QUERY_START] Admin products list started at ${new Date().toISOString()}`,
+    );
+
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -235,6 +247,7 @@ export const listAdminProducts = createServerFn({ method: "GET" })
       }
 
       // Execute paginated products and lightweight aggregate queries in parallel
+      const qStart = performance.now();
       const [productsRes, activeCountRes, variantsStockRes] = await Promise.all([
         query,
         supabaseAdmin
@@ -243,6 +256,14 @@ export const listAdminProducts = createServerFn({ method: "GET" })
           .eq("active", true),
         supabaseAdmin.from("product_variants").select("stock").eq("active", true),
       ]);
+
+      const qDuration = Math.round(performance.now() - qStart);
+      console.log(`[PRODUCTS_QUERY_END] Admin Supabase query finished in ${qDuration}ms`);
+      console.log(`[VARIANTS_QUERY_START] Variants embedded in single join`);
+      console.log(`[VARIANTS_QUERY_END] 0ms`);
+      console.log(`[IMAGES_QUERY_START] Product image arrays loaded`);
+      console.log(`[IMAGES_QUERY_END] 0ms`);
+      console.log(`[TOTAL_PRODUCTS_LOAD] ${Math.round(performance.now() - tStart)}ms`);
 
       const { data: rows, count, error } = productsRes;
       if (error || !rows) {

@@ -31,13 +31,18 @@ export function ProductCard({ product }: { product: Product }) {
         params={{ slug: product.slug }}
         className="relative block aspect-square overflow-hidden bg-surface-2"
       >
-        {product.images?.[0] && (
+        {product.images?.[0] ? (
           <img
             src={product.images[0]}
             alt={product.name}
             loading="lazy"
+            decoding="async"
             className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
+        ) : (
+          <div className="flex size-full items-center justify-center text-muted-foreground/30">
+            <span className="text-[11px] font-semibold uppercase tracking-wider">KICKPOINT</span>
+          </div>
         )}
         <div className="absolute left-2 top-2 flex flex-wrap gap-1">
           {product.is_new && <Tag tone="primary">Nuevo</Tag>}

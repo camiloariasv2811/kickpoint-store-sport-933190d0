@@ -92,6 +92,8 @@ function ProductRow({
 function useProducts() {
   return useQuery({
     queryKey: ["products"],
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listProducts();
@@ -108,6 +110,8 @@ function Home() {
   const { data: products = [], isLoading } = useProducts();
   const { data: categories = [] } = useQuery({
     queryKey: ["categories"],
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listCategories();

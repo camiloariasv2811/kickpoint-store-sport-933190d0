@@ -283,6 +283,7 @@ function AdminProductos() {
                               src={firstImage}
                               alt={r.name}
                               loading="lazy"
+                              decoding="async"
                               className="size-10 rounded-md border border-border object-cover"
                             />
                           ) : (

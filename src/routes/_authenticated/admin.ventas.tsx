@@ -86,6 +86,8 @@ function AdminVentas() {
 
   const { data: products = [], isLoading: loadingProducts } = useQuery({
     queryKey: ["admin", "products", "all"],
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listAdminProducts({ data: { pageSize: 500 } });
@@ -100,6 +102,8 @@ function AdminVentas() {
 
   const { data: customers = [] } = useQuery({
     queryKey: ["admin", "customers"],
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listCustomers();

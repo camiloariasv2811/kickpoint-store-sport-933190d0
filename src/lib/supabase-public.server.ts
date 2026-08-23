@@ -11,8 +11,12 @@ export function isSupabasePublicConfigured(): boolean {
   return Boolean(url && key && !key.includes("dummy-anon-key"));
 }
 
+let _publicClient: ReturnType<typeof createClient> | null = null;
+
 /** Server-side publishable (anon) client for public catalog reads. */
 export function createPublicClient() {
+  if (_publicClient) return _publicClient;
+
   const url =
     process.env["SUPABASE_URL"] ?? process.env["VITE_SUPABASE_URL"] ?? FALLBACK_SUPABASE_URL;
   const key =
@@ -20,7 +24,7 @@ export function createPublicClient() {
     process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ??
     FALLBACK_SUPABASE_KEY;
 
-  return createClient(url, key, {
+  _publicClient = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
       fetch: (input, init) => {
@@ -33,4 +37,5 @@ export function createPublicClient() {
       },
     },
   });
+  return _publicClient;
 }

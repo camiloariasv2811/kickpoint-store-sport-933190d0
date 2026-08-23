@@ -30,6 +30,8 @@ export const Route = createFileRoute("/categorias")({
 function Categorias() {
   const { data: categories = [], isLoading } = useQuery({
     queryKey: ["categories"],
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listCategories();
@@ -42,6 +44,8 @@ function Categorias() {
   });
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
         const res = await listProducts();

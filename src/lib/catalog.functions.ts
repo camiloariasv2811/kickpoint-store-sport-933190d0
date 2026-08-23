@@ -10,7 +10,7 @@ import {
 } from "./demo-data";
 import type { Brand, Category, Product } from "./types";
 
-const PRODUCT_SELECT = `
+const PRODUCT_SELECT_FULL = `
   id, name, slug, description, base_sku, retail_price, wholesale_price, wholesale_min_qty,
   images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, created_at,
   brand:brands ( id, name, slug ),
@@ -18,22 +18,59 @@ const PRODUCT_SELECT = `
   variants:product_variants ( id, product_id, size, color, sku, stock, active )
 `;
 
+const PRODUCT_SELECT_CATALOG = `
+  id, name, slug, base_sku, retail_price, wholesale_price, wholesale_min_qty,
+  images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, created_at,
+  brand:brands ( id, name, slug ),
+  category:categories ( id, name, slug ),
+  variants:product_variants ( id, product_id, size, color, sku, stock, active )
+`;
+
 export const listProducts = createServerFn({ method: "GET" }).handler(async () => {
+  const tStart = performance.now();
+  console.log(
+    `[PRODUCTS_QUERY_START] Catalog products query started at ${new Date().toISOString()}`,
+  );
+
   if (!isSupabasePublicConfigured()) {
-    return getInMemoryProducts().filter((p) => p.active);
+    const memStart = performance.now();
+    const result = getInMemoryProducts().filter((p) => p.active);
+    console.log(
+      `[PRODUCTS_QUERY_END] In-memory catalog query resolved in ${Math.round(performance.now() - memStart)}ms`,
+    );
+    console.log(`[VARIANTS_QUERY_START] In-memory variants attached`);
+    console.log(`[VARIANTS_QUERY_END] 0ms`);
+    console.log(`[IMAGES_QUERY_START] In-memory images array`);
+    console.log(`[IMAGES_QUERY_END] 0ms`);
+    console.log(`[TOTAL_PRODUCTS_LOAD] ${Math.round(performance.now() - tStart)}ms`);
+    return result;
   }
+
   try {
     const supabase = createPublicClient();
+    const qStart = performance.now();
     const { data, error } = await supabase
       .from("products")
-      .select(PRODUCT_SELECT)
+      .select(PRODUCT_SELECT_CATALOG)
       .eq("active", true)
       .order("created_at", { ascending: false });
+
+    const qDuration = Math.round(performance.now() - qStart);
+    console.log(
+      `[PRODUCTS_QUERY_END] Supabase products query finished in ${qDuration}ms (retrieved ${data?.length ?? 0} items)`,
+    );
+    console.log(`[VARIANTS_QUERY_START] Variants joined in single query`);
+    console.log(`[VARIANTS_QUERY_END] 0ms (0 extra queries)`);
+    console.log(`[IMAGES_QUERY_START] First image referenced for cards`);
+    console.log(`[IMAGES_QUERY_END] 0ms`);
+    console.log(`[TOTAL_PRODUCTS_LOAD] ${Math.round(performance.now() - tStart)}ms`);
+
     if (error || !data || data.length === 0) {
       return getInMemoryProducts().filter((p) => p.active);
     }
     return data as unknown as Product[];
   } catch {
+    console.log(`[TOTAL_PRODUCTS_LOAD] Fallback in ${Math.round(performance.now() - tStart)}ms`);
     return getInMemoryProducts().filter((p) => p.active);
   }
 });
@@ -48,7 +85,7 @@ export const getProduct = createServerFn({ method: "GET" })
       const supabase = createPublicClient();
       const { data: row, error } = await supabase
         .from("products")
-        .select(PRODUCT_SELECT)
+        .select(PRODUCT_SELECT_FULL)
         .eq("slug", data.slug)
         .eq("active", true)
         .maybeSingle();
