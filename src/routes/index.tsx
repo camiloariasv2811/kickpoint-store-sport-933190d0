@@ -164,11 +164,18 @@ function Home() {
     }
   }, [loaderData]);
 
-  const { data: products = loaderData?.products ?? [], isLoading } = useQuery({
+  const {
+    data: products = [],
+    isLoading: isLoadingProducts,
+    isPending: isPendingProducts,
+    isFetching: isFetchingProducts,
+  } = useQuery({
     queryKey: ["products"],
-    initialData: loaderData?.products,
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    ...(loaderData?.products && loaderData.products.length > 0
+      ? { initialData: loaderData.products }
+      : {}),
     queryFn: async () => {
       perf.log08({ queryKey: "products" });
       trackPerf("HOME_08", "PRODUCTS REQUEST START");
@@ -183,6 +190,10 @@ function Home() {
       }
     },
   });
+
+  const isLoading =
+    (!products || products.length === 0) &&
+    (isLoadingProducts || isPendingProducts || isFetchingProducts);
 
   useEffect(() => {
     if (products && products.length > 0) {
@@ -199,11 +210,18 @@ function Home() {
     return () => clearTimeout(timer);
   }, [products]);
 
-  const { data: categories = loaderData?.categories ?? [] } = useQuery({
+  const {
+    data: categories = [],
+    isLoading: isLoadingCategories,
+    isPending: isPendingCategories,
+    isFetching: isFetchingCategories,
+  } = useQuery({
     queryKey: ["categories"],
-    initialData: loaderData?.categories,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    ...(loaderData?.categories && loaderData.categories.length > 0
+      ? { initialData: loaderData.categories }
+      : {}),
     queryFn: async () => {
       try {
         const res = await listCategories();

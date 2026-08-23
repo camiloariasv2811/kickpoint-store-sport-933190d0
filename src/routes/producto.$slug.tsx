@@ -572,14 +572,20 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
               </div>
 
               {/* Secondary WhatsApp Action */}
-              <Button asChild variant="dark" size="lg" className="w-full justify-center">
+              <Button
+                asChild
+                variant="dark"
+                size="lg"
+                className="w-full justify-center px-4 py-2.5 h-auto"
+              >
                 <a
                   href={whatsappLink(`Hola KICKPOINT, quiero información de: ${product.name}`)}
                   target="_blank"
                   rel="noreferrer"
+                  className="flex items-center justify-center gap-2 text-center text-xs sm:text-sm font-medium"
                 >
-                  <MessageCircle className="size-5 text-emerald-500" /> Consultar disponibilidad o
-                  detalles por WhatsApp
+                  <MessageCircle className="size-4 sm:size-5 shrink-0 text-emerald-500" />
+                  <span>Consultar por WhatsApp</span>
                 </a>
               </Button>
             </div>

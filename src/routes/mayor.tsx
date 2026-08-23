@@ -93,11 +93,18 @@ function WholesaleCatalogPage() {
     "featured",
   );
 
-  const { data: products = loaderData?.products ?? [], isLoading: loadingProducts } = useQuery<
-    Product[]
-  >({
+  const {
+    data: products = [],
+    isLoading: isLoadingProducts,
+    isPending: isPendingProducts,
+    isFetching: isFetchingProducts,
+  } = useQuery<Product[]>({
     queryKey: ["products"],
-    initialData: loaderData?.products,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    ...(loaderData?.products && loaderData.products.length > 0
+      ? { initialData: loaderData.products }
+      : {}),
     queryFn: async () => {
       try {
         const res = await listProducts();
@@ -107,12 +114,24 @@ function WholesaleCatalogPage() {
         return [];
       }
     },
-    staleTime: 60 * 1000,
   });
 
-  const { data: categories = loaderData?.categories ?? [] } = useQuery<Category[]>({
+  const loadingProducts =
+    (!products || products.length === 0) &&
+    (isLoadingProducts || isPendingProducts || isFetchingProducts);
+
+  const {
+    data: categories = [],
+    isLoading: isLoadingCategories,
+    isPending: isPendingCategories,
+    isFetching: isFetchingCategories,
+  } = useQuery<Category[]>({
     queryKey: ["categories"],
-    initialData: loaderData?.categories,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    ...(loaderData?.categories && loaderData.categories.length > 0
+      ? { initialData: loaderData.categories }
+      : {}),
     queryFn: async () => {
       try {
         const res = await listCategories();
@@ -121,7 +140,6 @@ function WholesaleCatalogPage() {
         return [];
       }
     },
-    staleTime: 5 * 60 * 1000,
   });
 
   // Extract available brands

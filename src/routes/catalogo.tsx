@@ -31,6 +31,7 @@ export const Route = createFileRoute("/catalogo")({
     orden: typeof search["orden"] === "string" ? (search["orden"] as string) : undefined,
   }),
   loader: async ({ context }) => {
+    console.log("[CATALOG_DEBUG_01] loader start");
     const [products, categories, brands] = await Promise.all([
       context.queryClient.ensureQueryData({
         queryKey: ["products"],
@@ -48,6 +49,7 @@ export const Route = createFileRoute("/catalogo")({
         staleTime: 5 * 60 * 1000,
       }),
     ]);
+    console.log("[CATALOG_DEBUG_02] loader products count", products?.length ?? 0);
     return {
       products: products ?? [],
       categories: categories ?? [],
@@ -122,12 +124,21 @@ function Catalogo() {
   const [visibleLimit, setVisibleLimit] = useState(INITIAL_BATCH_SIZE);
   const firstRenderLogged = useRef(false);
   const firstImageLogged = useRef(false);
+  const renderCount = useRef(0);
+  renderCount.current += 1;
 
-  const { data: products = loaderData?.products ?? [], isLoading: isLoadingProducts } = useQuery({
+  const {
+    data: products = [],
+    isLoading: isLoadingProducts,
+    isPending: isPendingProducts,
+    isFetching: isFetchingProducts,
+  } = useQuery({
     queryKey: ["products"],
-    initialData: loaderData?.products,
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    ...(loaderData?.products && loaderData.products.length > 0
+      ? { initialData: loaderData.products }
+      : {}),
     queryFn: async () => {
       const reqStart = performance.now();
       console.log(`[CATALOG_REQUEST_START] Requesting catalog products from server`);
@@ -148,11 +159,18 @@ function Catalogo() {
     },
   });
 
-  const { data: categories = loaderData?.categories ?? [] } = useQuery({
+  const {
+    data: categories = [],
+    isLoading: isLoadingCategories,
+    isPending: isPendingCategories,
+    isFetching: isFetchingCategories,
+  } = useQuery({
     queryKey: ["categories"],
-    initialData: loaderData?.categories,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    ...(loaderData?.categories && loaderData.categories.length > 0
+      ? { initialData: loaderData.categories }
+      : {}),
     queryFn: async () => {
       try {
         const res = await listCategories();
@@ -164,11 +182,18 @@ function Catalogo() {
     },
   });
 
-  const { data: brands = loaderData?.brands ?? [] } = useQuery({
+  const {
+    data: brands = [],
+    isLoading: isLoadingBrands,
+    isPending: isPendingBrands,
+    isFetching: isFetchingBrands,
+  } = useQuery({
     queryKey: ["brands"],
-    initialData: loaderData?.brands,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    ...(loaderData?.brands && loaderData.brands.length > 0
+      ? { initialData: loaderData.brands }
+      : {}),
     queryFn: async () => {
       try {
         const res = await listBrands();
@@ -180,7 +205,16 @@ function Catalogo() {
     },
   });
 
-  const isLoading = isLoadingProducts && (!products || products.length === 0);
+  const isLoading =
+    (!products || products.length === 0) &&
+    (isLoadingProducts || isPendingProducts || isFetchingProducts);
+
+  console.log("[CATALOG_DEBUG_03] query initialData count", loaderData?.products?.length ?? 0);
+  console.log("[CATALOG_DEBUG_04] query data count", products?.length ?? 0);
+  console.log("[CATALOG_DEBUG_05] isLoading", isLoadingProducts);
+  console.log("[CATALOG_DEBUG_06] isFetching", isFetchingProducts);
+  console.log("[CATALOG_DEBUG_07] isPending", isPendingProducts);
+  console.log("[CATALOG_DEBUG_08] catalog render count", renderCount.current);
 
   const sizes = useMemo(() => {
     const set = new Set<string>();
@@ -364,7 +398,13 @@ function Catalogo() {
         </div>
 
         <p className="mt-5 text-sm text-muted-foreground">
-          {isLoading ? "Cargando productos..." : `${filtered.length} producto(s) encontrados`}
+          {isLoading
+            ? "Cargando productos..."
+            : filtered.length > 0
+              ? `${filtered.length} producto(s) encontrados`
+              : products.length > 0
+                ? "0 productos encontrados para los filtros seleccionados"
+                : "No hay productos disponibles"}
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 md:gap-4">
@@ -398,11 +438,30 @@ function Catalogo() {
           </div>
         )}
 
-        {!isLoading && filtered.length === 0 && (
+        {!isLoading && products.length > 0 && filtered.length === 0 && (
           <div className="surface-card mt-6 p-10 text-center">
             <p className="text-display text-xl">Sin resultados</p>
             <p className="mt-2 text-sm text-muted-foreground">
-              Prueba con otra búsqueda o quita algunos filtros.
+              No encontramos productos que coincidan con la búsqueda o filtros seleccionados.
+            </p>
+            {hasFilters && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate({ search: {} })}
+                className="mt-4"
+              >
+                Limpiar todos los filtros
+              </Button>
+            )}
+          </div>
+        )}
+
+        {!isLoading && products.length === 0 && (
+          <div className="surface-card mt-6 p-10 text-center">
+            <p className="text-display text-xl">No hay productos disponibles</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Pronto agregaremos nuevos productos a nuestra tienda.
             </p>
           </div>
         )}
