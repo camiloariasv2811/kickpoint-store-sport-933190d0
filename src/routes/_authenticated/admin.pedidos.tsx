@@ -51,6 +51,8 @@ import { ORDER_STATUS_LABELS, ORDER_STATUSES } from "@/lib/types";
 import { moneyExact, whatsappLink } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 import { resendOrderEmailNotification } from "@/lib/email.functions";
+import { printDeliveryNote } from "@/lib/delivery-note";
+
 
 export const Route = createFileRoute("/_authenticated/admin/pedidos")({
   component: AdminPedidos,
