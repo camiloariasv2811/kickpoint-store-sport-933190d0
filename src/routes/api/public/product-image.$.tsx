@@ -21,10 +21,13 @@ export const Route = createFileRoute("/api/public/product-image/$")({
         const raw = (params as { _splat?: string })._splat ?? "";
         const path = decodeURIComponent(raw).replace(/^\/+/, "");
 
-        // Evita path traversal y rutas vacías
-        if (!path || path.includes("..")) {
+        // Evita path traversal y rutas vacías (sin rechazar nombres que solo
+        // contienen puntos consecutivos, ej. "archivo_a.m..png").
+        const segments = path.split("/");
+        if (!path || segments.some((s) => s === "" || s === "." || s === "..")) {
           return new Response("Not found", { status: 404 });
         }
+
 
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
