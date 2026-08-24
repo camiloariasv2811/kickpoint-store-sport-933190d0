@@ -2,10 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
+  ArrowLeft,
   ArrowRight,
   Check,
   CheckCircle2,
   Copy,
+  CreditCard,
   FileText,
   Loader2,
   Package,
@@ -15,7 +17,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { SiteLayout } from "@/components/site/SiteLayout";
@@ -24,7 +26,7 @@ import { Input } from "@/components/ui/input";
 import { createOrder, listPaymentMethods } from "@/lib/checkout.functions";
 import { getPublicStoreSettings } from "@/lib/settings.functions";
 import { useCart, WHOLESALE_MIN_ORDER_UNITS } from "@/lib/cart";
-import { money, moneyExact } from "@/lib/format";
+import { moneyExact } from "@/lib/format";
 
 export const Route = createFileRoute("/checkout")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -51,25 +53,112 @@ export const Route = createFileRoute("/checkout")({
   component: CheckoutPage,
 });
 
+type FormKey =
+  | "firstName"
+  | "lastName"
+  | "identityDocument"
+  | "whatsapp"
+  | "email"
+  | "city"
+  | "state";
+
 const FIELDS: readonly {
-  key: "firstName" | "lastName" | "identityDocument" | "whatsapp" | "email" | "city" | "state";
+  key: FormKey;
   label: string;
   placeholder: string;
   required?: boolean;
+  inputMode?: "text" | "tel" | "email" | "numeric";
+  autoComplete?: string;
 }[] = [
-  { key: "firstName", label: "Nombre", placeholder: "María", required: true },
-  { key: "lastName", label: "Apellido", placeholder: "Pérez", required: false },
   {
-    key: "identityDocument",
-    label: "Cédula / RIF",
-    placeholder: "V-12345678",
+    key: "firstName",
+    label: "Nombre",
+    placeholder: "María",
     required: true,
+    autoComplete: "given-name",
   },
-  { key: "whatsapp", label: "WhatsApp", placeholder: "0412 123 4567", required: true },
-  { key: "email", label: "Correo (opcional)", placeholder: "maria@correo.com", required: false },
-  { key: "city", label: "Ciudad / Municipio", placeholder: "Caracas", required: true },
-  { key: "state", label: "Estado", placeholder: "Distrito Capital", required: false },
+  {
+    key: "lastName",
+    label: "Apellido",
+    placeholder: "Pérez",
+    required: true,
+    autoComplete: "family-name",
+  },
+  { key: "identityDocument", label: "Cédula / RIF", placeholder: "V-12345678", required: true },
+  {
+    key: "whatsapp",
+    label: "Teléfono / WhatsApp",
+    placeholder: "0412 123 4567",
+    required: true,
+    inputMode: "tel",
+    autoComplete: "tel",
+  },
+  {
+    key: "email",
+    label: "Correo (opcional)",
+    placeholder: "maria@correo.com",
+    inputMode: "email",
+    autoComplete: "email",
+  },
+  {
+    key: "state",
+    label: "Estado",
+    placeholder: "Barinas",
+    required: true,
+    autoComplete: "address-level1",
+  },
+  {
+    key: "city",
+    label: "Ciudad / Municipio",
+    placeholder: "Barinas",
+    required: true,
+    autoComplete: "address-level2",
+  },
 ] as const;
+
+const STEPS = [
+  { id: 1, label: "Envío" },
+  { id: 2, label: "Pago" },
+  { id: 3, label: "Confirmación" },
+] as const;
+
+function StepIndicator({ current }: { current: number }) {
+  return (
+    <ol className="mt-4 flex items-center gap-2 sm:gap-3">
+      {STEPS.map((s, idx) => {
+        const done = current > s.id;
+        const active = current === s.id;
+        return (
+          <li key={s.id} className="flex flex-1 items-center gap-2">
+            <div
+              className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-all ${
+                active
+                  ? "bg-primary text-primary-foreground ring-4 ring-primary/20"
+                  : done
+                    ? "bg-emerald-600 text-white"
+                    : "border border-border bg-surface-2 text-muted-foreground"
+              }`}
+            >
+              {done ? <Check className="size-4" /> : s.id}
+            </div>
+            <span
+              className={`text-xs font-semibold sm:text-sm ${
+                active ? "text-primary" : done ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {s.label}
+            </span>
+            {idx < STEPS.length - 1 && (
+              <span
+                className={`hidden h-px flex-1 sm:block ${done ? "bg-emerald-600" : "bg-border"}`}
+              />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 function CheckoutPage() {
   const navigate = useNavigate();
@@ -143,6 +232,7 @@ function CheckoutPage() {
     },
   });
 
+  const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -154,12 +244,12 @@ function CheckoutPage() {
     state: "",
     notes: "",
   });
-  const [shippingMethod, setShippingMethod] = useState<"TEALCA" | "MRW">("MRW");
+  const [shippingMethod, setShippingMethod] = useState<"TEALCA" | "MRW" | "">("");
   const [method, setMethod] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const submittingRef = useRef(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  // Proof and Reference State
   const [reference, setReference] = useState("");
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState<string | null>(null);
@@ -172,7 +262,7 @@ function CheckoutPage() {
     isWholesale?: boolean;
   } | null>(null);
 
-  const selected = method || methods?.[0]?.code || "";
+  const selected = method;
   const activeMethod = methods?.find((m) => m.code === selected);
 
   const usdtRate = Number(storeSettings?.exchange_rate_usdt || 86.2);
@@ -202,76 +292,86 @@ function CheckoutPage() {
 
     if (selectedFile.type.startsWith("image/")) {
       const reader = new FileReader();
-      reader.onload = () => {
-        setProofPreview(reader.result as string);
-      };
+      reader.onload = () => setProofPreview(reader.result as string);
       reader.readAsDataURL(selectedFile);
     } else {
       setProofPreview(null);
     }
   }
 
+  function goToStep(next: number) {
+    setStep(next);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function validateShipping(): boolean {
+    if (!shippingMethod) {
+      toast.error("Selecciona dónde deseas recibir tu pedido (MRW o TEALCA)");
+      return false;
+    }
+    const missing: string[] = [];
+    if (!form.firstName.trim()) missing.push("Nombre");
+    if (!form.lastName.trim()) missing.push("Apellido");
+    if (!form.identityDocument.trim()) missing.push("Cédula");
+    if (!form.whatsapp.trim()) missing.push("Teléfono");
+    if (!form.state.trim()) missing.push("Estado");
+    if (!form.city.trim()) missing.push("Ciudad");
+    if (!form.address.trim()) missing.push(`Agencia ${shippingMethod}`);
+
+    if (missing.length) {
+      toast.error("Falta información obligatoria", { description: missing.join(", ") });
+      return false;
+    }
+    return true;
+  }
+
+  function validatePayment(): boolean {
+    if (!selected) {
+      toast.error("Selecciona un método de pago");
+      return false;
+    }
+    if (!proofFile) {
+      toast.error("Debes subir el comprobante de pago para continuar");
+      return false;
+    }
+    return true;
+  }
+
   async function submit() {
+    if (submittingRef.current || saving || successOrder) return;
     if (isWholesaleCheckout && !isWholesaleValid) {
       toast.error(
         `El pedido mayorista requiere mínimo ${WHOLESALE_MIN_ORDER_UNITS} unidades (actualmente tienes ${wholesaleCount}).`,
       );
       return;
     }
-
-    if (!shippingMethod) {
-      toast.error("Por favor selecciona una empresa de envío (TEALCA o MRW)");
+    if (!validateShipping()) {
+      goToStep(1);
+      return;
+    }
+    if (!validatePayment()) {
+      goToStep(2);
       return;
     }
 
-    if (!form.firstName.trim()) {
-      toast.error("Por favor ingresa tu nombre");
-      return;
-    }
-
-    if (!form.identityDocument.trim()) {
-      toast.error("Por favor ingresa tu cédula o RIF (obligatorio para el envío)");
-      return;
-    }
-
-    if (!form.whatsapp.trim()) {
-      toast.error("Por favor ingresa tu número de WhatsApp");
-      return;
-    }
-
-    if (!form.city.trim() || !form.address.trim()) {
-      toast.error("Por favor ingresa la ciudad y dirección o agencia de entrega");
-      return;
-    }
-
-    if (!selected) {
-      toast.error("Por favor selecciona un método de pago");
-      return;
-    }
-
-    if (!proofFile) {
-      toast.error("Por favor adjunta la captura o recibo de tu comprobante de pago");
-      return;
-    }
-
+    submittingRef.current = true;
     setSaving(true);
     try {
-      // Convert file to base64
+      const file = proofFile!;
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
           const res = reader.result as string;
-          const cleanBase64 = res.includes(",") ? res.split(",")[1] : res;
-          resolve(cleanBase64);
+          resolve(res.includes(",") ? res.split(",")[1]! : res);
         };
         reader.onerror = (err) => reject(err);
-        reader.readAsDataURL(proofFile);
+        reader.readAsDataURL(file);
       });
 
       const result = await createOrder({
         data: {
           customer: form,
-          shippingMethod,
+          shippingMethod: shippingMethod as "TEALCA" | "MRW",
           paymentMethod: selected,
           rateType: "USDT",
           exchangeRateUsed: usdtRate,
@@ -279,8 +379,8 @@ function CheckoutPage() {
           lines: activeLines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
           paymentProof: {
             reference: reference.trim(),
-            fileName: proofFile.name,
-            contentType: proofFile.type || "image/jpeg",
+            fileName: file.name,
+            contentType: file.type || "image/jpeg",
             dataBase64: base64,
           },
         },
@@ -295,17 +395,19 @@ function CheckoutPage() {
       setSuccessOrder({
         orderNumber: result.orderNumber,
         total: Number(result.total || activeSubtotal),
-        shippingMethod,
+        shippingMethod: shippingMethod || "MRW",
         isWholesale: isWholesaleCheckout,
       });
       toast.success("¡Pedido y comprobante registrados con éxito!", {
         description: `Orden ${result.orderNumber}${isWholesaleCheckout ? " (Mayorista)" : ""}`,
       });
+      if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Error al crear el pedido:", error);
       toast.error("No pudimos crear el pedido", {
         description: error instanceof Error ? error.message : "Intenta nuevamente.",
       });
+      submittingRef.current = false;
     } finally {
       setSaving(false);
     }
@@ -318,43 +420,38 @@ function CheckoutPage() {
     setTimeout(() => setCopiedCode(false), 2500);
   }
 
-  // Pantalla de Confirmación de Pedido Exitoso
+  // ---------- PASO 4: Pedido realizado ----------
   if (successOrder) {
     return (
       <SiteLayout>
         <div className="mx-auto max-w-2xl px-4 py-12 sm:py-16 animate-in fade-in zoom-in-95 duration-300">
           <div className="surface-card relative overflow-hidden rounded-2xl border border-primary/20 p-6 sm:p-10 text-center shadow-xl shadow-primary/5">
-            {/* Animación del Checkmark */}
             <div className="mx-auto flex size-20 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-500 ring-8 ring-emerald-500/10 animate-in zoom-in-50 duration-500">
               <Check className="size-10 stroke-[3]" />
             </div>
 
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
-              <span className="mt-6 inline-block rounded-full bg-primary/10 px-3.5 py-1 text-xs font-bold text-primary">
-                Paso 3 de 4 • Registro Exitoso
-              </span>
-
-              <h1 className="mt-3 text-display text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
-                ¡Pedido Realizado Exitosamente!
+              <h1 className="mt-5 text-display text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
+                ¡Pedido realizado correctamente!
               </h1>
 
               {successOrder.isWholesale && (
                 <div className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-amber-500/20 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300">
-                  <Tag className="size-3.5" /> Pedido Registrado con Tarifa Mayorista
+                  <Tag className="size-3.5" /> Pedido con tarifa mayorista
                 </div>
               )}
 
               <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-                Tu orden ha sido registrada en nuestro sistema y está lista para ser procesada.
+                Hemos recibido tu pedido y tu comprobante de pago. Nuestro equipo verificará la
+                información y comenzará a procesar tu pedido.
               </p>
             </div>
 
-            {/* Tarjeta de Resumen del Pedido */}
             <div className="mt-6 rounded-xl border border-border bg-surface-2/60 p-4 sm:p-5 text-left animate-in fade-in slide-in-from-bottom-3 duration-500">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-3.5">
                 <div>
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Número de Seguimiento
+                    Número de pedido
                   </span>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="font-mono text-lg sm:text-xl font-bold text-primary">
@@ -383,7 +480,7 @@ function CheckoutPage() {
 
                 <div className="text-left sm:text-right">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Monto Total
+                    Monto total
                   </span>
                   <p className="text-display text-lg font-bold text-foreground">
                     {moneyExact(successOrder.total)}
@@ -393,7 +490,7 @@ function CheckoutPage() {
 
               <div className="grid grid-cols-2 gap-3 pt-3 text-xs">
                 <div>
-                  <span className="text-muted-foreground block">Empresa de Envío:</span>
+                  <span className="text-muted-foreground block">Empresa de envío:</span>
                   <span className="font-semibold text-foreground flex items-center gap-1 mt-0.5">
                     <Truck className="size-3.5 text-primary" />
                     Agencia {successOrder.shippingMethod}
@@ -409,7 +506,6 @@ function CheckoutPage() {
               </div>
             </div>
 
-            {/* Botones de Acción */}
             <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <Button
                 variant="hero"
@@ -503,410 +599,565 @@ function CheckoutPage() {
     );
   }
 
-  const ready =
-    form.firstName.trim() &&
-    form.identityDocument.trim() &&
-    form.whatsapp.trim() &&
-    form.city.trim() &&
-    form.address.trim() &&
-    Boolean(shippingMethod) &&
-    Boolean(selected) &&
-    Boolean(proofFile) &&
-    (!isWholesaleCheckout || isWholesaleValid);
+  const lineRows = activeLines.map((l, idx) => {
+    const unit = isWholesaleCheckout
+      ? isWholesaleValid && l.wholesalePrice != null
+        ? Number(l.wholesalePrice)
+        : Number(l.retailPrice || 0)
+      : getLineUnitPrice(l as any);
+    return {
+      key: `${l.productId}_${l.variantId}_${l.size}_${l.color || ""}_${idx}`,
+      name: l.name,
+      size: l.size,
+      quantity: Number(l.quantity) || 0,
+      unit,
+      subtotal: unit * (Number(l.quantity) || 0),
+    };
+  });
+
+  const summary = (
+    <aside className="surface-card h-fit p-5 lg:sticky lg:top-24">
+      <div className="flex items-center justify-between">
+        <h2 className="text-display text-lg">Resumen del pedido</h2>
+        {isWholesaleCheckout && (
+          <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 dark:text-amber-300">
+            MAYORISTA ({activeCount} uds.)
+          </span>
+        )}
+      </div>
+
+      <ul className="mt-4 space-y-3 text-sm">
+        {lineRows.map((l) => (
+          <li key={l.key} className="flex justify-between gap-3">
+            <span className="min-w-0">
+              <span className="block truncate font-medium">{l.name}</span>
+              <span className="text-xs text-muted-foreground">
+                Talla {l.size} × {l.quantity}
+                {isWholesaleCheckout && " · mayor"}
+              </span>
+            </span>
+            <span className="font-semibold tabular-nums">{moneyExact(l.subtotal)}</span>
+          </li>
+        ))}
+      </ul>
+
+      {activeSavings > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs sm:text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+          <span>Descuento al mayor ({activeCount} uds.)</span>
+          <span className="font-bold tabular-nums">-{moneyExact(activeSavings)}</span>
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-border pt-4">
+        <span className="min-w-0 text-xs sm:text-sm text-muted-foreground">Total USD</span>
+        <span className="ml-auto text-right text-display text-xl sm:text-2xl text-primary tabular-nums whitespace-nowrap">
+          {moneyExact(activeSubtotal)}
+        </span>
+      </div>
+
+      <div className="mt-4 rounded-xl border border-border bg-surface-2/60 p-3.5 text-xs space-y-2.5">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-foreground">Conversión a Bolívares (Bs.)</span>
+          <span className="rounded bg-primary/10 px-2 py-0.5 font-bold text-[10px] text-primary">
+            Tasa USDT Oficial
+          </span>
+        </div>
+        <div className="flex justify-between items-center text-muted-foreground pt-1">
+          <span>Tasa de cambio:</span>
+          <span className="font-semibold text-foreground font-mono">
+            Bs. {usdtRate.toFixed(2)} / USD
+          </span>
+        </div>
+        <div className="flex justify-between items-center border-t border-border/80 pt-2 text-sm font-bold text-foreground">
+          <span>Total en Bs.:</span>
+          <span className="text-primary font-mono text-base">
+            Bs.{" "}
+            {totalBs.toLocaleString("es-VE", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
+          </span>
+        </div>
+      </div>
+    </aside>
+  );
 
   return (
     <SiteLayout>
-      <div className="mx-auto max-w-6xl px-4 py-8">
-        <p className="text-eyebrow text-primary">Paso 2 de 4</p>
-        <h1 className="text-display text-3xl sm:text-4xl">Datos, envío y método de pago</h1>
+      <div className="mx-auto max-w-6xl px-4 py-8 pb-28 lg:pb-8">
+        <p className="text-eyebrow text-primary">Checkout KICKPOINT</p>
+        <h1 className="text-display text-3xl sm:text-4xl">
+          {step === 1
+            ? "Información de envío"
+            : step === 2
+              ? "Método de pago"
+              : "Revisa tu pedido"}
+        </h1>
+        <p className="mt-1.5 text-sm text-muted-foreground">
+          {step === 1
+            ? "Completa tus datos para que podamos preparar y enviar tu pedido."
+            : step === 2
+              ? "Selecciona tu método de pago y registra tu comprobante."
+              : "Verifica que todo esté correcto antes de confirmar tu pedido."}
+        </p>
+
+        <StepIndicator current={step} />
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_360px]">
           <div className="space-y-6">
-            {/* Método de Envío */}
-            <section className="surface-card p-5">
-              <div className="flex items-center gap-2">
-                <Truck className="size-5 text-primary" />
-                <h2 className="text-display text-lg font-bold">Empresa de Envío Nacional</h2>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Selecciona la empresa de encomienda de tu preferencia para recibir tu pedido a nivel
-                nacional.
-              </p>
-
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShippingMethod("MRW")}
-                  className={`flex flex-col items-center justify-center rounded-xl border p-4 text-center transition-all ${
-                    shippingMethod === "MRW"
-                      ? "border-primary bg-accent ring-2 ring-primary"
-                      : "border-border hover:border-primary/40"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-bold text-base">
-                    <span>MRW</span>
-                    {shippingMethod === "MRW" && <CheckCircle2 className="size-4 text-primary" />}
+            {/* ---------- PASO 1 ---------- */}
+            {step === 1 && (
+              <>
+                <section className="surface-card p-5">
+                  <div className="flex items-center gap-2">
+                    <Truck className="size-5 text-primary" />
+                    <h2 className="text-display text-lg font-bold">
+                      ¿Dónde deseas recibir tu pedido?
+                    </h2>
                   </div>
-                  <span className="mt-1 text-[11px] text-muted-foreground">
-                    Envíos a agencias y a domicilio
-                  </span>
-                </button>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Selecciona la empresa de encomienda con cobertura nacional.
+                  </p>
 
-                <button
-                  type="button"
-                  onClick={() => setShippingMethod("TEALCA")}
-                  className={`flex flex-col items-center justify-center rounded-xl border p-4 text-center transition-all ${
-                    shippingMethod === "TEALCA"
-                      ? "border-primary bg-accent ring-2 ring-primary"
-                      : "border-border hover:border-primary/40"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 font-bold text-base">
-                    <span>TEALCA</span>
-                    {shippingMethod === "TEALCA" && (
-                      <CheckCircle2 className="size-4 text-primary" />
-                    )}
-                  </div>
-                  <span className="mt-1 text-[11px] text-muted-foreground">
-                    Cobertura nacional con tracking express
-                  </span>
-                </button>
-              </div>
-            </section>
-
-            {/* Datos de Entrega */}
-            <section className="surface-card p-5">
-              <h2 className="text-display text-lg">Datos de entrega</h2>
-              <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                {FIELDS.map((field) => (
-                  <label key={field.key} className="block">
-                    <span className="text-xs font-semibold text-muted-foreground">
-                      {field.label}
-                      {field.required ? " *" : ""}
-                    </span>
-                    <Input
-                      className="mt-1.5 h-11"
-                      value={form[field.key]}
-                      placeholder={field.placeholder}
-                      onChange={(e) => setForm((f) => ({ ...f, [field.key]: e.target.value }))}
-                    />
-                  </label>
-                ))}
-                <label className="block sm:col-span-2">
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    Dirección exacta o Código/Nombre de Agencia ({shippingMethod}) *
-                  </span>
-                  <Input
-                    className="mt-1.5 h-11"
-                    value={form.address}
-                    placeholder={`Ej: Agencia ${shippingMethod} Centro, Av. Principal, C.C. Los Samanes`}
-                    onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-                  />
-                </label>
-                <label className="block sm:col-span-2">
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    Nota o indicaciones adicionales (opcional)
-                  </span>
-                  <textarea
-                    className="mt-1.5 min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-primary"
-                    value={form.notes}
-                    placeholder="Ej: titular que retira en agencia, número de cédula para el paquete, etc."
-                    onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  />
-                </label>
-              </div>
-            </section>
-
-            {/* Método de Pago */}
-            <section className="surface-card p-5">
-              <h2 className="text-display text-lg">Método de pago</h2>
-              <div className="mt-4 space-y-3">
-                {(methods ?? []).map((m) => {
-                  const active = m.code === selected;
-                  return (
-                    <button
-                      key={m.code}
-                      type="button"
-                      onClick={() => setMethod(m.code)}
-                      className={`w-full rounded-xl border p-4 text-left transition-colors ${
-                        active
-                          ? "border-primary bg-accent"
-                          : "border-border hover:border-primary/40"
-                      }`}
-                    >
-                      <p className="font-bold">{m.name}</p>
-                      {m.instructions && (
-                        <p className="mt-1 text-xs text-muted-foreground">{m.instructions}</p>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {activeMethod && Object.keys(activeMethod.details ?? {}).length > 0 && (
-                <dl className="mt-4 grid gap-2 rounded-xl border border-border bg-surface-2/50 p-4 text-sm">
-                  {Object.entries(activeMethod.details).map(([key, value]) => (
-                    <div key={key} className="flex justify-between gap-4">
-                      <dt className="capitalize text-muted-foreground">{key}</dt>
-                      <dd className="text-right font-semibold">{String(value)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-            </section>
-
-            {/* Carga Obligatoria de Comprobante de Pago y Referencia */}
-            <section className="surface-card p-5 border-2 border-primary/30">
-              <div className="flex items-center gap-2">
-                <Upload className="size-5 text-primary" />
-                <h2 className="text-display text-lg font-bold">Comprobante y Referencia de Pago</h2>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Realiza tu pago usando los datos indicados y adjunta la captura o recibo junto al
-                número de referencia para procesar tu orden.
-              </p>
-
-              <div className="mt-4 space-y-4">
-                {/* Campo Referencia */}
-                <label className="block">
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    Número de Referencia Bancaria / Hash de Operación (opcional o según aplique)
-                  </span>
-                  <Input
-                    className="mt-1.5 h-11 font-mono text-sm"
-                    value={reference}
-                    placeholder="Ej: 12345678 o 00987654"
-                    onChange={(e) => setReference(e.target.value)}
-                  />
-                </label>
-
-                {/* Campo Archivo Comprobante */}
-                <div>
-                  <span className="text-xs font-semibold text-muted-foreground block mb-1.5">
-                    Captura o Recibo de Pago (JPG, PNG, WEBP o PDF) *
-                  </span>
-
-                  {!proofFile ? (
-                    <div
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setIsDragOver(true);
-                      }}
-                      onDragLeave={() => setIsDragOver(false)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setIsDragOver(false);
-                        const droppedFile = e.dataTransfer.files?.[0];
-                        if (droppedFile) handleFileSelect(droppedFile);
-                      }}
-                      className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${
-                        isDragOver
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-primary/50 hover:bg-surface-2/40"
-                      }`}
-                      onClick={() => {
-                        const input = document.getElementById(
-                          "checkout-proof-file",
-                        ) as HTMLInputElement;
-                        if (input) input.click();
-                      }}
-                    >
-                      <input
-                        id="checkout-proof-file"
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0] || null;
-                          handleFileSelect(file);
-                        }}
-                      />
-                      <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-2">
-                        <Upload className="size-6" />
-                      </div>
-                      <p className="text-xs font-bold text-foreground">
-                        Haz clic aquí o arrastra tu comprobante de pago
-                      </p>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Formatos soportados: JPG, PNG, WEBP o PDF (Máximo 5 MB)
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="rounded-xl border border-border bg-surface-2/60 p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          {proofPreview ? (
-                            <div className="relative size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-background">
-                              <img
-                                src={proofPreview}
-                                alt="Previsualización del comprobante"
-                                className="size-full object-cover"
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-border bg-primary/10 text-primary">
-                              <FileText className="size-8" />
-                            </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {(["MRW", "TEALCA"] as const).map((agency) => (
+                      <button
+                        key={agency}
+                        type="button"
+                        onClick={() => setShippingMethod(agency)}
+                        className={`flex min-h-[88px] flex-col items-center justify-center rounded-xl border p-4 text-center transition-all ${
+                          shippingMethod === agency
+                            ? "border-primary bg-accent ring-2 ring-primary"
+                            : "border-border hover:border-primary/40"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 font-bold text-base">
+                          <span>{agency}</span>
+                          {shippingMethod === agency && (
+                            <CheckCircle2 className="size-4 text-primary" />
                           )}
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                              <CheckCircle2 className="size-4 shrink-0" />
-                              <span>Comprobante cargado</span>
-                            </div>
-                            <p
-                              className="truncate text-xs font-medium text-foreground mt-0.5"
-                              title={proofFile.name}
-                            >
-                              {proofFile.name}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                              {(proofFile.size / 1024).toFixed(0)} KB ·{" "}
-                              {proofFile.type || "Documento"}
-                            </p>
-                          </div>
                         </div>
+                        <span className="mt-1 text-[11px] text-muted-foreground">
+                          {agency === "MRW"
+                            ? "Envíos a agencias en todo el país"
+                            : "Cobertura nacional con tracking"}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
 
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 px-2 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
-                          onClick={() => {
-                            setProofFile(null);
-                            setProofPreview(null);
-                          }}
-                        >
-                          <X className="size-4 mr-1" />
-                          Quitar
-                        </Button>
+                {shippingMethod && (
+                  <>
+                    <section className="surface-card p-5">
+                      <h2 className="text-display text-lg">Datos del cliente</h2>
+                      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                        {FIELDS.map((field) => (
+                          <label key={field.key} className="block">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                              {field.label}
+                              {field.required ? " *" : ""}
+                            </span>
+                            <Input
+                              className="mt-1.5 h-12 text-base"
+                              value={form[field.key]}
+                              placeholder={field.placeholder}
+                              inputMode={field.inputMode}
+                              autoComplete={field.autoComplete}
+                              onChange={(e) =>
+                                setForm((f) => ({ ...f, [field.key]: e.target.value }))
+                              }
+                            />
+                          </label>
+                        ))}
                       </div>
+                    </section>
 
-                      {proofPreview && (
-                        <div className="mt-3 overflow-hidden rounded-lg border border-border bg-black/5 dark:bg-black/20 p-2">
-                          <p className="text-[10px] uppercase font-semibold text-muted-foreground mb-1">
-                            Previsualización
-                          </p>
-                          <img
-                            src={proofPreview}
-                            alt="Vista previa completa"
-                            className="max-h-60 w-auto rounded object-contain mx-auto"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
+                    <section className="surface-card p-5">
+                      <h2 className="text-display text-lg">Datos de la agencia</h2>
+                      <label className="mt-4 block">
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          Agencia {shippingMethod} donde deseas recibir tu pedido *
+                        </span>
+                        <Input
+                          className="mt-1.5 h-12 text-base"
+                          value={form.address}
+                          placeholder={`Ej: Agencia ${shippingMethod} Centro, Av. Principal, C.C. Los Samanes`}
+                          onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                        />
+                      </label>
+                      <label className="mt-4 block">
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          Nota o indicaciones adicionales (opcional)
+                        </span>
+                        <textarea
+                          className="mt-1.5 min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base outline-none focus-visible:border-primary"
+                          value={form.notes}
+                          placeholder="Ej: titular que retira en agencia, referencia de ubicación, etc."
+                          onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+                        />
+                      </label>
+                    </section>
+                  </>
+                )}
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+                  <Button asChild variant="outline" size="lg" className="sm:w-auto">
+                    <Link to="/carrito">
+                      <ArrowLeft className="size-4 mr-1" /> Volver al carrito
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    className="sm:w-auto"
+                    onClick={() => {
+                      if (validateShipping()) goToStep(2);
+                    }}
+                  >
+                    Continuar al pago <ArrowRight className="size-4 ml-1" />
+                  </Button>
                 </div>
-              </div>
-            </section>
-          </div>
-
-          {/* Resumen Lateral */}
-          <aside className="surface-card h-fit p-5 lg:sticky lg:top-24">
-            <div className="flex items-center justify-between">
-              <h2 className="text-display text-lg">Resumen del Pedido</h2>
-              {isWholesaleCheckout && (
-                <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-extrabold text-amber-700 dark:text-amber-300">
-                  MAYORISTA ({activeCount} uds.)
-                </span>
-              )}
-            </div>
-
-            <ul className="mt-4 space-y-3 text-sm">
-              {activeLines.map((l, idx) => {
-                const linePrice = isWholesaleCheckout
-                  ? isWholesaleValid && l.wholesalePrice != null
-                    ? Number(l.wholesalePrice)
-                    : Number(l.retailPrice || 0)
-                  : getLineUnitPrice(l as any);
-
-                const safeKey = `${l.productId}_${l.variantId}_${l.size}_${l.color || ""}_${idx}`;
-
-                return (
-                  <li key={safeKey} className="flex justify-between gap-3">
-                    <span className="min-w-0">
-                      <span className="block truncate font-medium">{l.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        Talla {l.size} × {l.quantity}
-                        {isWholesaleCheckout && " · mayor"}
-                      </span>
-                    </span>
-                    <span className="font-semibold">
-                      {moneyExact(linePrice * (Number(l.quantity) || 0))}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {activeSavings > 0 && (
-              <div className="mt-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs sm:text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                <span className="text-xs sm:text-sm">Descuento al mayor ({activeCount} uds.)</span>
-                <span className="text-xs sm:text-sm font-bold tabular-nums whitespace-nowrap">
-                  -{moneyExact(activeSavings)}
-                </span>
-              </div>
+              </>
             )}
 
-            {/* Total USD */}
-            <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 border-t border-border pt-4">
-              <span className="min-w-0 text-xs sm:text-sm text-muted-foreground">Total USD</span>
-              <span className="ml-auto text-right text-display text-xl sm:text-2xl text-primary tabular-nums whitespace-nowrap">
-                {moneyExact(activeSubtotal)}
-              </span>
-            </div>
+            {/* ---------- PASO 2 ---------- */}
+            {step === 2 && (
+              <>
+                <section className="surface-card p-5">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="size-5 text-primary" />
+                    <h2 className="text-display text-lg font-bold">Selecciona tu método de pago</h2>
+                  </div>
+                  <div className="mt-4 space-y-3">
+                    {(methods ?? []).map((m) => {
+                      const active = m.code === selected;
+                      return (
+                        <button
+                          key={m.code}
+                          type="button"
+                          onClick={() => setMethod(m.code)}
+                          className={`w-full rounded-xl border p-4 text-left transition-colors ${
+                            active
+                              ? "border-primary bg-accent ring-2 ring-primary"
+                              : "border-border hover:border-primary/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-bold">{m.name}</p>
+                            {active && <CheckCircle2 className="size-4 text-primary shrink-0" />}
+                          </div>
+                          {m.instructions && (
+                            <p className="mt-1 text-xs text-muted-foreground">{m.instructions}</p>
+                          )}
+                        </button>
+                      );
+                    })}
+                    {(methods ?? []).length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No hay métodos de pago disponibles en este momento.
+                      </p>
+                    )}
+                  </div>
 
-            {/* Conversión a Bolívares usando exclusivamente la Tasa USDT */}
-            <div className="mt-4 rounded-xl border border-border bg-surface-2/60 p-3.5 text-xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground">Conversión a Bolívares (Bs.)</span>
-                <span className="rounded bg-primary/10 px-2 py-0.5 font-bold text-[10px] text-primary">
-                  Tasa USDT Oficial
-                </span>
-              </div>
+                  {activeMethod && Object.keys(activeMethod.details ?? {}).length > 0 && (
+                    <dl className="mt-4 grid gap-2 rounded-xl border border-border bg-surface-2/50 p-4 text-sm">
+                      {Object.entries(activeMethod.details).map(([key, value]) => (
+                        <div key={key} className="flex justify-between gap-4">
+                          <dt className="capitalize text-muted-foreground">{key}</dt>
+                          <dd className="text-right font-semibold break-all">{String(value)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                </section>
 
-              <div className="flex justify-between items-center text-muted-foreground pt-1">
-                <span>Tasa de cambio:</span>
-                <span className="font-semibold text-foreground font-mono">
-                  Bs. {usdtRate.toFixed(2)} / USD
-                </span>
-              </div>
+                <section className="surface-card p-5 border-2 border-primary/30">
+                  <div className="flex items-center gap-2">
+                    <Upload className="size-5 text-primary" />
+                    <h2 className="text-display text-lg font-bold">Comprobante de pago</h2>
+                  </div>
+                  <p className="mt-1 text-xs font-bold text-foreground">
+                    Para confirmar tu pedido es obligatorio subir el comprobante de pago.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Una vez realizado el pago, sube aquí la captura o comprobante de la
+                    transferencia.
+                  </p>
 
-              <div className="flex justify-between items-center border-t border-border/80 pt-2 text-sm font-bold text-foreground">
-                <span>Total en Bs.:</span>
-                <span className="text-primary font-mono text-base">
-                  Bs.{" "}
-                  {totalBs.toLocaleString("es-VE", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-            </div>
+                  <div className="mt-4 space-y-4">
+                    <label className="block">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        Número de referencia bancaria / hash (opcional)
+                      </span>
+                      <Input
+                        className="mt-1.5 h-12 font-mono text-base"
+                        value={reference}
+                        placeholder="Ej: 12345678"
+                        inputMode="numeric"
+                        onChange={(e) => setReference(e.target.value)}
+                      />
+                    </label>
 
-            <Button
-              variant="hero"
-              size="lg"
-              className="mt-4 w-full"
-              disabled={!ready || !selected || saving}
-              onClick={submit}
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="size-5 animate-spin mr-2" />
-                  Procesando pedido y comprobante...
-                </>
-              ) : (
-                <>
-                  Confirmar pedido <ArrowRight className="size-5 ml-1" />
-                </>
-              )}
-            </Button>
-            <p className="mt-2 text-center text-[0.7rem] text-muted-foreground">
-              {!proofFile
-                ? "Adjunta tu comprobante de pago arriba para habilitar la confirmación."
-                : "Al confirmar, tu orden y comprobante quedan registrados y asociados en el sistema."}
-            </p>
-          </aside>
+                    <div>
+                      <span className="text-xs font-semibold text-muted-foreground block mb-1.5">
+                        Captura o recibo de pago (JPG, PNG, WEBP o PDF) *
+                      </span>
+
+                      {!proofFile ? (
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            setIsDragOver(true);
+                          }}
+                          onDragLeave={() => setIsDragOver(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setIsDragOver(false);
+                            const droppedFile = e.dataTransfer.files?.[0];
+                            if (droppedFile) handleFileSelect(droppedFile);
+                          }}
+                          className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-colors cursor-pointer ${
+                            isDragOver
+                              ? "border-primary bg-primary/5"
+                              : "border-border hover:border-primary/50 hover:bg-surface-2/40"
+                          }`}
+                          onClick={() => {
+                            const input = document.getElementById(
+                              "checkout-proof-file",
+                            ) as HTMLInputElement | null;
+                            input?.click();
+                          }}
+                        >
+                          <input
+                            id="checkout-proof-file"
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
+                            className="hidden"
+                            onChange={(e) => handleFileSelect(e.target.files?.[0] || null)}
+                          />
+                          <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary mb-2">
+                            <Upload className="size-6" />
+                          </div>
+                          <p className="text-xs font-bold text-foreground">
+                            Haz clic aquí o arrastra tu comprobante de pago
+                          </p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            Formatos: JPG, PNG, WEBP o PDF (máximo 5 MB)
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-border bg-surface-2/60 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {proofPreview ? (
+                                <div className="relative size-16 shrink-0 overflow-hidden rounded-lg border border-border bg-background">
+                                  <img
+                                    src={proofPreview}
+                                    alt="Previsualización del comprobante"
+                                    className="size-full object-cover"
+                                  />
+                                </div>
+                              ) : (
+                                <div className="flex size-16 shrink-0 items-center justify-center rounded-lg border border-border bg-primary/10 text-primary">
+                                  <FileText className="size-8" />
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                  <CheckCircle2 className="size-4 shrink-0" />
+                                  <span>Comprobante cargado correctamente</span>
+                                </div>
+                                <p
+                                  className="truncate text-xs font-medium text-foreground mt-0.5"
+                                  title={proofFile.name}
+                                >
+                                  {proofFile.name}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  {(proofFile.size / 1024).toFixed(0)} KB ·{" "}
+                                  {proofFile.type || "Documento"}
+                                </p>
+                              </div>
+                            </div>
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-9 px-2 text-rose-500 hover:bg-rose-500/10 hover:text-rose-600"
+                              onClick={() => {
+                                setProofFile(null);
+                                setProofPreview(null);
+                              }}
+                            >
+                              <X className="size-4 mr-1" />
+                              Quitar
+                            </Button>
+                          </div>
+
+                          {proofPreview && (
+                            <div className="mt-3 overflow-hidden rounded-lg border border-border bg-black/5 dark:bg-black/20 p-2">
+                              <p className="text-[10px] uppercase font-semibold text-muted-foreground mb-1">
+                                Previsualización
+                              </p>
+                              <img
+                                src={proofPreview}
+                                alt="Vista previa completa"
+                                className="max-h-60 w-auto rounded object-contain mx-auto"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div
+                      className={`rounded-lg border p-3 text-xs font-semibold ${
+                        proofFile && selected
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                          : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                      }`}
+                    >
+                      {proofFile && selected
+                        ? "✓ Comprobante recibido. Ya puedes continuar y confirmar tu pedido."
+                        : !selected
+                          ? "⚠️ Selecciona un método de pago para continuar."
+                          : "⚠️ Debes subir el comprobante de pago para confirmar tu pedido."}
+                    </div>
+                  </div>
+                </section>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+                  <Button variant="outline" size="lg" onClick={() => goToStep(1)}>
+                    <ArrowLeft className="size-4 mr-1" /> Volver a envío
+                  </Button>
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    disabled={!selected || !proofFile}
+                    onClick={() => {
+                      if (validatePayment()) goToStep(3);
+                    }}
+                  >
+                    Continuar a revisión <ArrowRight className="size-4 ml-1" />
+                  </Button>
+                </div>
+              </>
+            )}
+
+            {/* ---------- PASO 3 ---------- */}
+            {step === 3 && (
+              <>
+                <section className="surface-card p-5">
+                  <h2 className="text-display text-lg font-bold">Productos</h2>
+                  <div className="mt-3 divide-y divide-border">
+                    {lineRows.map((l) => (
+                      <div key={l.key} className="flex items-center justify-between gap-3 py-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{l.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Talla {l.size} · Cantidad {l.quantity} · {moneyExact(l.unit)} c/u
+                          </p>
+                        </div>
+                        <span className="font-bold tabular-nums">{moneyExact(l.subtotal)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="surface-card p-5">
+                  <h2 className="text-display text-lg font-bold">Información de envío</h2>
+                  <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+                    {[
+                      ["Nombre", form.firstName],
+                      ["Apellido", form.lastName],
+                      ["Cédula", form.identityDocument],
+                      ["Teléfono", form.whatsapp],
+                      ["Estado", form.state],
+                      ["Ciudad", form.city],
+                      ["Agencia", shippingMethod],
+                      ["Dirección de la agencia", form.address],
+                    ].map(([label, value]) => (
+                      <div key={label} className="flex justify-between gap-3 sm:block">
+                        <dt className="text-xs text-muted-foreground">{label}</dt>
+                        <dd className="font-semibold text-right sm:text-left break-words">
+                          {value || "—"}
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                  {form.notes.trim() && (
+                    <p className="mt-3 rounded-lg border border-border bg-surface-2/60 p-3 text-xs text-muted-foreground">
+                      <strong className="text-foreground">Nota: </strong>
+                      {form.notes}
+                    </p>
+                  )}
+                </section>
+
+                <section className="surface-card p-5">
+                  <h2 className="text-display text-lg font-bold">Pago</h2>
+                  <div className="mt-3 space-y-2 text-sm">
+                    <div className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">Método de pago</span>
+                      <span className="font-semibold">{activeMethod?.name ?? selected}</span>
+                    </div>
+                    {reference.trim() && (
+                      <div className="flex justify-between gap-3">
+                        <span className="text-muted-foreground">Referencia</span>
+                        <span className="font-mono font-semibold">{reference}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Comprobante</span>
+                      <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                        <CheckCircle2 className="size-4" />
+                        {proofFile ? "Cargado" : "Pendiente"}
+                      </span>
+                    </div>
+                    {proofPreview && (
+                      <img
+                        src={proofPreview}
+                        alt="Comprobante cargado"
+                        className="mt-2 max-h-48 rounded-lg border border-border object-contain"
+                      />
+                    )}
+                  </div>
+                  <div className="mt-4 flex items-baseline justify-between border-t border-border pt-3">
+                    <span className="text-sm text-muted-foreground">Total a pagar</span>
+                    <span className="text-display text-2xl text-primary tabular-nums">
+                      {moneyExact(activeSubtotal)}
+                    </span>
+                  </div>
+                </section>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+                  <Button variant="outline" size="lg" onClick={() => goToStep(2)} disabled={saving}>
+                    <ArrowLeft className="size-4 mr-1" /> Volver y editar
+                  </Button>
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    disabled={saving || !proofFile || !selected}
+                    onClick={submit}
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="size-5 animate-spin mr-2" />
+                        Procesando pedido...
+                      </>
+                    ) : (
+                      <>
+                        Confirmar pedido <ArrowRight className="size-5 ml-1" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+
+          {summary}
         </div>
       </div>
     </SiteLayout>
