@@ -754,14 +754,6 @@ export const createBrand = createServerFn({ method: "POST" })
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)+/g, "");
 
-    // Check duplicate in memory (case-insensitive)
-    const existingInMem = getInMemoryBrands().find(
-      (b) => b.name.trim().toLowerCase() === name.toLowerCase() || b.slug === slug,
-    );
-    if (existingInMem) {
-      throw new Error("Ya existe esta marca");
-    }
-
     const newBrand: Brand = {
       id: `brand-${Date.now()}`,
       name,
@@ -769,12 +761,18 @@ export const createBrand = createServerFn({ method: "POST" })
     };
 
     if (!isSupabaseServerConfigured()) {
-      const added = addInMemoryBrand(newBrand);
-      return added;
+      // Only when there is no database: check duplicates in the local fallback list
+      const existingInMem = getInMemoryBrands().find(
+        (b) => b.name.trim().toLowerCase() === name.toLowerCase() || b.slug === slug,
+      );
+      if (existingInMem) {
+        return existingInMem;
+      }
+      return addInMemoryBrand(newBrand);
     }
 
     try {
-      // Check duplicate in Supabase (case-insensitive name or exact slug)
+      // Check duplicate in the database (case-insensitive name or exact slug)
       const { data: existingDb } = await context.supabase
         .from("brands")
         .select("id, name, slug")
@@ -782,7 +780,8 @@ export const createBrand = createServerFn({ method: "POST" })
         .limit(1);
 
       if (existingDb && existingDb.length > 0) {
-        throw new Error("Ya existe esta marca");
+        invalidateServerCatalogCache();
+        return existingDb[0] as Brand;
       }
 
       const { data: inserted, error } = await context.supabase
@@ -797,23 +796,27 @@ export const createBrand = createServerFn({ method: "POST" })
 
       if (error) {
         if (error.code === "23505") {
-          throw new Error("Ya existe esta marca");
+          const { data: dup } = await context.supabase
+            .from("brands")
+            .select("id, name, slug")
+            .eq("slug", slug)
+            .limit(1);
+          if (dup && dup.length > 0) {
+            invalidateServerCatalogCache();
+            return dup[0] as Brand;
+          }
         }
-        console.warn("[createBrand] Supabase error, falling back to memory:", error);
-        return addInMemoryBrand(newBrand);
+        throw new Error(error.message || "No se pudo crear la marca");
       }
 
       if (!inserted) {
-        return addInMemoryBrand(newBrand);
+        throw new Error("No se pudo crear la marca");
       }
 
-      addInMemoryBrand(inserted as Brand);
+      invalidateServerCatalogCache();
       return inserted as Brand;
     } catch (err: any) {
-      if (err.message === "Ya existe esta marca") {
-        throw err;
-      }
-      console.warn("[createBrand] Error creating brand in Supabase:", err);
-      return addInMemoryBrand(newBrand);
+      throw new Error(err?.message || "No se pudo crear la marca");
     }
   });
+
