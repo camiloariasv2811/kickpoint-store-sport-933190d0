@@ -16,7 +16,13 @@ function AuthenticatedLayout() {
     let isMounted = true;
 
     async function verifySession() {
+      // Limpia el antiguo indicador de demo que provocaba tokens inválidos
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("kp_demo_auth");
+      }
+
       if (!isSupabaseConfigured()) {
+
         // Entorno local sin credenciales del backend
         if (isMounted) {
           setAuthorized(true);
