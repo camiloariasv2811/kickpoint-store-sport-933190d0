@@ -25,7 +25,9 @@ export type Product = {
   is_offer: boolean;
   active: boolean;
   low_stock_threshold: number;
+  sort_order?: number;
   created_at: string;
+
   brand: { id: string; name: string; slug: string } | null;
   category: { id: string; name: string; slug: string } | null;
   variants: Variant[];

@@ -50,7 +50,7 @@ export function invalidateServerCatalogCache() {
 
 const PRODUCT_SELECT_FULL = `
   id, name, slug, description, base_sku, retail_price, wholesale_price, wholesale_min_qty,
-  images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, created_at,
+  images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, sort_order, created_at,
   brand:brands ( id, name, slug ),
   category:categories ( id, name, slug ),
   variants:product_variants ( id, product_id, size, color, sku, stock, active )
@@ -58,11 +58,12 @@ const PRODUCT_SELECT_FULL = `
 
 const PRODUCT_SELECT_CATALOG = `
   id, name, slug, base_sku, retail_price, wholesale_price, wholesale_min_qty,
-  images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, created_at,
+  images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, sort_order, created_at,
   brand:brands ( id, name, slug ),
   category:categories ( id, name, slug ),
   variants:product_variants ( id, product_id, size, color, sku, stock, active )
 `;
+
 
 /** Minimal Query: Only id, name, slug, price, main_image, active */
 export const getMinimalProducts = createServerFn({ method: "GET" }).handler(async () => {
@@ -383,7 +384,9 @@ function normalizeProduct(p: any): Product {
     is_offer: Boolean(p.is_offer),
     active: p.active !== false,
     low_stock_threshold: Number(p.low_stock_threshold) || 5,
+    sort_order: Number(p.sort_order) || 0,
     created_at: String(p.created_at ?? new Date().toISOString()),
+
     brand: brandObj,
     category: categoryObj,
     variants: normalizedVariants,
