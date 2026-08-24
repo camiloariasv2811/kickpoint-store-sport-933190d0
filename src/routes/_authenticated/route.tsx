@@ -16,17 +16,21 @@ function AuthenticatedLayout() {
     let isMounted = true;
 
     async function verifySession() {
-      if (
-        !isSupabaseConfigured() ||
-        (typeof window !== "undefined" && localStorage.getItem("kp_demo_auth") === "true")
-      ) {
-        // In local development / preview without Supabase credentials or demo access
+      // Limpia el antiguo indicador de demo que provocaba tokens inválidos
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("kp_demo_auth");
+      }
+
+      if (!isSupabaseConfigured()) {
+
+        // Entorno local sin credenciales del backend
         if (isMounted) {
           setAuthorized(true);
           setChecking(false);
         }
         return;
       }
+
 
       try {
         const { data, error } = await supabase.auth.getUser();
