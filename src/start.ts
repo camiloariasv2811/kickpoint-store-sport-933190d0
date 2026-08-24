@@ -22,13 +22,14 @@ const errorMiddleware = createMiddleware().server(async ({ next, request }) => {
     let isServerFn = false;
     let isHtmlExpected = true;
     try {
-      const req = getRequest();
+      const req = request as Request | undefined;
       const accept = req?.headers?.get("accept") ?? "";
       isHtmlExpected = accept.includes("text/html");
       isServerFn = Boolean(req?.headers?.get("x-ts-server-fn") || req?.url?.includes("_serverFn"));
     } catch {
       // ignore
     }
+
 
     if (isServerFn || !isHtmlExpected) {
       throw error;
