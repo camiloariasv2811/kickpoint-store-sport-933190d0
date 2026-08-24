@@ -60,12 +60,11 @@ export type AdminOrder = {
 
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
     if (!isSupabaseServerConfigured()) {
       return getInMemoryOrders() as unknown as AdminOrder[];
     }
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const ordersResult = await supabaseAdmin
+    const ordersResult = await context.supabase
       .from("orders")
       .select(
         "id, order_number, customer_id, status, channel, payment_method_code, subtotal, total, is_wholesale, inventory_applied, notes, created_at",
@@ -85,18 +84,18 @@ export const listOrders = createServerFn({ method: "GET" })
     const customerIds = [...new Set(orders.map((order) => order.customer_id).filter(Boolean))] as string[];
     const [customersResult, itemsResult, paymentsResult] = await Promise.all([
       customerIds.length > 0
-        ? supabaseAdmin
+        ? context.supabase
             .from("customers")
             .select("id, first_name, last_name, whatsapp, email, address, city, state")
             .in("id", customerIds)
         : Promise.resolve({ data: [], error: null }),
-      supabaseAdmin
+      context.supabase
         .from("order_items")
         .select(
           "id, order_id, product_name, size, color, quantity, unit_price, unit_cost, subtotal, variant_id, image_url",
         )
         .in("order_id", orderIds),
-      supabaseAdmin
+      context.supabase
         .from("payments")
         .select(
           "id, order_id, status, amount, method_code, reference, proof_url, proof_uploaded_at, rejection_reason, created_at",
@@ -734,23 +733,28 @@ export const getProofUrl = createServerFn({ method: "POST" })
 
 export const getPendingAdminBadges = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async () => {
+  .handler(async ({ context }) => {
     if (!isSupabaseServerConfigured()) {
       return getInMemoryBadges();
     }
     try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
       const [ordersRes, paymentsRes] = await Promise.all([
-        supabaseAdmin
+        context.supabase
           .from("orders")
-          .select("id, status")
+          .select("id", { count: "exact", head: true })
           .in("status", ["pedido_recibido", "pago_pendiente", "pago_subido"]),
-        supabaseAdmin.from("payments").select("id, status").eq("status", "pendiente"),
+        context.supabase
+          .from("payments")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "pendiente"),
       ]);
 
-      const pendingOrders = ordersRes.data?.length ?? 0;
-      const pendingPayments = paymentsRes.data?.length ?? 0;
+      if (ordersRes.error || paymentsRes.error) {
+        throw ordersRes.error ?? paymentsRes.error;
+      }
+
+      const pendingOrders = ordersRes.count ?? 0;
+      const pendingPayments = paymentsRes.count ?? 0;
 
       return {
         pendingOrders,

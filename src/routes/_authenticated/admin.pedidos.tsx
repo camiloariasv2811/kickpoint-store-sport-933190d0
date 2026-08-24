@@ -112,7 +112,7 @@ function AdminPedidos() {
   const counts = {
     todos: orders.length,
     mayoristas: orders.filter((o) => o.is_wholesale).length,
-    pago_pendiente: orders.filter((o) => o.status === "pago_pendiente").length,
+    pago_pendiente: orders.filter((o) => ["pedido_recibido", "pago_pendiente", "pago_subido"].includes(o.status)).length,
     pago_verificado: orders.filter((o) => o.status === "pago_verificado").length,
     preparando_pedido: orders.filter((o) => o.status === "preparando_pedido").length,
     pedido_enviado: orders.filter((o) => o.status === "pedido_enviado").length,
@@ -127,6 +127,8 @@ function AdminPedidos() {
     let matchesStatus = true;
     if (statusFilter === "mayoristas") {
       matchesStatus = Boolean(o.is_wholesale);
+    } else if (statusFilter === "pago_pendiente") {
+      matchesStatus = ["pedido_recibido", "pago_pendiente", "pago_subido"].includes(o.status);
     } else if (statusFilter !== "todos") {
       matchesStatus = o.status === statusFilter;
     }
