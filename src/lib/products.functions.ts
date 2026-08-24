@@ -866,42 +866,42 @@ export const uploadProductImage = createServerFn({ method: "POST" })
       : "jpg";
     const sanitizedName = data.fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
     const path = `${data.productId || "catalog"}/${Date.now()}-${sanitizedName}.${ext}`;
-    const fallbackDataUrl = `data:${data.contentType || "image/jpeg"};base64,${data.dataBase64}`;
 
-    if (isSupabaseServerConfigured()) {
-      try {
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const bytes = Buffer.from(data.dataBase64, "base64");
-        const BUCKET = "product_images";
+    if (!isSupabaseServerConfigured()) {
+      throw new Error("El almacenamiento de imágenes no está disponible en este momento.");
+    }
 
-        const { error: uploadError } = await supabaseAdmin.storage
-          .from(BUCKET)
-          .upload(path, bytes, { contentType: data.contentType, upsert: false });
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const bytes = Buffer.from(data.dataBase64, "base64");
+    const BUCKET = "product-images";
 
-        if (!uploadError) {
-          const { data: pubData } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
-          const url = pubData?.publicUrl || path;
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(BUCKET)
+      .upload(path, bytes, { contentType: data.contentType, upsert: false });
 
-          if (data.productId) {
-            const { data: p, error: fetchErr } = await supabaseAdmin
-              .from("products")
-              .select("images")
-              .eq("id", data.productId)
-              .single();
-            if (!fetchErr && p) {
-              const images = (p.images ?? []) as string[];
-              if (!images.includes(url)) {
-                images.push(url);
-                await supabaseAdmin.from("products").update({ images }).eq("id", data.productId);
-              }
-            }
-          }
-          return { path, url };
+    if (uploadError) {
+      console.error("[uploadProductImage] Storage upload error:", uploadError);
+      throw new Error("No pudimos subir la imagen. Inténtalo de nuevo.");
+    }
+
+    // Se guarda una URL corta y cacheable (nunca la imagen completa en la base de datos).
+    const url = `/api/public/product-image/${path}`;
+
+    if (data.productId) {
+      const { data: p, error: fetchErr } = await supabaseAdmin
+        .from("products")
+        .select("images")
+        .eq("id", data.productId)
+        .single();
+      if (!fetchErr && p) {
+        const images = (p.images ?? []) as string[];
+        if (!images.includes(url)) {
+          images.push(url);
+          await supabaseAdmin.from("products").update({ images }).eq("id", data.productId);
         }
-      } catch (err) {
-        console.warn("[uploadProductImage] Storage upload error, falling back to data URL:", err);
       }
     }
 
-    return { path, url: fallbackDataUrl };
+    return { path, url };
   });
+
