@@ -670,7 +670,27 @@ function AdminPedidos() {
                 </div>
               )}
 
+              {/* Nota de entrega / Guía del paquete */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                <div className="text-xs">
+                  <p className="font-semibold text-foreground">Nota de entrega y guía del paquete</p>
+                  <p className="text-muted-foreground">
+                    Documento con productos, totales y etiqueta grande para identificar el paquete.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="hero"
+                  size="sm"
+                  className="gap-1 text-xs"
+                  onClick={() => handlePrintDeliveryNote(selectedOrder)}
+                >
+                  <Printer className="size-4" /> Imprimir nota y guía
+                </Button>
+              </div>
+
               {/* Botones de Acción Crítica: Cancelar / Eliminar Orden / Reenviar Email */}
+
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
