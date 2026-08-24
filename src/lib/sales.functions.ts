@@ -57,12 +57,13 @@ export type AdminSale = {
 
 export const listSales = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     if (!isSupabaseServerConfigured()) {
       return getInMemorySales() as AdminSale[];
     }
     try {
-      const { data, error } = await context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data, error } = await supabaseAdmin
         .from("sales")
         .select(
           `
@@ -74,11 +75,13 @@ export const listSales = createServerFn({ method: "GET" })
         .order("created_at", { ascending: false })
         .limit(300);
       if (error || !data) {
-        return getInMemorySales() as AdminSale[];
+        console.error("[listSales] Supabase error:", error);
+        return [];
       }
       return (data ?? []) as unknown as AdminSale[];
-    } catch {
-      return getInMemorySales() as AdminSale[];
+    } catch (err) {
+      console.error("[listSales] Fatal catch:", err);
+      return [];
     }
   });
 

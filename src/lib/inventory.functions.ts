@@ -35,7 +35,7 @@ const INVENTORY_SELECT = `
 /** Lista el inventario a nivel de variante (talla/color), para búsqueda y filtros en el panel. */
 export const listInventory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     if (!isSupabaseServerConfigured()) {
       const products = getInMemoryProducts();
       const rows: InventoryRow[] = [];
@@ -70,41 +70,15 @@ export const listInventory = createServerFn({ method: "GET" })
     }
 
     try {
-      const { data, error } = await context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data, error } = await supabaseAdmin
         .from("products")
         .select(INVENTORY_SELECT)
         .eq("active", true);
+
       if (error || !data) {
-        const products = getInMemoryProducts();
-        const rows: InventoryRow[] = [];
-        for (const p of products) {
-          if (p.active === false) continue;
-          const threshold = p.low_stock_threshold ?? 5;
-          for (const v of p.variants ?? []) {
-            if (v.active === false) continue;
-            const vStock = Number(v.stock ?? 0);
-            const status: InventoryRow["status"] =
-              vStock <= 0 ? "agotado" : vStock <= threshold ? "bajo" : "ok";
-            rows.push({
-              variantId: v.id,
-              productId: p.id,
-              productName: p.name,
-              baseSku: p.base_sku,
-              size: v.size,
-              color: v.color,
-              sku: v.sku,
-              stock: vStock,
-              active: v.active !== false,
-              lowStockThreshold: threshold,
-              categoryName: p.category?.name ?? null,
-              status,
-            });
-          }
-        }
-        rows.sort(
-          (a, b) => a.productName.localeCompare(b.productName) || a.size.localeCompare(b.size),
-        );
-        return rows;
+        console.error("[listInventory] Supabase error:", error);
+        return [];
       }
 
       const rows: InventoryRow[] = [];
@@ -152,37 +126,9 @@ export const listInventory = createServerFn({ method: "GET" })
         (a, b) => a.productName.localeCompare(b.productName) || a.size.localeCompare(b.size),
       );
       return rows;
-    } catch {
-      const products = getInMemoryProducts();
-      const rows: InventoryRow[] = [];
-      for (const p of products) {
-        if (p.active === false) continue;
-        const threshold = p.low_stock_threshold ?? 5;
-        for (const v of p.variants ?? []) {
-          if (v.active === false) continue;
-          const vStock = Number(v.stock ?? 0);
-          const status: InventoryRow["status"] =
-            vStock <= 0 ? "agotado" : vStock <= threshold ? "bajo" : "ok";
-          rows.push({
-            variantId: v.id,
-            productId: p.id,
-            productName: p.name,
-            baseSku: p.base_sku,
-            size: v.size,
-            color: v.color,
-            sku: v.sku,
-            stock: vStock,
-            active: v.active !== false,
-            lowStockThreshold: threshold,
-            categoryName: p.category?.name ?? null,
-            status,
-          });
-        }
-      }
-      rows.sort(
-        (a, b) => a.productName.localeCompare(b.productName) || a.size.localeCompare(b.size),
-      );
-      return rows;
+    } catch (err) {
+      console.error("[listInventory] Fatal catch:", err);
+      return [];
     }
   });
 
@@ -208,7 +154,7 @@ export type InventoryMovementRow = {
 export const listInventoryMovements = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { variantId?: string | undefined; type?: string; limit?: number }) => data)
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     if (!isSupabaseServerConfigured()) {
       const inMem = getInMemoryKardex();
       return inMem.map((k) => ({
@@ -231,7 +177,8 @@ export const listInventoryMovements = createServerFn({ method: "GET" })
     }
 
     try {
-      let query = context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      let query = supabaseAdmin
         .from("inventory_movements")
         .select(
           `
@@ -247,24 +194,8 @@ export const listInventoryMovements = createServerFn({ method: "GET" })
 
       const { data: rows, error } = await query;
       if (error) {
-        const inMem = getInMemoryKardex();
-        return inMem.map((k) => ({
-          id: k.id,
-          variantId: "v-demo",
-          productName: k.productName,
-          size: k.size ?? "—",
-          color: k.color,
-          sku: k.sku,
-          type: k.type,
-          quantity: k.quantity,
-          unitCost: 14.0,
-          stockAfter: k.stockAfter,
-          reference: k.reference,
-          note: k.note,
-          createdBy: "admin",
-          createdByEmail: "admin@kickpoint.store",
-          createdAt: k.createdAt,
-        })) satisfies InventoryMovementRow[];
+        console.error("[listInventoryMovements] Supabase error:", error);
+        return [];
       }
 
       const creatorIds = [
@@ -273,7 +204,6 @@ export const listInventoryMovements = createServerFn({ method: "GET" })
       const emailById = new Map<string, string>();
       if (creatorIds.length > 0) {
         try {
-          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { data: profiles } = await supabaseAdmin
             .from("profiles")
             .select("id, email")
@@ -311,25 +241,9 @@ export const listInventoryMovements = createServerFn({ method: "GET" })
           createdAt: r.created_at,
         } satisfies InventoryMovementRow;
       });
-    } catch {
-      const inMem = getInMemoryKardex();
-      return inMem.map((k) => ({
-        id: k.id,
-        variantId: "v-demo",
-        productName: k.productName,
-        size: k.size ?? "—",
-        color: k.color,
-        sku: k.sku,
-        type: k.type,
-        quantity: k.quantity,
-        unitCost: 14.0,
-        stockAfter: k.stockAfter,
-        reference: k.reference,
-        note: k.note,
-        createdBy: "admin",
-        createdByEmail: "admin@kickpoint.store",
-        createdAt: k.createdAt,
-      })) satisfies InventoryMovementRow[];
+    } catch (err) {
+      console.error("[listInventoryMovements] Fatal catch:", err);
+      return [];
     }
   });
 
@@ -382,21 +296,14 @@ export const recordInventoryMovement = createServerFn({ method: "POST" })
     }
 
     try {
-      const { data: variant, error: variantError } = await context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: variant, error: variantError } = await supabaseAdmin
         .from("product_variants")
         .select("id, stock, active")
         .eq("id", data.variantId)
         .single();
       if (variantError || !variant) {
-        const res = recordInMemoryMovement(
-          data.variantId,
-          data.type,
-          data.quantity,
-          data.unitCost,
-          data.reference,
-          data.note,
-        );
-        return { ok: true as const, stockAfter: res.stockAfter };
+        throw new Error(variantError?.message ?? "Variante no encontrada");
       }
 
       const currentStock = Number(variant.stock ?? 0);
@@ -420,23 +327,15 @@ export const recordInventoryMovement = createServerFn({ method: "POST" })
         loggedQuantity = stockAfter - currentStock;
       }
 
-      const { error: updateError } = await context.supabase
+      const { error: updateError } = await supabaseAdmin
         .from("product_variants")
         .update({ stock: stockAfter })
         .eq("id", data.variantId);
       if (updateError) {
-        const res = recordInMemoryMovement(
-          data.variantId,
-          data.type,
-          data.quantity,
-          data.unitCost,
-          data.reference,
-          data.note,
-        );
-        return { ok: true as const, stockAfter: res.stockAfter };
+        throw new Error(`Error al actualizar stock: ${updateError.message}`);
       }
 
-      const { error: insertError } = await context.supabase.from("inventory_movements").insert({
+      const { error: insertError } = await supabaseAdmin.from("inventory_movements").insert({
         variant_id: data.variantId,
         type: data.type,
         quantity: loggedQuantity,
@@ -455,15 +354,8 @@ export const recordInventoryMovement = createServerFn({ method: "POST" })
       if (err.message && err.message.includes("No hay suficiente stock")) {
         throw err;
       }
-      const res = recordInMemoryMovement(
-        data.variantId,
-        data.type,
-        data.quantity,
-        data.unitCost,
-        data.reference,
-        data.note,
-      );
-      return { ok: true as const, stockAfter: res.stockAfter };
+      console.error("[recordInventoryMovement] Error:", err);
+      throw err;
     }
   });
 

@@ -21,12 +21,13 @@ export type CustomerRow = {
 
 export const listCustomers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     if (!isSupabaseServerConfigured()) {
       return getInMemoryCustomers() as CustomerRow[];
     }
     try {
-      const { data: customers, error } = await context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: customers, error } = await supabaseAdmin
         .from("customers")
         .select(
           `
@@ -35,8 +36,10 @@ export const listCustomers = createServerFn({ method: "GET" })
         `,
         )
         .order("created_at", { ascending: false });
+
       if (error || !customers) {
-        return getInMemoryCustomers() as CustomerRow[];
+        console.error("[listCustomers] Supabase error:", error);
+        return [];
       }
 
       return (customers ?? []).map((c: any) => {
@@ -60,8 +63,9 @@ export const listCustomers = createServerFn({ method: "GET" })
           total_spent: totalSpent,
         } as CustomerRow;
       });
-    } catch {
-      return getInMemoryCustomers() as CustomerRow[];
+    } catch (err) {
+      console.error("[listCustomers] Fatal catch:", err);
+      return [];
     }
   });
 
@@ -80,7 +84,7 @@ export const createCustomer = createServerFn({ method: "POST" })
       notes?: string | null;
     }) => d,
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     if (!data.first_name?.trim()) throw new Error("El nombre es requerido");
     const payload = {
       first_name: data.first_name.trim(),
@@ -100,19 +104,19 @@ export const createCustomer = createServerFn({ method: "POST" })
     }
 
     try {
-      const { data: inserted, error } = await context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: inserted, error } = await supabaseAdmin
         .from("customers")
         .insert(payload)
         .select("id")
         .single();
       if (error || !inserted) {
-        const inMem = addInMemoryCustomer(payload);
-        return { id: inMem.id };
+        throw new Error(error?.message ?? "Error al crear cliente");
       }
       return { id: inserted.id };
-    } catch {
-      const inMem = addInMemoryCustomer(payload);
-      return { id: inMem.id };
+    } catch (err) {
+      console.error("[createCustomer] Error:", err);
+      throw err;
     }
   });
 
@@ -132,21 +136,23 @@ export const updateCustomer = createServerFn({ method: "POST" })
       notes?: string | null;
     }) => d,
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const { id, ...patch } = data;
-    updateInMemoryCustomer(id, patch);
 
     if (!isSupabaseServerConfigured()) {
+      updateInMemoryCustomer(id, patch);
       return { ok: true as const };
     }
 
     try {
-      const { error } = await context.supabase.from("customers").update(patch).eq("id", id);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin.from("customers").update(patch).eq("id", id);
       if (error) {
-        console.warn("Supabase update customer warning:", error.message);
+        throw new Error(error.message);
       }
       return { ok: true as const };
-    } catch {
-      return { ok: true as const };
+    } catch (err) {
+      console.error("[updateCustomer] Error:", err);
+      throw err;
     }
   });

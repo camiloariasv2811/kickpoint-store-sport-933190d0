@@ -7,6 +7,7 @@ import {
   updateInMemoryCategory,
   deleteInMemoryCategory,
 } from "./demo-data";
+import { invalidateServerCatalogCache } from "./catalog.functions";
 
 export type CategoryRow = {
   id: string;
@@ -20,7 +21,7 @@ export type CategoryRow = {
 
 export const listAdminCategories = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     if (!isSupabaseServerConfigured()) {
       return getInMemoryCategories().map((c) => ({
         id: c.id,
@@ -33,32 +34,20 @@ export const listAdminCategories = createServerFn({ method: "GET" })
       })) as CategoryRow[];
     }
     try {
-      const { data, error } = await context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data, error } = await supabaseAdmin
         .from("categories")
         .select("id, name, slug, parent_id, image_url, sort_order, active")
         .order("sort_order", { ascending: true });
+
       if (error || !data) {
-        return getInMemoryCategories().map((c) => ({
-          id: c.id,
-          name: c.name,
-          slug: c.slug,
-          parent_id: c.parent_id,
-          image_url: c.image_url,
-          sort_order: c.sort_order,
-          active: true,
-        })) as CategoryRow[];
+        console.error("[listAdminCategories] Supabase error:", error);
+        return [];
       }
       return data as CategoryRow[];
-    } catch {
-      return getInMemoryCategories().map((c) => ({
-        id: c.id,
-        name: c.name,
-        slug: c.slug,
-        parent_id: c.parent_id,
-        image_url: c.image_url,
-        sort_order: c.sort_order,
-        active: true,
-      })) as CategoryRow[];
+    } catch (err) {
+      console.error("[listAdminCategories] Fatal catch:", err);
+      return [];
     }
   });
 
@@ -73,7 +62,8 @@ export const createCategory = createServerFn({ method: "POST" })
       active?: boolean;
     }) => d,
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
+    invalidateServerCatalogCache();
     const name = data.name.trim();
     if (!name) throw new Error("Nombre requerido");
     const slug =
@@ -101,7 +91,8 @@ export const createCategory = createServerFn({ method: "POST" })
     }
 
     try {
-      const { data: inserted, error } = await context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: inserted, error } = await supabaseAdmin
         .from("categories")
         .insert({
           name,
@@ -113,13 +104,12 @@ export const createCategory = createServerFn({ method: "POST" })
         .select("id")
         .single();
       if (error || !inserted) {
-        addInMemoryCategory(newCat);
-        return { id: newCat.id };
+        throw new Error(error?.message ?? "Error al crear categoría");
       }
       return { id: inserted.id };
-    } catch {
-      addInMemoryCategory(newCat);
-      return { id: newCat.id };
+    } catch (err) {
+      console.error("[createCategory] Error:", err);
+      throw err;
     }
   });
 
@@ -135,44 +125,48 @@ export const updateCategory = createServerFn({ method: "POST" })
       active?: boolean;
     }) => d,
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
+    invalidateServerCatalogCache();
     const { id, ...patch } = data;
     if (patch.parent_id === "") patch.parent_id = null;
 
-    updateInMemoryCategory(id, patch);
-
     if (!isSupabaseServerConfigured()) {
+      updateInMemoryCategory(id, patch);
       return { ok: true as const };
     }
 
     try {
-      const { error } = await context.supabase.from("categories").update(patch).eq("id", id);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin.from("categories").update(patch).eq("id", id);
       if (error) {
-        console.warn("Supabase updateCategory fallback to in-memory:", error.message);
+        throw new Error(error.message);
       }
       return { ok: true as const };
-    } catch {
-      return { ok: true as const };
+    } catch (err) {
+      console.error("[updateCategory] Error:", err);
+      throw err;
     }
   });
 
 export const deleteCategory = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { id: string }) => d)
-  .handler(async ({ data, context }) => {
-    deleteInMemoryCategory(data.id);
-
+  .handler(async ({ data }) => {
+    invalidateServerCatalogCache();
     if (!isSupabaseServerConfigured()) {
+      deleteInMemoryCategory(data.id);
       return { ok: true as const };
     }
 
     try {
-      const { error } = await context.supabase.from("categories").delete().eq("id", data.id);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin.from("categories").delete().eq("id", data.id);
       if (error) {
-        console.warn("Supabase deleteCategory fallback to in-memory:", error.message);
+        throw new Error(error.message);
       }
       return { ok: true as const };
-    } catch {
-      return { ok: true as const };
+    } catch (err) {
+      console.error("[deleteCategory] Error:", err);
+      throw err;
     }
   });
