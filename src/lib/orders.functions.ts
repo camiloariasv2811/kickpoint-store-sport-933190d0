@@ -77,14 +77,14 @@ export const listOrders = createServerFn({ method: "GET" })
         .from("orders")
         .select(ORDER_SELECT)
         .order("created_at", { ascending: false })
-        .limit(300);
+        .limit(120);
       if (error) {
         console.error("[listOrders] Error query with admin:", error.message);
         const fallback = await context.supabase
           .from("orders")
           .select(ORDER_SELECT)
           .order("created_at", { ascending: false })
-          .limit(300);
+          .limit(120);
         if (fallback.data) {
           return fallback.data as unknown as AdminOrder[];
         }

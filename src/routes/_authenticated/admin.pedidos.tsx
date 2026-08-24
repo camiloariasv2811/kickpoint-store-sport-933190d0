@@ -148,7 +148,8 @@ function AdminPedidos() {
       toast.success("Estado del pedido actualizado", {
         description: ORDER_STATUS_LABELS[newStatus] ?? newStatus,
       });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
@@ -172,7 +173,8 @@ function AdminPedidos() {
     try {
       await cancelOrder({ data: { orderId: order.id, reason: "Cancelación desde panel admin" } });
       toast.success(`Pedido ${order.order_number} cancelado`);
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       setSelectedOrder(null);
     } catch (err: any) {
       toast.error(`Error: ${err.message}`);
@@ -193,7 +195,8 @@ function AdminPedidos() {
     try {
       await deleteOrder({ data: { orderId: order.id, restoreStock: true } });
       toast.success(`Pedido ${order.order_number} eliminado correctamente`);
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       setSelectedOrder(null);
     } catch (err: any) {
       toast.error(`Error: ${err.message}`);
