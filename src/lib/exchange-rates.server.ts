@@ -1,8 +1,10 @@
 // Server-only helper: fetches the current Venezuelan USD rates (BCV official) and
-// the live USDT price from Binance P2P (VES market), storing them in the store settings.
+// the live USDT price, prioritising alcambio.app (same numbers the user sees there).
 const RATES_SOURCE_URL = "https://ve.dolarapi.com/v1/dolares";
 const BINANCE_P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search";
 const CRIPTOYA_URL = "https://criptoya.com/api/usdt/ves/1";
+const ALCAMBIO_URL = "https://api.alcambio.app/graphql";
+
 
 export type RateRefreshResult = {
   ok: boolean;
