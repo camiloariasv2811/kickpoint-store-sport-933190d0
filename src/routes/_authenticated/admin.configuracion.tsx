@@ -512,6 +512,33 @@ function AdminConfiguracion() {
                   </p>
                 </div>
 
+                <div className="sm:col-span-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                        Actualización automática diaria de tasas
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {settings?.exchange_rates_updated_at
+                          ? `Última sincronización automática: ${new Date(settings.exchange_rates_updated_at).toLocaleString("es-VE")}`
+                          : "Las tasas BCV y USDT/Paralelo se sincronizan una vez al día desde la fuente pública de referencia."}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRefreshRates}
+                      disabled={refreshingRates}
+                      className="h-8 gap-1.5 text-xs"
+                    >
+                      <RefreshCw className={`size-3.5 ${refreshingRates ? "animate-spin" : ""}`} />
+                      {refreshingRates ? "Consultando..." : "Actualizar tasas ahora"}
+                    </Button>
+                  </div>
+                </div>
+
+
                 <div>
                   <Label htmlFor="s-stock" className="flex items-center gap-1.5 font-semibold">
                     Alerta de Stock Bajo (Umbral por defecto)
