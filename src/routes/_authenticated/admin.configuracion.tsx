@@ -66,6 +66,7 @@ export const Route = createFileRoute("/_authenticated/admin/configuracion")({
 function AdminConfiguracion() {
   const queryClient = useQueryClient();
   const [savingSettings, setSavingSettings] = useState(false);
+  const [refreshingRates, setRefreshingRates] = useState(false);
 
   // Store General Settings
   const [whatsapp, setWhatsapp] = useState("");
