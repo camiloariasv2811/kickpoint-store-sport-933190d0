@@ -16,8 +16,11 @@ function AuthenticatedLayout() {
     let isMounted = true;
 
     async function verifySession() {
-      if (!isSupabaseConfigured()) {
-        // In local development / preview without Supabase credentials
+      if (
+        !isSupabaseConfigured() ||
+        (typeof window !== "undefined" && localStorage.getItem("kp_demo_auth") === "true")
+      ) {
+        // In local development / preview without Supabase credentials or demo access
         if (isMounted) {
           setAuthorized(true);
           setChecking(false);

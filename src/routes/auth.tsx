@@ -179,6 +179,18 @@ function AuthPage() {
             Continuar con Google
           </Button>
 
+          <Button
+            variant="outline"
+            size="lg"
+            className="mt-2.5 w-full border-dashed border-primary/40 bg-primary/5 text-primary hover:bg-primary/10"
+            onClick={() => {
+              localStorage.setItem("kp_demo_auth", "true");
+              navigate({ to: "/admin", replace: true });
+            }}
+          >
+            Acceso Directo al Panel (Vista Previa / Demo)
+          </Button>
+
           <button
             onClick={() => setMode(mode === "login" ? "signup" : "login")}
             className="mt-5 w-full text-center text-sm text-muted-foreground hover:text-primary"
