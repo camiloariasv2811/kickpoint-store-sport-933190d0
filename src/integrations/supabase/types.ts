@@ -536,6 +536,7 @@ export type Database = {
           name: string
           retail_price: number
           slug: string
+          sort_order: number
           updated_at: string
           wholesale_min_qty: number
           wholesale_price: number | null
@@ -558,6 +559,7 @@ export type Database = {
           name: string
           retail_price?: number
           slug: string
+          sort_order?: number
           updated_at?: string
           wholesale_min_qty?: number
           wholesale_price?: number | null
@@ -580,6 +582,7 @@ export type Database = {
           name?: string
           retail_price?: number
           slug?: string
+          sort_order?: number
           updated_at?: string
           wholesale_min_qty?: number
           wholesale_price?: number | null

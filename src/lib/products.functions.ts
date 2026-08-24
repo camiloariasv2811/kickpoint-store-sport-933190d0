@@ -112,11 +112,12 @@ async function assertIsStaff(context: any) {
 
 const PRODUCT_SELECT = `
   id, name, slug, description, base_sku, cost, retail_price, wholesale_price, wholesale_min_qty,
-  images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, created_at,
+  images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, sort_order, created_at,
   brand:brands ( id, name, slug ),
   category:categories ( id, name, slug ),
   variants:product_variants ( id, product_id, size, color, sku, stock, active )
 `;
+
 
 export type ListAdminProductsInput = {
   page?: number;
@@ -236,7 +237,10 @@ export const listAdminProducts = createServerFn({ method: "GET" })
         query = query.or(`name.ilike.%${term}%,base_sku.ilike.%${term}%`);
       }
 
-      query = query.order("created_at", { ascending: false });
+      query = query
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false });
+
 
       const page = Math.max(1, Number(data?.page) || 1);
       const pageSize = data?.pageSize !== undefined ? Number(data.pageSize) : 20;
@@ -917,3 +921,79 @@ export const uploadProductImage = createServerFn({ method: "POST" })
     return { path, url };
   });
 
+
+// ===== Orden del catálogo (qué producto aparece primero en el portal del cliente) =====
+
+export type CatalogOrderItem = {
+  id: string;
+  name: string;
+  slug: string | null;
+  retail_price: number;
+  image: string | null;
+  active: boolean;
+  sort_order: number;
+};
+
+export const listCatalogOrder = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<CatalogOrderItem[]> => {
+    await assertIsStaff(context);
+
+    if (!isSupabaseServerConfigured()) {
+      return getInMemoryProducts().map((p, idx) => ({
+        id: String(p.id),
+        name: String(p.name),
+        slug: p.slug ?? null,
+        retail_price: Number(p.retail_price) || 0,
+        image: Array.isArray(p.images) && p.images.length > 0 ? String(p.images[0]) : null,
+        active: p.active !== false,
+        sort_order: idx * 10,
+      }));
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin
+      .from("products")
+      .select("id, name, slug, retail_price, images, active, sort_order, created_at")
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: false });
+
+    if (error) throw new Error(error.message);
+
+    return (data ?? []).map((p: any) => ({
+      id: String(p.id),
+      name: String(p.name ?? "Producto"),
+      slug: p.slug ? String(p.slug) : null,
+      retail_price: Number(p.retail_price) || 0,
+      image: Array.isArray(p.images) && p.images.length > 0 ? String(p.images[0]) : null,
+      active: p.active !== false,
+      sort_order: Number(p.sort_order) || 0,
+    }));
+  });
+
+export const saveCatalogOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { ids: string[] }) => d)
+  .handler(async ({ data, context }) => {
+    await assertIsStaff(context);
+    const ids = (data?.ids ?? []).map(String).filter(Boolean);
+    if (ids.length === 0) return { ok: true as const, updated: 0 };
+
+    invalidateServerCatalogCache();
+
+    if (!isSupabaseServerConfigured()) {
+      return { ok: true as const, updated: ids.length };
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let updated = 0;
+    for (let i = 0; i < ids.length; i++) {
+      const { error } = await supabaseAdmin
+        .from("products")
+        .update({ sort_order: (i + 1) * 10 })
+        .eq("id", ids[i]!);
+      if (error) throw new Error(error.message);
+      updated += 1;
+    }
+    return { ok: true as const, updated };
+  });
