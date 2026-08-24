@@ -148,6 +148,9 @@ function AdminPedidos() {
       toast.success("Estado del pedido actualizado", {
         description: ORDER_STATUS_LABELS[newStatus] ?? newStatus,
       });
+      queryClient.setQueryData<AdminOrder[]>(["admin", "orders"], (prev) =>
+        (prev ?? []).map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)),
+      );
       void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       if (selectedOrder && selectedOrder.id === orderId) {
