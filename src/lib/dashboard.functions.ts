@@ -434,8 +434,11 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
       ]);
 
       if (productsRes.error || ordersRes.error || salesRes.error) {
-        console.warn("[getAdminDashboard] database query warning, falling back to demo metrics");
-        return getInMemoryDashboardMetrics();
+        console.error("[getAdminDashboard] database query error:", {
+          productsError: productsRes.error?.message,
+          ordersError: ordersRes.error?.message,
+          salesError: salesRes.error?.message,
+        });
       }
 
       const rawProducts = productsRes.data ?? [];
@@ -809,7 +812,51 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
         recentMovements,
       };
     } catch (err) {
-      console.warn("[getAdminDashboard] exception handled, using fallback metrics:", err);
+      console.error("[getAdminDashboard] exception handled:", err);
+      if (isSupabaseServerConfigured()) {
+        return {
+          sales: {
+            todayTotal: 0,
+            todayCount: 0,
+            monthTotal: 0,
+            monthCount: 0,
+            totalGenerated: 0,
+            totalCollected: 0,
+            totalUnitsSold: 0,
+            pendingPaymentsCount: 0,
+            pendingPaymentsAmount: 0,
+            pendingOrdersCount: 0,
+          },
+          inventory: {
+            totalUnits: 0,
+            totalCostValue: 0,
+            totalRetailValue: 0,
+            totalWholesaleValue: 0,
+            activeProductsCount: 0,
+            outOfStockCount: 0,
+            lowStockCount: 0,
+          },
+          inventoryFlow: {
+            currentStockUnits: 0,
+            totalSoldUnits: 0,
+            totalCollectedMoney: 0,
+            totalEntriesUnits: 0,
+            totalExitsUnits: 0,
+            totalAdjustmentsUnits: 0,
+            initialUnits: 0,
+            hasHistoricalMovements: false,
+            flowDescription: "0 disponibles · 0 vendidas",
+          },
+          charts: {
+            salesEvolution: [],
+            salesByChannel: [],
+            inventoryByCategory: [],
+          },
+          recentOrders: [],
+          lowStockItems: [],
+          recentMovements: [],
+        };
+      }
       return getInMemoryDashboardMetrics();
     }
   });
