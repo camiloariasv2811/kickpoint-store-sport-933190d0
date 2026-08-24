@@ -824,6 +824,40 @@ function CheckoutPage() {
             {/* ---------- PASO 2 ---------- */}
             {step === 2 && (
               <>
+                {/* Monto a pagar — visible de inmediato en móvil */}
+                <section className="surface-card border-2 border-primary/40 p-4 lg:hidden">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Monto a pagar
+                      </p>
+                      <p className="text-display text-3xl text-primary tabular-nums">
+                        {moneyExact(activeSubtotal)}
+                      </p>
+                      <p className="mt-0.5 font-mono text-sm font-bold text-foreground">
+                        Bs.{" "}
+                        {totalBs.toLocaleString("es-VE", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                        Tasa USDT
+                      </span>
+                      <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                        Bs. {usdtRate.toFixed(2)} / USD
+                      </p>
+                      {isWholesaleCheckout && (
+                        <p className="mt-1 text-[10px] font-extrabold text-amber-600 dark:text-amber-400">
+                          MAYORISTA · {activeCount} uds.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </section>
+
                 <section className="surface-card p-5">
                   <div className="flex items-center gap-2">
                     <CreditCard className="size-5 text-primary" />
