@@ -1,11 +1,11 @@
 import { createStart, createCsrfMiddleware, createMiddleware } from "@tanstack/react-start";
 import { isNotFound, isRedirect } from "@tanstack/react-router";
-import { getRequest } from "@tanstack/react-start/server";
 
 import { renderErrorPage } from "./lib/error-page";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 
-const errorMiddleware = createMiddleware().server(async ({ next }) => {
+const errorMiddleware = createMiddleware().server(async ({ next, request }) => {
+
   try {
     return await next();
   } catch (error) {
@@ -22,13 +22,14 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
     let isServerFn = false;
     let isHtmlExpected = true;
     try {
-      const req = getRequest();
+      const req = request as Request | undefined;
       const accept = req?.headers?.get("accept") ?? "";
       isHtmlExpected = accept.includes("text/html");
       isServerFn = Boolean(req?.headers?.get("x-ts-server-fn") || req?.url?.includes("_serverFn"));
     } catch {
       // ignore
     }
+
 
     if (isServerFn || !isHtmlExpected) {
       throw error;
