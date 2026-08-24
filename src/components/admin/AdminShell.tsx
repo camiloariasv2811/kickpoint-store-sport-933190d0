@@ -55,6 +55,7 @@ function NavList({
           <Link
             key={item.to}
             to={item.to}
+            preload="intent"
             onClick={onNavigate}
             activeOptions={{ exact: Boolean((item as { exact?: boolean }).exact) }}
             activeProps={{
@@ -95,10 +96,10 @@ export function AdminShell({
 
   const { data: badges } = useQuery({
     queryKey: ["admin", "pending-badges"],
-    staleTime: 0,
-    refetchInterval: 8000,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
     refetchOnWindowFocus: true,
-    refetchOnMount: "always",
+    refetchOnMount: false,
     queryFn: async () => {
       try {
         const res = await getPendingAdminBadges();
