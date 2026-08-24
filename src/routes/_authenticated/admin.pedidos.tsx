@@ -81,10 +81,10 @@ function AdminPedidos() {
 
   const { data: orders = [], isLoading } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
-    staleTime: 0,
-    refetchInterval: 5000,
+    staleTime: 1000 * 20,
+    refetchInterval: 20000,
     refetchOnWindowFocus: true,
-    refetchOnMount: "always",
+    placeholderData: (prev) => prev,
     queryFn: async () => {
       try {
         const res = await listOrders();
