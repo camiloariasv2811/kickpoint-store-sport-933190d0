@@ -66,6 +66,8 @@ function AdminPagos() {
 
   const { data: orders = [], isLoading } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
+    staleTime: 1000 * 20,
+    placeholderData: (prev) => prev,
     queryFn: async () => {
       try {
         const res = await listOrders();
