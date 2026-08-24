@@ -27,12 +27,38 @@ function pickRate(entry: DolarApiEntry | undefined): number | null {
   return Number.isFinite(value) && value > 0 ? Number(value.toFixed(4)) : null;
 }
 
-// Median price of the top Binance P2P sell offers for USDT/VES.
+// Primary source: CriptoYa aggregates the live Binance P2P USDT/VES book and is
+// reachable from the edge runtime (Binance blocks some datacenter IPs).
+async function fetchCriptoYaUsdtRate(): Promise<number | null> {
+  try {
+    const response = await fetch(CRIPTOYA_URL, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`CriptoYa respondió ${response.status}`);
+    const json = (await response.json()) as Record<string, { ask?: number; bid?: number }>;
+    const p2p = json["binancep2p"];
+    const candidates = [p2p?.ask, p2p?.bid].map(Number).filter((n) => Number.isFinite(n) && n > 0);
+    if (candidates.length === 0) return null;
+    const avg = candidates.reduce((a, b) => a + b, 0) / candidates.length;
+    return Number(avg.toFixed(4));
+  } catch (err) {
+    console.warn(
+      "[refreshExchangeRates] CriptoYa failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
+
+// Average of the best (highest) Binance P2P sell offers for USDT/VES.
 async function fetchBinanceUsdtRate(): Promise<number | null> {
   try {
     const response = await fetch(BINANCE_P2P_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+      },
       body: JSON.stringify({
         page: 1,
         rows: 20,
@@ -48,12 +74,11 @@ async function fetchBinanceUsdtRate(): Promise<number | null> {
     const prices = (json.data ?? [])
       .map((item) => Number(item.adv?.price))
       .filter((n) => Number.isFinite(n) && n > 0)
-      .sort((a, b) => a - b);
+      .sort((a, b) => b - a)
+      .slice(0, 5);
     if (prices.length === 0) return null;
-    const mid = Math.floor(prices.length / 2);
-    const median =
-      prices.length % 2 === 0 ? ((prices[mid - 1] as number) + (prices[mid] as number)) / 2 : (prices[mid] as number);
-    return Number(median.toFixed(4));
+    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+    return Number(avg.toFixed(4));
   } catch (err) {
     console.warn(
       "[refreshExchangeRates] Binance P2P failed:",
@@ -62,6 +87,7 @@ async function fetchBinanceUsdtRate(): Promise<number | null> {
     return null;
   }
 }
+
 
 
 export async function refreshExchangeRates(): Promise<RateRefreshResult> {
