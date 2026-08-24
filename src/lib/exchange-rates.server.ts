@@ -132,7 +132,7 @@ export async function refreshExchangeRates(): Promise<RateRefreshResult> {
       updated: false,
       bcv,
       usdt,
-      source: RATES_SOURCE_URL,
+      source: usdtSource,
       fetchedAt,
       error: message,
     };
