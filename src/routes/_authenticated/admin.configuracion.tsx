@@ -43,6 +43,7 @@ import {
   listAllPaymentMethods,
   updatePaymentMethod,
   listStaffUsers,
+  refreshExchangeRatesNow,
   type StoreSettings,
   type PaymentMethodRow,
 } from "@/lib/settings.functions";
@@ -65,6 +66,7 @@ export const Route = createFileRoute("/_authenticated/admin/configuracion")({
 function AdminConfiguracion() {
   const queryClient = useQueryClient();
   const [savingSettings, setSavingSettings] = useState(false);
+  const [refreshingRates, setRefreshingRates] = useState(false);
 
   // Store General Settings
   const [whatsapp, setWhatsapp] = useState("");
@@ -289,6 +291,30 @@ function AdminConfiguracion() {
     }
   }
 
+  async function handleRefreshRates() {
+    setRefreshingRates(true);
+    try {
+      const res = await refreshExchangeRatesNow();
+      if (res?.ok) {
+        if (res.bcv) setExchangeRateBcv(String(res.bcv));
+        if (res.usdt) setExchangeRateUsdt(String(res.usdt));
+        toast.success("Tasas actualizadas desde la fuente oficial", {
+          description: `BCV: Bs. ${res.bcv ?? "-"} · USDT/Paralelo: Bs. ${res.usdt ?? "-"}`,
+        });
+        await queryClient.invalidateQueries({ queryKey: ["admin", "settings", "store"] });
+        await queryClient.invalidateQueries({ queryKey: ["public", "store-settings"] });
+      } else {
+        toast.error("No se pudieron obtener las tasas", {
+          description: res?.error || "Intenta nuevamente en unos minutos.",
+        });
+      }
+    } catch (err: any) {
+      toast.error(`Error al actualizar tasas: ${err.message || "Error desconocido"}`);
+    } finally {
+      setRefreshingRates(false);
+    }
+  }
+
   function openEditMethod(m: PaymentMethodRow) {
     setEditingMethod(m);
     setMethodName(m.name);
@@ -485,6 +511,33 @@ function AdminConfiguracion() {
                     Utilizada si el cliente elige cotización en tasa USDT en checkout.
                   </p>
                 </div>
+
+                <div className="sm:col-span-2 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                        Actualización automática diaria de tasas
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {settings?.exchange_rates_updated_at
+                          ? `Última sincronización automática: ${new Date(settings.exchange_rates_updated_at).toLocaleString("es-VE")}`
+                          : "Las tasas BCV y USDT/Paralelo se sincronizan una vez al día desde la fuente pública de referencia."}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleRefreshRates}
+                      disabled={refreshingRates}
+                      className="h-8 gap-1.5 text-xs"
+                    >
+                      <RefreshCw className={`size-3.5 ${refreshingRates ? "animate-spin" : ""}`} />
+                      {refreshingRates ? "Consultando..." : "Actualizar tasas ahora"}
+                    </Button>
+                  </div>
+                </div>
+
 
                 <div>
                   <Label htmlFor="s-stock" className="flex items-center gap-1.5 font-semibold">

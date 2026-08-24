@@ -15,6 +15,8 @@ export type StoreSettings = {
   exchange_rate_bs?: number;
   exchange_rate_bcv?: number;
   exchange_rate_usdt?: number;
+  exchange_rates_updated_at?: string;
+  exchange_rates_auto_source?: string;
 };
 
 export type PaymentMethodRow = {
@@ -116,6 +118,22 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
     } catch {
       return { ok: true as const };
     }
+  });
+
+export const refreshExchangeRatesNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    if (!isSupabaseServerConfigured()) {
+      return {
+        ok: false as const,
+        updated: false,
+        bcv: null,
+        usdt: null,
+        error: "Base de datos no disponible en este entorno",
+      };
+    }
+    const { refreshExchangeRates } = await import("./exchange-rates.server");
+    return await refreshExchangeRates();
   });
 
 export const listAllPaymentMethods = createServerFn({ method: "GET" })
