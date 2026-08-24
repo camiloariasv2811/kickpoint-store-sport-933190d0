@@ -291,6 +291,30 @@ function AdminConfiguracion() {
     }
   }
 
+  async function handleRefreshRates() {
+    setRefreshingRates(true);
+    try {
+      const res = await refreshExchangeRatesNow();
+      if (res?.ok) {
+        if (res.bcv) setExchangeRateBcv(String(res.bcv));
+        if (res.usdt) setExchangeRateUsdt(String(res.usdt));
+        toast.success("Tasas actualizadas desde la fuente oficial", {
+          description: `BCV: Bs. ${res.bcv ?? "-"} · USDT/Paralelo: Bs. ${res.usdt ?? "-"}`,
+        });
+        await queryClient.invalidateQueries({ queryKey: ["admin", "settings", "store"] });
+        await queryClient.invalidateQueries({ queryKey: ["public", "store-settings"] });
+      } else {
+        toast.error("No se pudieron obtener las tasas", {
+          description: res?.error || "Intenta nuevamente en unos minutos.",
+        });
+      }
+    } catch (err: any) {
+      toast.error(`Error al actualizar tasas: ${err.message || "Error desconocido"}`);
+    } finally {
+      setRefreshingRates(false);
+    }
+  }
+
   function openEditMethod(m: PaymentMethodRow) {
     setEditingMethod(m);
     setMethodName(m.name);
