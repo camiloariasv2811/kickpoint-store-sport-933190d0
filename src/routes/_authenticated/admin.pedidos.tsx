@@ -420,6 +420,16 @@ function AdminPedidos() {
                         >
                           <Eye className="size-3.5" /> Detalle
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handlePrintDeliveryNote(o)}
+                          title="Imprimir nota de entrega y guía del paquete"
+                          className="size-8 p-0"
+                        >
+                          <Printer className="size-4" />
+                        </Button>
+
                         {o.customer?.whatsapp && (
                           <Button
                             size="sm"
