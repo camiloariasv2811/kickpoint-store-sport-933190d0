@@ -864,8 +864,15 @@ export const uploadProductImage = createServerFn({ method: "POST" })
     const ext = String(data.contentType).includes("/")
       ? String(data.contentType).split("/")[1]
       : "jpg";
-    const sanitizedName = data.fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const baseName = data.fileName
+      .replace(/\.[^.]+$/, "") // quita la extensión original (se usa la del contentType)
+      .replace(/[^a-zA-Z0-9-]+/g, "_") // sin puntos ni caracteres especiales
+      .replace(/_+/g, "_")
+      .slice(0, 60)
+      .replace(/^_|_$/g, "");
+    const sanitizedName = baseName || "imagen";
     const path = `${data.productId || "catalog"}/${Date.now()}-${sanitizedName}.${ext}`;
+
 
     if (!isSupabaseServerConfigured()) {
       throw new Error("El almacenamiento de imágenes no está disponible en este momento.");

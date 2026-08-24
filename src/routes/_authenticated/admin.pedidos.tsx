@@ -15,6 +15,8 @@ import {
   Trash2,
   XCircle,
   Mail,
+  Printer,
+
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -49,6 +51,8 @@ import { ORDER_STATUS_LABELS, ORDER_STATUSES } from "@/lib/types";
 import { moneyExact, whatsappLink } from "@/lib/format";
 import { supabase } from "@/integrations/supabase/client";
 import { resendOrderEmailNotification } from "@/lib/email.functions";
+import { printDeliveryNote } from "@/lib/delivery-note";
+
 
 export const Route = createFileRoute("/_authenticated/admin/pedidos")({
   component: AdminPedidos,
@@ -65,6 +69,13 @@ function AdminPedidos() {
   const [resendingEmail, setResendingEmail] = useState(false);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [loadingProof, setLoadingProof] = useState(false);
+  function handlePrintDeliveryNote(order: AdminOrder) {
+    const ok = printDeliveryNote(order);
+    if (!ok) {
+      toast.error("Permite las ventanas emergentes para imprimir la nota de entrega");
+    }
+  }
+
 
   async function viewProof(path: string) {
     setLoadingProof(true);
@@ -420,6 +431,16 @@ function AdminPedidos() {
                         >
                           <Eye className="size-3.5" /> Detalle
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handlePrintDeliveryNote(o)}
+                          title="Imprimir nota de entrega y guía del paquete"
+                          className="size-8 p-0"
+                        >
+                          <Printer className="size-4" />
+                        </Button>
+
                         {o.customer?.whatsapp && (
                           <Button
                             size="sm"
@@ -649,7 +670,27 @@ function AdminPedidos() {
                 </div>
               )}
 
+              {/* Nota de entrega / Guía del paquete */}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                <div className="text-xs">
+                  <p className="font-semibold text-foreground">Nota de entrega y guía del paquete</p>
+                  <p className="text-muted-foreground">
+                    Documento con productos, totales y etiqueta grande para identificar el paquete.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="hero"
+                  size="sm"
+                  className="gap-1 text-xs"
+                  onClick={() => handlePrintDeliveryNote(selectedOrder)}
+                >
+                  <Printer className="size-4" /> Imprimir nota y guía
+                </Button>
+              </div>
+
               {/* Botones de Acción Crítica: Cancelar / Eliminar Orden / Reenviar Email */}
+
               <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
