@@ -450,6 +450,7 @@ export type InMemoryOrder = {
   created_at: string;
   customer: {
     first_name: string;
+    identity_document?: string | null;
     last_name: string | null;
     whatsapp: string | null;
     email: string | null;
