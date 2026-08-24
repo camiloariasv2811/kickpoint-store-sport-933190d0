@@ -219,7 +219,10 @@ function WholesaleCatalogPage() {
           const priceB = b.wholesale_price ?? b.retail_price ?? 0;
           return Number(priceB) - Number(priceA);
         }
+        const orderDiff = (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+        if (orderDiff !== 0) return orderDiff;
         return (b.is_featured ? 1 : 0) - (a.is_featured ? 1 : 0);
+
       });
   }, [products, q, selectedCategory, selectedBrand, selectedSize, onlyInStock, sortBy]);
 
