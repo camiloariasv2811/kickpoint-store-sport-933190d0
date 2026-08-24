@@ -79,7 +79,11 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" })
         context: {
           supabase,
           userId: "admin-demo-user",
-          claims: { sub: "admin-demo-user", role: "admin", email: "admin@kickpointstore.com" },
+          claims: {
+            sub: "admin-demo-user",
+            role: "admin" as "admin" | "staff",
+            email: "admin@kickpointstore.com",
+          },
         },
       });
     }
@@ -150,7 +154,7 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" })
         userId: user.id,
         claims: {
           sub: user.id,
-          role,
+          role: role as "admin" | "staff",
           email: user.email || "",
         },
       },

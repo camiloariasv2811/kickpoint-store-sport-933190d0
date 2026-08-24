@@ -68,6 +68,7 @@ export function Footer() {
               <li>
                 <Link
                   to="/pedido"
+                search={{ code: undefined }}
                   preload="intent"
                   className="transition-colors hover:text-primary"
                 >

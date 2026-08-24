@@ -357,7 +357,7 @@ function CartPage() {
                 </Button>
               ) : (
                 <Button asChild variant="hero" size="xl" className="mt-5 w-full">
-                  <Link to="/checkout">
+                  <Link to="/checkout" search={{ tipo: undefined }}>
                     Continuar al Checkout <ArrowRight className="size-5" />
                   </Link>
                 </Button>
