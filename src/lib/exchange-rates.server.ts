@@ -66,32 +66,28 @@ async function fetchBinanceUsdtRate(): Promise<number | null> {
 
 export async function refreshExchangeRates(): Promise<RateRefreshResult> {
   const fetchedAt = new Date().toISOString();
-  let payload: DolarApiEntry[] = [];
 
-  try {
-    const response = await fetch(RATES_SOURCE_URL, {
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok) {
-      throw new Error(`Fuente de tasas respondió ${response.status}`);
-    }
-    payload = (await response.json()) as DolarApiEntry[];
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Error consultando la fuente de tasas";
-    console.warn("[refreshExchangeRates] fetch failed:", message);
-    return {
-      ok: false,
-      updated: false,
-      bcv: null,
-      usdt: null,
-      source: RATES_SOURCE_URL,
-      fetchedAt,
-      error: message,
-    };
-  }
+  const [officialResult, binanceUsdt] = await Promise.all([
+    (async (): Promise<DolarApiEntry[]> => {
+      try {
+        const response = await fetch(RATES_SOURCE_URL, { headers: { Accept: "application/json" } });
+        if (!response.ok) throw new Error(`Fuente de tasas respondió ${response.status}`);
+        return (await response.json()) as DolarApiEntry[];
+      } catch (err) {
+        console.warn(
+          "[refreshExchangeRates] dolarapi failed:",
+          err instanceof Error ? err.message : err,
+        );
+        return [];
+      }
+    })(),
+    fetchBinanceUsdtRate(),
+  ]);
 
-  const bcv = pickRate(payload.find((entry) => entry.fuente === "oficial"));
-  const usdt = pickRate(payload.find((entry) => entry.fuente === "paralelo"));
+  const bcv = pickRate(officialResult.find((entry) => entry.fuente === "oficial"));
+  // USDT: live Binance P2P median; fallback to the parallel reference if Binance is unreachable.
+  const usdt = binanceUsdt ?? pickRate(officialResult.find((entry) => entry.fuente === "paralelo"));
+  const usdtSource = binanceUsdt ? "binance-p2p (USDT/VES)" : RATES_SOURCE_URL;
 
   if (!bcv && !usdt) {
     return {
@@ -99,9 +95,9 @@ export async function refreshExchangeRates(): Promise<RateRefreshResult> {
       updated: false,
       bcv: null,
       usdt: null,
-      source: RATES_SOURCE_URL,
+      source: usdtSource,
       fetchedAt,
-      error: "La fuente no devolvió tasas válidas",
+      error: "Las fuentes no devolvieron tasas válidas",
     };
   }
 
@@ -118,9 +114,10 @@ export async function refreshExchangeRates(): Promise<RateRefreshResult> {
       ...previous,
       ...(bcv ? { exchange_rate_bcv: bcv, exchange_rate_bs: bcv } : {}),
       ...(usdt ? { exchange_rate_usdt: usdt } : {}),
-      exchange_rates_auto_source: RATES_SOURCE_URL,
+      exchange_rates_auto_source: usdtSource,
       exchange_rates_updated_at: fetchedAt,
     };
+
 
     const { error } = await supabaseAdmin
       .from("settings")
