@@ -1,8 +1,10 @@
 // Server-only helper: fetches the current Venezuelan USD rates (BCV official) and
-// the live USDT price from Binance P2P (VES market), storing them in the store settings.
+// the live USDT price, prioritising alcambio.app (same numbers the user sees there).
 const RATES_SOURCE_URL = "https://ve.dolarapi.com/v1/dolares";
 const BINANCE_P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search";
 const CRIPTOYA_URL = "https://criptoya.com/api/usdt/ves/1";
+const ALCAMBIO_URL = "https://api.alcambio.app/graphql";
+
 
 export type RateRefreshResult = {
   ok: boolean;
@@ -89,12 +91,80 @@ async function fetchBinanceUsdtRate(): Promise<number | null> {
   }
 }
 
+// alcambio.app: same rates shown on https://alcambio.app (USDT = promedio compra/venta
+// de Binance P2P calculado por ellos; BCV = tasa oficial publicada).
+async function fetchAlCambioRates(): Promise<{ usdt: number | null; bcv: number | null }> {
+  const empty = { usdt: null, bcv: null };
+  try {
+    const [usdtRes, bcvRes] = await Promise.all([
+      fetch(ALCAMBIO_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          query:
+            "query getBinanceP2PAverages { getBinanceP2PAverages { sellAverage buyAverage asset } }",
+        }),
+      }),
+      fetch(ALCAMBIO_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          query:
+            'query { getCountryConversions(payload: { countryCode: "VE" }) { conversionRates { baseValue official type rateCurrency { code } } } }',
+        }),
+      }),
+    ]);
 
+    let usdt: number | null = null;
+    if (usdtRes.ok) {
+      const json = (await usdtRes.json()) as {
+        data?: { getBinanceP2PAverages?: { sellAverage?: number; buyAverage?: number } };
+      };
+      const avgs = json.data?.getBinanceP2PAverages;
+      const values = [avgs?.sellAverage, avgs?.buyAverage]
+        .map(Number)
+        .filter((n) => Number.isFinite(n) && n > 0);
+      if (values.length > 0) {
+        usdt = Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(4));
+      }
+    }
+
+    let bcv: number | null = null;
+    if (bcvRes.ok) {
+      const json = (await bcvRes.json()) as {
+        data?: {
+          getCountryConversions?: {
+            conversionRates?: Array<{
+              baseValue?: number;
+              official?: boolean;
+              type?: string;
+              rateCurrency?: { code?: string };
+            }>;
+          };
+        };
+      };
+      const rates = json.data?.getCountryConversions?.conversionRates ?? [];
+      const official = rates.find(
+        (r) => r.type === "SECONDARY" && r.official === true && r.rateCurrency?.code === "USD",
+      );
+      const value = Number(official?.baseValue);
+      if (Number.isFinite(value) && value > 0) bcv = Number(value.toFixed(4));
+    }
+
+    return { usdt, bcv };
+  } catch (err) {
+    console.warn(
+      "[refreshExchangeRates] alcambio failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return empty;
+  }
+}
 
 export async function refreshExchangeRates(): Promise<RateRefreshResult> {
   const fetchedAt = new Date().toISOString();
 
-  const [officialResult, criptoyaUsdt, binanceUsdt] = await Promise.all([
+  const [officialResult, alcambio, criptoyaUsdt, binanceUsdt] = await Promise.all([
     (async (): Promise<DolarApiEntry[]> => {
       try {
         const response = await fetch(RATES_SOURCE_URL, { headers: { Accept: "application/json" } });
@@ -108,19 +178,26 @@ export async function refreshExchangeRates(): Promise<RateRefreshResult> {
         return [];
       }
     })(),
+    fetchAlCambioRates(),
     fetchCriptoYaUsdtRate(),
     fetchBinanceUsdtRate(),
   ]);
 
-  const bcv = pickRate(officialResult.find((entry) => entry.fuente === "oficial"));
-  // USDT: live Binance P2P (direct, then CriptoYa aggregator); parallel reference as last resort.
+  const bcv = alcambio.bcv ?? pickRate(officialResult.find((entry) => entry.fuente === "oficial"));
+  // USDT: alcambio.app primero (la referencia del usuario), luego Binance P2P y CriptoYa.
   const usdt =
-    binanceUsdt ?? criptoyaUsdt ?? pickRate(officialResult.find((entry) => entry.fuente === "paralelo"));
-  const usdtSource = binanceUsdt
-    ? "binance-p2p (USDT/VES)"
-    : criptoyaUsdt
-      ? "criptoya binance-p2p (USDT/VES)"
-      : RATES_SOURCE_URL;
+    alcambio.usdt ??
+    binanceUsdt ??
+    criptoyaUsdt ??
+    pickRate(officialResult.find((entry) => entry.fuente === "paralelo"));
+  const usdtSource = alcambio.usdt
+    ? "alcambio.app (USDT/VES)"
+    : binanceUsdt
+      ? "binance-p2p (USDT/VES)"
+      : criptoyaUsdt
+        ? "criptoya binance-p2p (USDT/VES)"
+        : RATES_SOURCE_URL;
+
 
 
   if (!bcv && !usdt) {
