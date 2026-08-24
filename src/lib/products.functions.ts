@@ -112,11 +112,12 @@ async function assertIsStaff(context: any) {
 
 const PRODUCT_SELECT = `
   id, name, slug, description, base_sku, cost, retail_price, wholesale_price, wholesale_min_qty,
-  images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, created_at,
+  images, is_featured, is_bestseller, is_new, is_offer, active, low_stock_threshold, sort_order, created_at,
   brand:brands ( id, name, slug ),
   category:categories ( id, name, slug ),
   variants:product_variants ( id, product_id, size, color, sku, stock, active )
 `;
+
 
 export type ListAdminProductsInput = {
   page?: number;
@@ -236,7 +237,10 @@ export const listAdminProducts = createServerFn({ method: "GET" })
         query = query.or(`name.ilike.%${term}%,base_sku.ilike.%${term}%`);
       }
 
-      query = query.order("created_at", { ascending: false });
+      query = query
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: false });
+
 
       const page = Math.max(1, Number(data?.page) || 1);
       const pageSize = data?.pageSize !== undefined ? Number(data.pageSize) : 20;
