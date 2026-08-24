@@ -58,61 +58,98 @@ export type AdminOrder = {
   }[];
 };
 
-const ORDER_SELECT = `
-  id, order_number, status, channel, payment_method_code, subtotal, total, is_wholesale,
-  inventory_applied, notes, created_at,
-  customer:customers ( first_name, last_name, whatsapp, email, address, city, state ),
-  items:order_items ( id, product_name, size, color, quantity, unit_price, unit_cost, subtotal, variant_id, image_url ),
-  payments ( id, status, amount, method_code, reference, proof_url, proof_uploaded_at, rejection_reason, created_at )
-`;
-
 export const listOrders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     if (!isSupabaseServerConfigured()) {
       return getInMemoryOrders() as unknown as AdminOrder[];
     }
-    try {
-      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const { data, error } = await supabaseAdmin
-        .from("orders")
-        .select(ORDER_SELECT)
-        .order("created_at", { ascending: false })
-        .limit(120);
-      if (error) {
-        console.error("[listOrders] Error query with admin:", error.message);
-        const fallback = await context.supabase
-          .from("orders")
-          .select(ORDER_SELECT)
-          .order("created_at", { ascending: false })
-          .limit(120);
-        if (fallback.data) {
-          return fallback.data as unknown as AdminOrder[];
-        }
-        return [];
-      }
-      return (data ?? []) as unknown as AdminOrder[];
-    } catch (err: any) {
-      console.error("[listOrders] Fatal catch:", err);
-      return [];
-    }
-  });
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const ordersResult = await supabaseAdmin
+      .from("orders")
+      .select(
+        "id, order_number, customer_id, status, channel, payment_method_code, subtotal, total, is_wholesale, inventory_applied, notes, created_at",
+      )
+      .order("created_at", { ascending: false })
+      .limit(120);
 
-const ALLOWED_STATUSES = [
-  "pedido_recibido",
-  "pago_pendiente",
-  "pago_verificado",
-  "preparando_pedido",
-  "empacando_pedido",
-  "pedido_enviado",
-  "pedido_entregado",
-  "cancelado",
-];
+    if (ordersResult.error) {
+      console.error("[listOrders] Orders query failed:", ordersResult.error.message);
+      throw new Error("No se pudieron cargar los pedidos. Intenta nuevamente.");
+    }
+
+    const orders = ordersResult.data ?? [];
+    if (orders.length === 0) return [];
+
+    const orderIds = orders.map((order) => order.id);
+    const customerIds = [...new Set(orders.map((order) => order.customer_id).filter(Boolean))] as string[];
+    const [customersResult, itemsResult, paymentsResult] = await Promise.all([
+      customerIds.length > 0
+        ? supabaseAdmin
+            .from("customers")
+            .select("id, first_name, last_name, whatsapp, email, address, city, state")
+            .in("id", customerIds)
+        : Promise.resolve({ data: [], error: null }),
+      supabaseAdmin
+        .from("order_items")
+        .select(
+          "id, order_id, product_name, size, color, quantity, unit_price, unit_cost, subtotal, variant_id, image_url",
+        )
+        .in("order_id", orderIds),
+      supabaseAdmin
+        .from("payments")
+        .select(
+          "id, order_id, status, amount, method_code, reference, proof_url, proof_uploaded_at, rejection_reason, created_at",
+        )
+        .in("order_id", orderIds)
+        .order("created_at", { ascending: true }),
+    ]);
+
+    const relatedError = customersResult.error ?? itemsResult.error ?? paymentsResult.error;
+    if (relatedError) {
+      console.error("[listOrders] Related data query failed:", relatedError.message);
+      throw new Error("No se pudo completar la información de los pedidos.");
+    }
+
+    const customersById = new Map((customersResult.data ?? []).map((customer) => [customer.id, customer]));
+    const itemsByOrder = new Map<string, typeof itemsResult.data>();
+    for (const item of itemsResult.data ?? []) {
+      const current = itemsByOrder.get(item.order_id) ?? [];
+      current.push(item);
+      itemsByOrder.set(item.order_id, current);
+    }
+    const paymentsByOrder = new Map<string, typeof paymentsResult.data>();
+    for (const payment of paymentsResult.data ?? []) {
+      const current = paymentsByOrder.get(payment.order_id) ?? [];
+      current.push(payment);
+      paymentsByOrder.set(payment.order_id, current);
+    }
+
+    return orders.map((order) => ({
+      ...order,
+      customer: order.customer_id ? (customersById.get(order.customer_id) ?? null) : null,
+      items: itemsByOrder.get(order.id) ?? [],
+      payments: paymentsByOrder.get(order.id) ?? [],
+    })) as unknown as AdminOrder[];
+  });
 
 export const updateOrderStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { orderId: string; status: string }) => {
-    if (!ALLOWED_STATUSES.includes(data.status)) throw new Error("Estado inválido");
+    if (
+      ![
+        "pedido_recibido",
+        "pago_pendiente",
+        "pago_verificado",
+        "preparando_pedido",
+        "empacando_pedido",
+        "pedido_enviado",
+        "pedido_entregado",
+        "cancelado",
+      ].includes(data.status)
+    ) {
+      throw new Error("Estado inválido");
+    }
     return data;
   })
   .handler(async ({ data, context }) => {

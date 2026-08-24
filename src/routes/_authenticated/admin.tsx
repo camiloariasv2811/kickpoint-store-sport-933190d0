@@ -14,6 +14,9 @@ export const Route = createFileRoute("/_authenticated/admin")({
 function AdminGuard() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["my-roles"],
+    staleTime: 10 * 60 * 1000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       try {
         const res = await getMyRoles();

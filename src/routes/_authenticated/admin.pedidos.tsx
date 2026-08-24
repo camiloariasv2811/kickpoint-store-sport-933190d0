@@ -79,21 +79,14 @@ function AdminPedidos() {
     }
   }
 
-  const { data: orders = [], isLoading } = useQuery<AdminOrder[]>({
+  const { data: orders = [], isLoading, isError, refetch } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
-    staleTime: 1000 * 20,
-    refetchInterval: 20000,
-    refetchOnWindowFocus: true,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
     placeholderData: (prev) => prev,
-    queryFn: async () => {
-      try {
-        const res = await listOrders();
-        return (res ?? []) as AdminOrder[];
-      } catch (err) {
-        console.warn("[AdminPedidos] Error fetching orders:", err);
-        return [] as AdminOrder[];
-      }
-    },
+    queryFn: async () => (await listOrders()) as AdminOrder[],
   });
 
   // Realtime subscription to immediately refresh orders and pending badges on new events
@@ -320,7 +313,17 @@ function AdminPedidos() {
 
       {isLoading && <Skeleton className="h-64 w-full rounded-xl" />}
 
-      {!isLoading && (
+      {isError && !isLoading && (
+        <div className="surface-card flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-center">
+          <AlertCircle className="size-8 text-destructive" />
+          <p className="text-sm text-muted-foreground">No se pudieron cargar los pedidos.</p>
+          <Button variant="outline" size="sm" onClick={() => void refetch()}>
+            Volver a intentar
+          </Button>
+        </div>
+      )}
+
+      {!isLoading && !isError && (
         <div className="surface-card overflow-x-auto">
           <table className="w-full min-w-[880px] text-sm">
             <thead>
