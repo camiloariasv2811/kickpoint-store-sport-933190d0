@@ -2,6 +2,7 @@
 // the live USDT price from Binance P2P (VES market), storing them in the store settings.
 const RATES_SOURCE_URL = "https://ve.dolarapi.com/v1/dolares";
 const BINANCE_P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search";
+const CRIPTOYA_URL = "https://criptoya.com/api/usdt/ves/1";
 
 export type RateRefreshResult = {
   ok: boolean;
