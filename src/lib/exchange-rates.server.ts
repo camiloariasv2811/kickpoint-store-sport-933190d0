@@ -1,6 +1,7 @@
-// Server-only helper: fetches the current Venezuelan USD rates (BCV official and
-// parallel/USDT) from a public source and stores them in the store settings.
+// Server-only helper: fetches the current Venezuelan USD rates (BCV official) and
+// the live USDT price from Binance P2P (VES market), storing them in the store settings.
 const RATES_SOURCE_URL = "https://ve.dolarapi.com/v1/dolares";
+const BINANCE_P2P_URL = "https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search";
 
 export type RateRefreshResult = {
   ok: boolean;
@@ -25,6 +26,43 @@ function pickRate(entry: DolarApiEntry | undefined): number | null {
   const value = Number(entry.promedio ?? entry.venta ?? entry.compra ?? 0);
   return Number.isFinite(value) && value > 0 ? Number(value.toFixed(4)) : null;
 }
+
+// Median price of the top Binance P2P sell offers for USDT/VES.
+async function fetchBinanceUsdtRate(): Promise<number | null> {
+  try {
+    const response = await fetch(BINANCE_P2P_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        page: 1,
+        rows: 20,
+        asset: "USDT",
+        fiat: "VES",
+        tradeType: "SELL",
+        payTypes: [],
+        transAmount: "1000",
+      }),
+    });
+    if (!response.ok) throw new Error(`Binance P2P respondió ${response.status}`);
+    const json = (await response.json()) as { data?: Array<{ adv?: { price?: string } }> };
+    const prices = (json.data ?? [])
+      .map((item) => Number(item.adv?.price))
+      .filter((n) => Number.isFinite(n) && n > 0)
+      .sort((a, b) => a - b);
+    if (prices.length === 0) return null;
+    const mid = Math.floor(prices.length / 2);
+    const median =
+      prices.length % 2 === 0 ? ((prices[mid - 1] as number) + (prices[mid] as number)) / 2 : (prices[mid] as number);
+    return Number(median.toFixed(4));
+  } catch (err) {
+    console.warn(
+      "[refreshExchangeRates] Binance P2P failed:",
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
+
 
 export async function refreshExchangeRates(): Promise<RateRefreshResult> {
   const fetchedAt = new Date().toISOString();
