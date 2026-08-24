@@ -260,35 +260,41 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
   async function handleFileUpload(files: FileList | null) {
     if (!files || files.length === 0) return;
     setUploadingImage(true);
+    let uploaded = 0;
     try {
       for (const file of Array.from(files)) {
-        if (!file.type.startsWith("image/")) continue;
-        const reader = new FileReader();
-        const base64Promise = new Promise<string>((resolve, reject) => {
-          reader.onload = () => {
-            const res = reader.result as string;
-            const base64 = res.split(",")[1] || "";
-            resolve(base64);
-          };
-          reader.onerror = reject;
-        });
-        reader.readAsDataURL(file);
-        const dataBase64 = await base64Promise;
+        if (!file.type.startsWith("image/")) {
+          toast.error(`"${file.name}" no es una imagen válida`);
+          continue;
+        }
+        if (file.size > 20 * 1024 * 1024) {
+          toast.error(`"${file.name}" supera los 20 MB permitidos`);
+          continue;
+        }
+
+        // Se optimiza en el navegador: evita fallos de subida con fotos grandes
+        // y hace que la imagen cargue rápido en la tienda.
+        const compressed = await compressImageFile(file);
 
         const uploadRes = await uploadProductImage({
           data: {
             productId: product?.id || null,
-            fileName: file.name,
-            contentType: file.type,
-            dataBase64,
+            fileName: compressed.fileName,
+            contentType: compressed.contentType,
+            dataBase64: compressed.base64,
           },
         });
 
         if (uploadRes.url) {
-          setImages((prev) => [...prev, uploadRes.url]);
+          setImages((prev) => (prev.includes(uploadRes.url) ? prev : [...prev, uploadRes.url]));
+          uploaded += 1;
         }
       }
-      toast.success("Imagen subida correctamente");
+      if (uploaded > 0) {
+        toast.success(
+          uploaded === 1 ? "Imagen subida correctamente" : `${uploaded} imágenes subidas`,
+        );
+      }
     } catch (err: any) {
       console.error(err);
       toast.error(`Error al subir imagen: ${err.message || "Error desconocido"}`);
@@ -296,6 +302,7 @@ export default function ProductForm({ product = null, onClose, open: openProp, o
       setUploadingImage(false);
     }
   }
+
 
   function removeImage(index: number) {
     setImages((prev) => prev.filter((_, i) => i !== index));
