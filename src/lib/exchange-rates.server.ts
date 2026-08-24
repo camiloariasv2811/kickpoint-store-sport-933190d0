@@ -94,7 +94,7 @@ async function fetchBinanceUsdtRate(): Promise<number | null> {
 export async function refreshExchangeRates(): Promise<RateRefreshResult> {
   const fetchedAt = new Date().toISOString();
 
-  const [officialResult, binanceUsdt] = await Promise.all([
+  const [officialResult, criptoyaUsdt, binanceUsdt] = await Promise.all([
     (async (): Promise<DolarApiEntry[]> => {
       try {
         const response = await fetch(RATES_SOURCE_URL, { headers: { Accept: "application/json" } });
@@ -108,13 +108,20 @@ export async function refreshExchangeRates(): Promise<RateRefreshResult> {
         return [];
       }
     })(),
+    fetchCriptoYaUsdtRate(),
     fetchBinanceUsdtRate(),
   ]);
 
   const bcv = pickRate(officialResult.find((entry) => entry.fuente === "oficial"));
-  // USDT: live Binance P2P median; fallback to the parallel reference if Binance is unreachable.
-  const usdt = binanceUsdt ?? pickRate(officialResult.find((entry) => entry.fuente === "paralelo"));
-  const usdtSource = binanceUsdt ? "binance-p2p (USDT/VES)" : RATES_SOURCE_URL;
+  // USDT: live Binance P2P (direct, then CriptoYa aggregator); parallel reference as last resort.
+  const usdt =
+    binanceUsdt ?? criptoyaUsdt ?? pickRate(officialResult.find((entry) => entry.fuente === "paralelo"));
+  const usdtSource = binanceUsdt
+    ? "binance-p2p (USDT/VES)"
+    : criptoyaUsdt
+      ? "criptoya binance-p2p (USDT/VES)"
+      : RATES_SOURCE_URL;
+
 
   if (!bcv && !usdt) {
     return {
