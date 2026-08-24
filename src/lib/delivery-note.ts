@@ -4,7 +4,15 @@ import { ORDER_STATUS_LABELS } from "./types";
 const BRAND = {
   name: "KICKPOINT",
   tagline: "Ropa deportiva al mayor y detal",
-  whatsapp: "+58 412-0000000",
+  whatsapp: "+58 412-1546698",
+};
+
+/** Remitente fijo de todos los envíos KICKPOINT. */
+const SENDER = {
+  name: "Camilo Arias",
+  cedula: "30146738",
+  phone: "04121546698",
+  city: "Barinas - Barinas",
 };
 
 function esc(value: unknown): string {
@@ -30,6 +38,16 @@ function fullAddress(order: AdminOrder): string {
   if (!c) return "Sin dirección registrada";
   const parts = [c.address, c.city, c.state].filter(Boolean);
   return parts.length ? parts.join(", ") : "Sin dirección registrada";
+}
+
+function agencyAddress(order: AdminOrder): string {
+  const raw = order.customer?.address ?? "";
+  const cleaned = raw.replace(/^(TEALCA|MRW|ZOOM|DOMESA)\s*-\s*/i, "").trim();
+  return cleaned || "Sin dirección de agencia registrada";
+}
+
+function customerCedula(order: AdminOrder): string {
+  return order.customer?.identity_document?.trim() || "No registrada";
 }
 
 function totalUnits(order: AdminOrder): number {
@@ -143,13 +161,15 @@ export function buildDeliveryNoteHtml(order: AdminOrder): string {
     <div class="card">
       <h2>Cliente</h2>
       <p><strong>${esc(customerName(order))}</strong></p>
+      <p>Cédula / RIF: ${esc(customerCedula(order))}</p>
       <p>WhatsApp: ${esc(order.customer?.whatsapp ?? "—")}</p>
       <p>Email: ${esc(order.customer?.email ?? "—")}</p>
     </div>
     <div class="card">
-      <h2>Dirección de entrega</h2>
-      <p>${esc(fullAddress(order))}</p>
-      <p class="muted">Envío: ${esc(carrier)}</p>
+      <h2>Agencia de envío y dirección</h2>
+      <p><strong>Agencia: ${esc(carrier)}</strong></p>
+      <p>${esc(agencyAddress(order))}</p>
+      <p>${esc([order.customer?.city, order.customer?.state].filter(Boolean).join(", ") || "—")}</p>
       ${order.notes ? `<p class="muted">Nota: ${esc(order.notes)}</p>` : ""}
     </div>
   </div>
@@ -174,15 +194,18 @@ export function buildDeliveryNoteHtml(order: AdminOrder): string {
   </div>
 
   <footer>
-    ${BRAND.name} · ${esc(BRAND.whatsapp)} · Documento sin valor fiscal · Impreso ${esc(printedAt)}
+    ${BRAND.name} · Remitente: ${esc(SENDER.name)} · C.I. ${esc(SENDER.cedula)} · Tel. ${esc(SENDER.phone)} · ${esc(SENDER.city)} · Documento sin valor fiscal · Impreso ${esc(printedAt)}
   </footer>
 
   <!-- GUÍA / ETIQUETA DEL PAQUETE -->
   <div class="label">
     <div class="to">Enviar a</div>
     <div class="name">${esc(customerName(order))}</div>
-    <div class="addr">${esc(fullAddress(order))}</div>
-    <div class="addr"><strong>Tel:</strong> ${esc(order.customer?.whatsapp ?? "—")}</div>
+    <div class="addr"><strong>Cédula:</strong> ${esc(customerCedula(order))}</div>
+    <div class="addr"><strong>Teléfono:</strong> ${esc(order.customer?.whatsapp ?? "—")}</div>
+    <div class="addr"><strong>Agencia:</strong> ${esc(carrier)}</div>
+    <div class="addr"><strong>Dirección de la agencia:</strong> ${esc(agencyAddress(order))}</div>
+    <div class="addr">${esc([order.customer?.city, order.customer?.state].filter(Boolean).join(", ") || "")}</div>
     <div class="row">
       <div>
         <div class="to">Pedido</div>
@@ -202,7 +225,10 @@ export function buildDeliveryNoteHtml(order: AdminOrder): string {
       <ul>${checklist || "<li>Sin productos</li>"}</ul>
     </div>
     <div class="row">
-      <div class="to">Remitente: KICKPOINT · ${esc(BRAND.whatsapp)}</div>
+      <div class="to">
+        Remitente: ${esc(SENDER.name)} · C.I. ${esc(SENDER.cedula)} · Tel. ${esc(SENDER.phone)} ·
+        ${esc(SENDER.city)} · KICKPOINT
+      </div>
       <div class="to">${esc(order.is_wholesale ? "PEDIDO MAYORISTA" : "PEDIDO DETAL")}</div>
     </div>
   </div>
@@ -214,10 +240,45 @@ export function buildDeliveryNoteHtml(order: AdminOrder): string {
 /** Abre la nota de entrega + guía en una ventana nueva lista para imprimir. */
 export function printDeliveryNote(order: AdminOrder): boolean {
   const html = buildDeliveryNoteHtml(order);
-  const win = window.open("", "_blank", "width=900,height=1000");
-  if (!win) return false;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-  return true;
+
+  try {
+    const win = window.open("", "_blank", "width=900,height=1000");
+    if (win) {
+      win.document.open();
+      win.document.write(html);
+      win.document.close();
+      return true;
+    }
+  } catch {
+    // popup bloqueado (frecuente en móviles): usamos el iframe de abajo
+  }
+
+  // Fallback móvil: imprimir mediante un iframe oculto en la misma pestaña.
+  try {
+    const previous = document.getElementById("kp-delivery-note-frame");
+    previous?.remove();
+
+    const frame = document.createElement("iframe");
+    frame.id = "kp-delivery-note-frame";
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.position = "fixed";
+    frame.style.right = "0";
+    frame.style.bottom = "0";
+    frame.style.width = "0";
+    frame.style.height = "0";
+    frame.style.border = "0";
+    frame.srcdoc = html;
+    frame.onload = () => {
+      try {
+        frame.contentWindow?.focus();
+        frame.contentWindow?.print();
+      } catch {
+        /* noop */
+      }
+    };
+    document.body.appendChild(frame);
+    return true;
+  } catch {
+    return false;
+  }
 }
