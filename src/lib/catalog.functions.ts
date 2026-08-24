@@ -9,6 +9,7 @@ import {
   addInMemoryBrand,
   getInMemoryProducts,
 } from "./demo-data";
+import { toSafeUuid } from "./uuid-utils";
 import type { Brand, Category, Product } from "./types";
 
 export type MinimalProduct = {
@@ -514,16 +515,23 @@ export const getProduct = createServerFn({ method: "GET" })
     }
 
     // Attempt 1: Fetch via Admin client (preferred, handles RLS)
+    const validUuid = toSafeUuid(decodedSlug);
     try {
       const { supabaseAdmin, isSupabaseServerConfigured } =
         await import("@/integrations/supabase/client.server");
       if (isSupabaseServerConfigured()) {
-        const { data: row, error } = await supabaseAdmin
+        let query = supabaseAdmin
           .from("products")
           .select(PRODUCT_SELECT_FULL)
-          .or(`slug.eq."${decodedSlug}",id.eq."${decodedSlug}",slug.ilike."${decodedSlug}"`)
-          .or("active.eq.true,active.is.null")
-          .maybeSingle();
+          .or("active.eq.true,active.is.null");
+
+        if (validUuid) {
+          query = query.or(`id.eq.${validUuid},slug.eq.${decodedSlug}`);
+        } else {
+          query = query.or(`slug.eq.${decodedSlug},slug.ilike.${decodedSlug}`);
+        }
+
+        const { data: row, error } = await query.maybeSingle();
 
         if (!error && row) {
           const finalProduct = normalizeProduct(row);
@@ -539,12 +547,18 @@ export const getProduct = createServerFn({ method: "GET" })
     if (isSupabasePublicConfigured()) {
       try {
         const supabase = createPublicClient();
-        const { data: row, error } = await supabase
+        let query = supabase
           .from("products")
           .select(PRODUCT_SELECT_FULL)
-          .or(`slug.eq."${decodedSlug}",id.eq."${decodedSlug}",slug.ilike."${decodedSlug}"`)
-          .or("active.eq.true,active.is.null")
-          .maybeSingle();
+          .or("active.eq.true,active.is.null");
+
+        if (validUuid) {
+          query = query.or(`id.eq.${validUuid},slug.eq.${decodedSlug}`);
+        } else {
+          query = query.or(`slug.eq.${decodedSlug},slug.ilike.${decodedSlug}`);
+        }
+
+        const { data: row, error } = await query.maybeSingle();
 
         if (!error && row) {
           const finalProduct = normalizeProduct(row);
