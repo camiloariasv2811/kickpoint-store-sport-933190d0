@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
+  ExternalLink,
   History,
   Loader2,
   Search,
@@ -423,8 +424,14 @@ function KardexDialog({
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
-        <DialogHeader>
+        <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <DialogTitle>{title}</DialogTitle>
+          <Button variant="ghost" size="sm" asChild className="text-xs">
+            <Link to="/admin/kardex">
+              <ExternalLink className="mr-1.5 size-3.5" />
+              Kárdex Completo (Editar/Eliminar)
+            </Link>
+          </Button>
         </DialogHeader>
 
         {query.isLoading && <Skeleton className="h-48 w-full rounded-xl" />}

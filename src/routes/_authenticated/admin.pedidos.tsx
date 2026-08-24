@@ -66,6 +66,19 @@ function AdminPedidos() {
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [loadingProof, setLoadingProof] = useState(false);
 
+  async function viewProof(path: string) {
+    setLoadingProof(true);
+    try {
+      const res = await getProofUrl({ data: { path } });
+      setProofUrl(res.url);
+    } catch (err) {
+      console.error("[AdminPedidos] Error getting proof url:", err);
+      toast.error("No se pudo cargar la imagen del comprobante");
+    } finally {
+      setLoadingProof(false);
+    }
+  }
+
   const { data: orders = [], isLoading } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
     staleTime: 0,

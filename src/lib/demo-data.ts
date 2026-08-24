@@ -890,6 +890,50 @@ export function recordInMemoryMovement(
   return { ok: true, stockAfter };
 }
 
+export function deleteInMemoryMovement(
+  movementId: string,
+  revertStock = true,
+): { ok: boolean; stockAfter?: number } {
+  const movementIndex = _inMemoryKardex.findIndex((m) => m.id === movementId);
+  if (movementIndex === -1) return { ok: false };
+  const movement = _inMemoryKardex[movementIndex]!;
+
+  let newStock: number | undefined;
+  if (revertStock) {
+    for (const p of _inMemoryProducts) {
+      const v = p.variants?.find(
+        (va) =>
+          (movement.sku && va.sku === movement.sku) ||
+          (movement.size && va.size === movement.size && p.name === movement.productName),
+      );
+      if (v) {
+        const cur = Number(v.stock ?? 0);
+        if (movement.type === "salida" || movement.type === "venta") {
+          v.stock = cur + Math.abs(movement.quantity);
+        } else if (movement.type === "entrada") {
+          v.stock = Math.max(0, cur - Math.abs(movement.quantity));
+        }
+        newStock = v.stock;
+        break;
+      }
+    }
+  }
+
+  _inMemoryKardex = _inMemoryKardex.filter((m) => m.id !== movementId);
+  return { ok: true, stockAfter: newStock };
+}
+
+export function updateInMemoryMovement(
+  movementId: string,
+  patch: { reference?: string | null; note?: string | null },
+): boolean {
+  const movement = _inMemoryKardex.find((m) => m.id === movementId);
+  if (!movement) return false;
+  if (patch.reference !== undefined) movement.reference = patch.reference;
+  if (patch.note !== undefined) movement.note = patch.note;
+  return true;
+}
+
 export function getInMemorySettings() {
   return _inMemorySettings;
 }

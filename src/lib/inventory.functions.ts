@@ -2,7 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { isSupabaseServerConfigured } from "@/integrations/supabase/client.server";
 import { invalidateServerCatalogCache } from "./catalog.functions";
-import { getInMemoryKardex, getInMemoryProducts, recordInMemoryMovement } from "./demo-data";
+import {
+  deleteInMemoryMovement,
+  getInMemoryKardex,
+  getInMemoryProducts,
+  recordInMemoryMovement,
+  updateInMemoryMovement,
+} from "./demo-data";
 import { toSafeUuid } from "./uuid-utils";
 
 export type InventoryRow = {
@@ -458,5 +464,133 @@ export const recordInventoryMovement = createServerFn({ method: "POST" })
         data.note,
       );
       return { ok: true as const, stockAfter: res.stockAfter };
+    }
+  });
+
+/**
+ * Elimina de manera segura un movimiento de inventario erróneo y revierte el stock
+ * de la variante para mantener la coherencia física y contable del almacén.
+ */
+export const deleteInventoryMovement = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { movementId: string; revertStock?: boolean }) => data)
+  .handler(async ({ data, context }) => {
+    invalidateServerCatalogCache();
+    const shouldRevert = data.revertStock !== false;
+
+    if (!isSupabaseServerConfigured()) {
+      const res = deleteInMemoryMovement(data.movementId, shouldRevert);
+      return { ok: res.ok, stockAfter: res.stockAfter ?? null };
+    }
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+      // Buscar el movimiento
+      const { data: movement, error: fetchErr } = await supabaseAdmin
+        .from("inventory_movements")
+        .select("id, variant_id, type, quantity, stock_after, reference")
+        .eq("id", data.movementId)
+        .maybeSingle();
+
+      if (fetchErr || !movement) {
+        const inMemRes = deleteInMemoryMovement(data.movementId, shouldRevert);
+        return { ok: inMemRes.ok, stockAfter: inMemRes.stockAfter ?? null };
+      }
+
+      let newStock: number | null = null;
+
+      if (shouldRevert && movement.variant_id) {
+        const { data: variant } = await supabaseAdmin
+          .from("product_variants")
+          .select("id, stock")
+          .eq("id", movement.variant_id)
+          .single();
+
+        if (variant) {
+          const curStock = Number(variant.stock ?? 0);
+          const qty = Math.abs(Number(movement.quantity));
+
+          if (movement.type === "salida" || movement.type === "venta") {
+            newStock = curStock + qty;
+          } else if (movement.type === "entrada") {
+            newStock = Math.max(0, curStock - qty);
+          } else {
+            newStock = curStock;
+          }
+
+          if (newStock !== curStock) {
+            await supabaseAdmin
+              .from("product_variants")
+              .update({ stock: newStock })
+              .eq("id", variant.id);
+          }
+        }
+      }
+
+      const { error: delError } = await supabaseAdmin
+        .from("inventory_movements")
+        .delete()
+        .eq("id", data.movementId);
+
+      if (delError) {
+        throw new Error(delError.message);
+      }
+
+      try {
+        await supabaseAdmin.from("audit_log").insert({
+          user_id: toSafeUuid(context.userId),
+          action: `Eliminó movimiento de inventario ${movement.id} (${movement.type} ${movement.quantity})`,
+          entity: "inventory_movements",
+          entity_id: movement.id,
+        });
+      } catch {
+        /* audit fallback */
+      }
+
+      return { ok: true as const, stockAfter: newStock };
+    } catch (err: any) {
+      const inMemRes = deleteInMemoryMovement(data.movementId, shouldRevert);
+      return { ok: inMemRes.ok, stockAfter: inMemRes.stockAfter ?? null };
+    }
+  });
+
+/**
+ * Permite editar la referencia o la nota explicativa de un movimiento de inventario.
+ */
+export const updateInventoryMovementNote = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (data: { movementId: string; reference?: string | null; note?: string | null }) => data,
+  )
+  .handler(async ({ data }) => {
+    if (!isSupabaseServerConfigured()) {
+      const ok = updateInMemoryMovement(data.movementId, {
+        reference: data.reference,
+        note: data.note,
+      });
+      return { ok };
+    }
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin
+        .from("inventory_movements")
+        .update({
+          reference: data.reference?.trim() || null,
+          note: data.note?.trim() || null,
+        })
+        .eq("id", data.movementId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+      return { ok: true as const };
+    } catch {
+      const ok = updateInMemoryMovement(data.movementId, {
+        reference: data.reference,
+        note: data.note,
+      });
+      return { ok };
     }
   });

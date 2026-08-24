@@ -1,22 +1,41 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowDownCircle,
   ArrowUpCircle,
   Boxes,
+  Edit2,
   FileSpreadsheet,
   History,
   Loader2,
+  MoreVertical,
   RefreshCw,
   Search,
+  Trash2,
 } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { AdminShell } from "@/components/admin/AdminShell";
 import { EmptyState } from "@/components/admin/StatCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -24,7 +43,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { listInventoryMovements, type InventoryMovementRow } from "@/lib/inventory.functions";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  deleteInventoryMovement,
+  listInventoryMovements,
+  updateInventoryMovementNote,
+  type InventoryMovementRow,
+} from "@/lib/inventory.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/kardex")({
   component: KardexPage,
@@ -48,8 +73,20 @@ const MOVEMENT_LABELS: Record<string, string> = {
 };
 
 function KardexPage() {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+
+  // Estados para modal de edición
+  const [editingMovement, setEditingMovement] = useState<InventoryMovementRow | null>(null);
+  const [editReference, setEditReference] = useState("");
+  const [editNote, setEditNote] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Estados para modal de eliminación
+  const [deletingMovement, setDeletingMovement] = useState<InventoryMovementRow | null>(null);
+  const [revertStock, setRevertStock] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const kardexQuery = useQuery({
     queryKey: ["admin", "kardex-all", typeFilter],
@@ -80,6 +117,54 @@ function KardexPage() {
       m.size.toLowerCase().includes(term)
     );
   });
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingMovement) return;
+    setIsSavingEdit(true);
+    try {
+      await updateInventoryMovementNote({
+        data: {
+          movementId: editingMovement.id,
+          reference: editReference,
+          note: editNote,
+        },
+      });
+      toast.success("Movimiento actualizado");
+      setEditingMovement(null);
+      kardexQuery.refetch();
+    } catch (err: any) {
+      toast.error(err.message || "Error al actualizar movimiento");
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deletingMovement) return;
+    setIsDeleting(true);
+    try {
+      const res = await deleteInventoryMovement({
+        data: {
+          movementId: deletingMovement.id,
+          revertStock,
+        },
+      });
+      toast.success(
+        revertStock && res.stockAfter !== null
+          ? `Movimiento eliminado. Stock restaurado a ${res.stockAfter} unidades.`
+          : "Movimiento eliminado del registro",
+      );
+      setDeletingMovement(null);
+      kardexQuery.refetch();
+      queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] });
+    } catch (err: any) {
+      toast.error(err.message || "Error al eliminar movimiento");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
 
   return (
     <AdminShell
@@ -158,6 +243,7 @@ function KardexPage() {
                     <th className="px-4 py-3 text-right">Stock Resultante</th>
                     <th className="px-4 py-3">Referencia / Motivo</th>
                     <th className="px-4 py-3">Responsable</th>
+                    <th className="px-4 py-3 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -228,6 +314,37 @@ function KardexPage() {
                         <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">
                           {m.createdByEmail || m.createdBy || "Sistema"}
                         </td>
+                        <td className="whitespace-nowrap px-4 py-3 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="size-8">
+                                <MoreVertical className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setEditingMovement(m);
+                                  setEditReference(m.reference || "");
+                                  setEditNote(m.note || "");
+                                }}
+                              >
+                                <Edit2 className="mr-2 size-4" />
+                                Editar Motivo / Referencia
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => {
+                                  setDeletingMovement(m);
+                                  setRevertStock(true);
+                                }}
+                              >
+                                <Trash2 className="mr-2 size-4" />
+                                Eliminar movimiento
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
                       </tr>
                     );
                   })}
@@ -237,6 +354,115 @@ function KardexPage() {
           )}
         </div>
       </div>
+
+      {/* Modal Editar Motivo / Referencia */}
+      <Dialog open={!!editingMovement} onOpenChange={(open) => !open && setEditingMovement(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Movimiento</DialogTitle>
+            <DialogDescription>
+              Modifica la referencia o la nota explicativa de este registro de kárdex.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveEdit} className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-ref">Referencia / Documento</Label>
+              <Input
+                id="edit-ref"
+                value={editReference}
+                onChange={(e) => setEditReference(e.target.value)}
+                placeholder="Ej: OR-1024, FACT-88"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-note">Nota / Observación</Label>
+              <Textarea
+                id="edit-note"
+                value={editNote}
+                onChange={(e) => setEditNote(e.target.value)}
+                placeholder="Motivo del movimiento..."
+                rows={3}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditingMovement(null)}
+                disabled={isSavingEdit}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isSavingEdit}>
+                {isSavingEdit ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Guardando...
+                  </>
+                ) : (
+                  "Guardar Cambios"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Eliminar Movimiento Erróneo */}
+      <Dialog open={!!deletingMovement} onOpenChange={(open) => !open && setDeletingMovement(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Eliminar Movimiento Erróneo</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que deseas eliminar este movimiento de{" "}
+              {deletingMovement?.productName} ({deletingMovement?.type} de{" "}
+              {deletingMovement?.quantity} unds)?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2 text-sm">
+            <label className="flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer bg-muted/30">
+              <input
+                type="checkbox"
+                checked={revertStock}
+                onChange={(e) => setRevertStock(e.target.checked)}
+                className="mt-0.5 rounded border-border text-primary focus:ring-primary"
+              />
+              <div>
+                <div className="font-semibold text-foreground">
+                  Revertir automáticamente el stock de la variante
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {deletingMovement?.type === "salida" || deletingMovement?.type === "venta"
+                    ? `Sumará +${Math.abs(deletingMovement?.quantity || 0)} unidades al stock actual.`
+                    : deletingMovement?.type === "entrada"
+                      ? `Restará -${Math.abs(deletingMovement?.quantity || 0)} unidades del stock actual.`
+                      : "Mantiene la coherencia física de inventario."}
+                </div>
+              </div>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeletingMovement(null)}
+              disabled={isDeleting}
+            >
+              Cancelar
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isDeleting}>
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Eliminando...
+                </>
+              ) : (
+                "Eliminar y Ajustar"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminShell>
   );
 }
