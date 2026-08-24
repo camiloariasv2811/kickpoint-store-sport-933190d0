@@ -258,9 +258,18 @@ function Catalogo() {
       case "vendidos":
         list.sort((a, b) => Number(b.is_bestseller) - Number(a.is_bestseller));
         break;
-      default:
+      case "nuevos":
         list.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+        break;
+      default:
+        // Respeta el orden personalizado definido en el admin (Orden catálogo)
+        list.sort((a, b) => {
+          const diff = (Number(a.sort_order) || 0) - (Number(b.sort_order) || 0);
+          if (diff !== 0) return diff;
+          return a.created_at < b.created_at ? 1 : -1;
+        });
     }
+
     return list;
   }, [products, search, categorySlugs]);
 
