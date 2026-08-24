@@ -8,6 +8,7 @@ import {
   getInMemoryOrders,
   reviewInMemoryPayment,
   updateInMemoryOrderStatus,
+  recordInMemoryMovement,
 } from "./demo-data";
 import { toSafeUuid } from "./uuid-utils";
 
@@ -233,7 +234,7 @@ export const reviewPayment = createServerFn({ method: "POST" })
 
     if (!isSupabaseServerConfigured()) {
       const res = reviewInMemoryPayment(data.paymentId, data.approve, data.reason);
-      return { ok: res.ok as const, approved: res.approved as const };
+      return { ok: res.ok, approved: res.approved };
     }
 
     const { userId } = context;
@@ -242,7 +243,7 @@ export const reviewPayment = createServerFn({ method: "POST" })
 
     if (!safePaymentId) {
       const res = reviewInMemoryPayment(data.paymentId, data.approve, data.reason);
-      return { ok: res.ok as const, approved: res.approved as const };
+      return { ok: res.ok, approved: res.approved };
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -256,7 +257,7 @@ export const reviewPayment = createServerFn({ method: "POST" })
     if (!payment) {
       // Payment might only be in memory if testing in mixed mode
       const res = reviewInMemoryPayment(data.paymentId, data.approve, data.reason);
-      return { ok: res.ok as const, approved: res.approved as const };
+      return { ok: res.ok, approved: res.approved };
     }
 
     if (!data.approve) {

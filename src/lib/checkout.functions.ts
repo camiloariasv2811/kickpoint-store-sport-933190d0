@@ -475,7 +475,7 @@ export const createOrder = createServerFn({ method: "POST" })
         is_wholesale: isOrderWholesale,
         notes: formattedNotes.slice(0, 500),
       })
-      .select("id, order_number, total")
+      .select("id, order_number, total, is_wholesale")
       .single();
     if (orderError) throw new Error(orderError.message);
 

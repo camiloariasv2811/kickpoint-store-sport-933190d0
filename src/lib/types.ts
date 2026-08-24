@@ -14,6 +14,7 @@ export type Product = {
   slug: string;
   description: string | null;
   base_sku: string | null;
+  cost?: number;
   retail_price: number;
   wholesale_price: number | null;
   wholesale_min_qty: number;
