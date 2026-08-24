@@ -61,6 +61,7 @@ export function Header() {
               ))}
               <Link
                 to="/pedido"
+                search={{ code: undefined }}
                 preload="intent"
                 onClick={() => setOpen(false)}
                 className="rounded-lg px-3 py-3 text-base font-semibold transition-colors hover:bg-surface"
@@ -88,6 +89,7 @@ export function Header() {
           ))}
           <Link
             to="/pedido"
+                search={{ code: undefined }}
             preload="intent"
             activeProps={{ className: "text-primary" }}
             className="rounded-md px-3 py-2 text-eyebrow text-[0.7rem] text-foreground/80 transition-colors hover:text-primary"

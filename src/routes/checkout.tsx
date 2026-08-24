@@ -264,7 +264,6 @@ function CheckoutPage() {
           rateType: "USDT",
           exchangeRateUsed: usdtRate,
           isWholesale: isWholesaleCheckout,
-          isOrderWholesale: isWholesaleCheckout,
           lines: activeLines.map((l) => ({ variantId: l.variantId, quantity: l.quantity })),
           paymentProof: {
             reference: reference.trim(),

@@ -277,7 +277,7 @@ function PedidoPage() {
                   Progreso del Envío
                 </p>
                 <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  {ORDER_STATUSES.filter((s) => s !== "cancelado").map((statusKey, idx) => {
+                  {ORDER_STATUSES.filter((s) => String(s) !== "cancelado").map((statusKey, idx) => {
                     const isCompleted = currentStatusIndex >= 0 && idx <= currentStatusIndex;
                     const isCurrent = idx === currentStatusIndex;
 

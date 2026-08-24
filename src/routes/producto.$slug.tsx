@@ -18,7 +18,7 @@ import { SiteLayout } from "@/components/site/SiteLayout";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProduct } from "@/lib/catalog.functions";
-import { useCart } from "@/lib/cart";
+import { useCart, WHOLESALE_MIN_ORDER_UNITS } from "@/lib/cart";
 import { money, moneyExact, whatsappLink } from "@/lib/format";
 import { totalStock, type Product } from "@/lib/types";
 

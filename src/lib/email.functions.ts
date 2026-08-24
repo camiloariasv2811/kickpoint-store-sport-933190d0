@@ -192,8 +192,8 @@ export const resendOrderEmailNotification = createServerFn({ method: "POST" })
             customerPhone = order.customer?.whatsapp || null;
             customerEmail = order.customer?.email || null;
             total = Number(order.total);
-            paymentMethod = order.payment_method || "transferencia";
-            paymentReference = order.payment_reference || null;
+            paymentMethod = order.payment_method_code || "transferencia";
+            paymentReference = null;
             isWholesale = Boolean(order.is_wholesale);
             items = (order.items || []).map((i: any) => ({
               productName: i.product_name,
