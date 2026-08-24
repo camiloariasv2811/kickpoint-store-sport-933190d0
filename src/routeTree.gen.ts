@@ -18,6 +18,7 @@ import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as MayorRouteImport } from './routes/mayor'
 import { Route as PedidoRouteImport } from './routes/pedido'
+import { Route as TestDiagnosticoRouteImport } from './routes/test-diagnostico'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ProductoSlugRouteImport } from './routes/producto.$slug'
@@ -77,6 +78,11 @@ const MayorRoute = MayorRouteImport.update({
 const PedidoRoute = PedidoRouteImport.update({
   id: '/pedido',
   path: '/pedido',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestDiagnosticoRoute = TestDiagnosticoRouteImport.update({
+  id: '/test-diagnostico',
+  path: '/test-diagnostico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/mayor': typeof MayorRoute
   '/pedido': typeof PedidoRoute
+  '/test-diagnostico': typeof TestDiagnosticoRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/producto/$slug': typeof ProductoSlugRoute
@@ -204,6 +211,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/mayor': typeof MayorRoute
   '/pedido': typeof PedidoRoute
+  '/test-diagnostico': typeof TestDiagnosticoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/producto/$slug': typeof ProductoSlugRoute
   '/admin/caja': typeof AuthenticatedAdminCajaRoute
@@ -231,6 +239,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/mayor': typeof MayorRoute
   '/pedido': typeof PedidoRoute
+  '/test-diagnostico': typeof TestDiagnosticoRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
   '/producto/$slug': typeof ProductoSlugRoute
@@ -259,6 +268,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/mayor'
     | '/pedido'
+    | '/test-diagnostico'
     | '/admin'
     | '/auth/callback'
     | '/producto/$slug'
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/mayor'
     | '/pedido'
+    | '/test-diagnostico'
     | '/auth/callback'
     | '/producto/$slug'
     | '/admin/caja'
@@ -311,6 +322,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/mayor'
     | '/pedido'
+    | '/test-diagnostico'
     | '/_authenticated/admin'
     | '/auth/callback'
     | '/producto/$slug'
@@ -339,6 +351,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   MayorRoute: typeof MayorRoute
   PedidoRoute: typeof PedidoRoute
+  TestDiagnosticoRoute: typeof TestDiagnosticoRoute
   ProductoSlugRoute: typeof ProductoSlugRoute
 }
 
@@ -405,6 +418,13 @@ declare module '@tanstack/react-router' {
       path: '/pedido'
       fullPath: '/pedido'
       preLoaderRoute: typeof PedidoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test-diagnostico': {
+      id: '/test-diagnostico'
+      path: '/test-diagnostico'
+      fullPath: '/test-diagnostico'
+      preLoaderRoute: typeof TestDiagnosticoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
@@ -588,6 +608,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   MayorRoute: MayorRoute,
   PedidoRoute: PedidoRoute,
+  TestDiagnosticoRoute: TestDiagnosticoRoute,
   ProductoSlugRoute: ProductoSlugRoute,
 }
 export const routeTree = rootRouteImport
