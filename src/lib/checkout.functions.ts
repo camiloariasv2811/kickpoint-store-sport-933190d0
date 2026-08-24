@@ -105,6 +105,7 @@ export type CheckoutInput = {
   customer: {
     firstName: string;
     lastName: string;
+    identityDocument?: string;
     whatsapp: string;
     email: string;
     address: string;
@@ -130,6 +131,8 @@ export const createOrder = createServerFn({ method: "POST" })
   .inputValidator((data: CheckoutInput) => {
     if (!data?.customer?.firstName?.trim()) throw new Error("Falta el nombre");
     if (!data.customer.whatsapp?.trim()) throw new Error("Falta el WhatsApp");
+    if (!data.customer.identityDocument?.trim())
+      throw new Error("Falta la cédula o RIF del cliente (obligatoria para el envío)");
     if (!data.customer.city?.trim() || !data.customer.address?.trim())
       throw new Error("Falta la dirección de entrega o agencia de envío");
     if (!data.shippingMethod || !["TEALCA", "MRW"].includes(data.shippingMethod))
@@ -263,6 +266,7 @@ export const createOrder = createServerFn({ method: "POST" })
         customer: {
           first_name: data.customer.firstName.trim().slice(0, 80),
           last_name: data.customer.lastName.trim().slice(0, 80) || null,
+          identity_document: data.customer.identityDocument?.trim().slice(0, 40) || null,
           whatsapp: data.customer.whatsapp.trim().slice(0, 40),
           email: data.customer.email.trim().slice(0, 120) || null,
           address: `${data.shippingMethod} - ${data.customer.address.trim().slice(0, 250)}`,
@@ -449,6 +453,7 @@ export const createOrder = createServerFn({ method: "POST" })
       .insert({
         first_name: data.customer.firstName.trim().slice(0, 80),
         last_name: data.customer.lastName.trim().slice(0, 80) || null,
+        identity_document: data.customer.identityDocument?.trim().slice(0, 40) || null,
         whatsapp: data.customer.whatsapp.trim().slice(0, 40),
         phone: data.customer.whatsapp.trim().slice(0, 40),
         email: data.customer.email.trim().slice(0, 120) || null,
