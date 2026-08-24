@@ -149,18 +149,21 @@ function AdminPagos() {
   async function handleReject() {
     if (!rejectingPayment) return;
     setProcessing(true);
+    const reason = rejectReason.trim() || "Comprobante no válido o no coincide con el monto.";
     try {
       await reviewPayment({
         data: {
           paymentId: rejectingPayment.paymentId,
           approve: false,
-          reason: rejectReason.trim() || "Comprobante no válido o no coincide con el monto.",
+          reason,
         },
       });
+      applyLocalPaymentStatus(rejectingPayment.paymentId, "rechazado", reason);
       toast.success("Pago rechazado", {
         description: `Se notificó en el estado del pedido ${rejectingPayment.orderNumber}.`,
       });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       setRejectingPayment(null);
       setInspectPayment(null);
     } catch (err: any) {
