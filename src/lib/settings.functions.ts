@@ -120,6 +120,22 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
     }
   });
 
+export const refreshExchangeRatesNow = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    if (!isSupabaseServerConfigured()) {
+      return {
+        ok: false as const,
+        updated: false,
+        bcv: null,
+        usdt: null,
+        error: "Base de datos no disponible en este entorno",
+      };
+    }
+    const { refreshExchangeRates } = await import("./exchange-rates.server");
+    return await refreshExchangeRates();
+  });
+
 export const listAllPaymentMethods = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
