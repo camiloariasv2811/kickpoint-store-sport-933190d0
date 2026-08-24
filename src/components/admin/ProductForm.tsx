@@ -22,6 +22,8 @@ import {
 } from "@/components/ui/select";
 import { UploadCloud, Trash, Plus, X, Loader2 } from "lucide-react";
 import { createProduct, updateProduct, uploadProductImage } from "@/lib/products.functions";
+import { compressImageFile } from "@/lib/image-compress";
+
 import { createBrand, listBrands, listCategories } from "@/lib/catalog.functions";
 import { toast } from "sonner";
 import VariantTable, { type Variant } from "./VariantTable";
