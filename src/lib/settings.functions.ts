@@ -72,12 +72,13 @@ export const getPublicStoreSettings = createServerFn({ method: "GET" }).handler(
 
 export const getStoreSettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     if (!isSupabaseServerConfigured()) {
       return getInMemorySettings() as StoreSettings;
     }
     try {
-      const { data, error } = await context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data, error } = await supabaseAdmin
         .from("settings")
         .select("key, value")
         .eq("key", "store")
@@ -98,17 +99,18 @@ export const getStoreSettings = createServerFn({ method: "GET" })
 export const updateStoreSettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: StoreSettings) => d)
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     updateInMemorySettings(data);
     if (!isSupabaseServerConfigured()) {
       return { ok: true as const };
     }
     try {
-      const { error } = await context.supabase
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin
         .from("settings")
         .upsert({ key: "store", value: data, updated_at: new Date().toISOString() });
       if (error) {
-        console.warn("Supabase upsert settings error (used memory):", error.message);
+        console.warn("[updateStoreSettings] Supabase upsert settings error:", error.message);
       }
       return { ok: true as const };
     } catch {
@@ -118,24 +120,11 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
 
 export const listAllPaymentMethods = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     if (!isSupabaseServerConfigured()) {
       return getInMemoryPaymentMethods() as PaymentMethodRow[];
     }
     try {
-      // Verify staff through the caller's own (RLS-scoped) client before touching
-      // the privileged client, since `details` holds bank/wallet account PII.
-      const { data: roleRows } = await context.supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", context.userId);
-      const isStaff = (roleRows ?? []).some(
-        (r: { role: string }) => r.role === "admin" || r.role === "staff",
-      );
-      if (!isStaff) {
-        return getInMemoryPaymentMethods() as PaymentMethodRow[];
-      }
-
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const { data, error } = await supabaseAdmin
         .from("payment_methods")
@@ -162,16 +151,17 @@ export const updatePaymentMethod = createServerFn({ method: "POST" })
       sort_order?: number;
     }) => d,
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const { id, ...patch } = data;
     updateInMemoryPaymentMethod(id, patch);
     if (!isSupabaseServerConfigured()) {
       return { ok: true as const };
     }
     try {
-      const { error } = await context.supabase.from("payment_methods").update(patch).eq("id", id);
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { error } = await supabaseAdmin.from("payment_methods").update(patch).eq("id", id);
       if (error) {
-        console.warn("Supabase update payment method error (used memory):", error.message);
+        console.warn("[updatePaymentMethod] Supabase update payment method error:", error.message);
       }
       return { ok: true as const };
     } catch {
@@ -181,7 +171,7 @@ export const updatePaymentMethod = createServerFn({ method: "POST" })
 
 export const listStaffUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     if (!isSupabaseServerConfigured()) {
       return [
         {
@@ -197,11 +187,13 @@ export const listStaffUsers = createServerFn({ method: "GET" })
       ];
     }
     try {
-      const { data, error } = await context.supabase.from("user_roles").select(`
-          id, user_id, role,
-          profile:profiles ( full_name, email, created_at )
-        `);
-      if (error || !data) {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const [rolesRes, profilesRes] = await Promise.all([
+        supabaseAdmin.from("user_roles").select("id, user_id, role"),
+        supabaseAdmin.from("profiles").select("id, full_name, email, created_at"),
+      ]);
+
+      if (rolesRes.error || !rolesRes.data || rolesRes.data.length === 0) {
         return [
           {
             id: "role-demo-admin",
@@ -215,7 +207,18 @@ export const listStaffUsers = createServerFn({ method: "GET" })
           },
         ];
       }
-      return data as any[];
+
+      const profileMap = new Map((profilesRes.data ?? []).map((p) => [p.id, p]));
+      return rolesRes.data.map((r) => ({
+        id: r.id,
+        user_id: r.user_id,
+        role: r.role,
+        profile: profileMap.get(r.user_id) || {
+          full_name: "Usuario del Sistema",
+          email: null,
+          created_at: null,
+        },
+      }));
     } catch {
       return [
         {

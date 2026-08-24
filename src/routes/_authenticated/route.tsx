@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase, isSupabaseConfigured } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -16,8 +16,8 @@ function AuthenticatedLayout() {
     let isMounted = true;
 
     async function verifySession() {
-      // 1. Check demo mode first
-      if (typeof window !== "undefined" && localStorage.getItem("kp_demo_auth") === "true") {
+      if (!isSupabaseConfigured()) {
+        // In local development / preview without Supabase credentials
         if (isMounted) {
           setAuthorized(true);
           setChecking(false);
@@ -25,7 +25,6 @@ function AuthenticatedLayout() {
         return;
       }
 
-      // 2. Check Supabase auth
       try {
         const { data, error } = await supabase.auth.getUser();
         if (error || !data?.user) {

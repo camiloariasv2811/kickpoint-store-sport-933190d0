@@ -692,18 +692,21 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
       // Movimientos recientes (últimos 15)
       const recentMovements: DashboardMetrics["recentMovements"] = rawMovements
         .slice(0, 15)
-        .map((m) => {
+        .map((m: any) => {
           const variant = m.product_variants as {
             id?: string;
             size?: string | null;
             color?: string | null;
             sku?: string | null;
             products?: { name?: string } | null;
+            product?: { name?: string } | null;
           } | null;
+
+          const prodName = variant?.products?.name ?? variant?.product?.name ?? "Producto";
 
           return {
             id: m.id,
-            productName: variant?.products?.name ?? "Producto",
+            productName: prodName,
             size: variant?.size ?? null,
             color: variant?.color ?? null,
             sku: variant?.sku ?? null,

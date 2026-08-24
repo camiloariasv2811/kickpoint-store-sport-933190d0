@@ -2,6 +2,7 @@ import { createMiddleware } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabase as browserSupabase } from "./client";
+import { isSupabaseServerConfigured, supabaseAdmin } from "./client.server";
 import type { Database } from "./types";
 
 function isNewSupabaseApiKey(value: string): boolean {
@@ -18,7 +19,6 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
       new Headers(init.headers).forEach((value, key) => headers.set(key, value));
     }
 
-    // New Supabase API keys are opaque strings, not bearer JWTs.
     if (
       isNewSupabaseApiKey(supabaseKey) &&
       headers.get("Authorization") === `Bearer ${supabaseKey}`
@@ -37,23 +37,20 @@ const FALLBACK_SUPABASE_KEY =
 
 export const requireSupabaseAuth = createMiddleware({ type: "function" })
   .client(async ({ next }) => {
-    let token = "demo-admin-token";
+    let token = "";
     if (typeof window !== "undefined") {
-      const isDemo = localStorage.getItem("kp_demo_auth") === "true";
-      if (!isDemo) {
-        try {
-          const { data } = await browserSupabase.auth.getSession();
-          if (data?.session?.access_token) {
-            token = data.session.access_token;
-          }
-        } catch {
-          // Keep demo token
+      try {
+        const { data } = await browserSupabase.auth.getSession();
+        if (data?.session?.access_token) {
+          token = data.session.access_token;
         }
+      } catch (err) {
+        console.warn("[AuthMiddleware] Error obtaining session token in browser:", err);
       }
     }
     return next({
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: token ? `Bearer ${token}` : "",
       },
     });
   })
@@ -65,12 +62,8 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" })
       process.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
       FALLBACK_SUPABASE_KEY;
 
-    const request = getRequest();
-
-    const authHeader = request?.headers?.get("authorization") || "Bearer demo-admin-token";
-    const token = authHeader.replace("Bearer ", "").trim() || "demo-admin-token";
-
-    if (token === "demo-admin-token" || token === "demo-token" || !token.includes(".")) {
+    if (!isSupabaseServerConfigured()) {
+      // In-memory demo/preview mode when Supabase is not connected
       const supabase = createClient<Database>(SUPABASE_URL!, SUPABASE_PUBLISHABLE_KEY!, {
         global: {
           fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY!),
@@ -86,9 +79,19 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" })
         context: {
           supabase,
           userId: "admin-demo-user",
-          claims: { sub: "admin-demo-user", role: "admin", email: "admin@kickpoint.com" },
+          claims: { sub: "admin-demo-user", role: "admin", email: "admin@kickpointstore.com" },
         },
       });
+    }
+
+    const request = getRequest();
+    const authHeader = request?.headers?.get("authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+
+    if (!token || token === "demo-admin-token" || !token.includes(".")) {
+      throw new Error(
+        "Acceso no autorizado: debes iniciar sesión en el portal administrativo con una cuenta válida.",
+      );
     }
 
     const supabase = createClient<Database>(SUPABASE_URL!, SUPABASE_PUBLISHABLE_KEY!, {
@@ -105,36 +108,51 @@ export const requireSupabaseAuth = createMiddleware({ type: "function" })
       },
     });
 
-    try {
-      const { data, error } = await supabase.auth.getUser(token);
-      if (error || !data?.user?.id) {
-        return next({
-          context: {
-            supabase,
-            userId: "admin-demo-user",
-            claims: { sub: "admin-demo-user", role: "admin", email: "admin@kickpoint.com" },
-          },
-        });
-      }
-
-      return next({
-        context: {
-          supabase,
-          userId: data.user.id,
-          claims: {
-            sub: data.user.id,
-            role: (data.user.app_metadata?.role as string) || "admin",
-            email: data.user.email || "",
-          },
-        },
-      });
-    } catch {
-      return next({
-        context: {
-          supabase,
-          userId: "admin-demo-user",
-          claims: { sub: "admin-demo-user", role: "admin", email: "admin@kickpoint.com" },
-        },
-      });
+    const { data: userData, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !userData?.user?.id) {
+      throw new Error("Sesión inválida o expirada. Por favor, inicia sesión nuevamente.");
     }
+
+    const user = userData.user;
+
+    // Strict role verification against user_roles in database
+    const { data: roleRows, error: roleError } = await supabaseAdmin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+
+    let role = roleRows?.[0]?.role;
+
+    if (!role && !roleError) {
+      // If user_roles table is completely empty, bootstrap the first registered user as admin
+      const { count } = await supabaseAdmin
+        .from("user_roles")
+        .select("*", { count: "exact", head: true });
+
+      if (count === 0) {
+        await supabaseAdmin.from("user_roles").insert({
+          user_id: user.id,
+          role: "admin",
+        });
+        role = "admin";
+      }
+    }
+
+    if (role !== "admin" && role !== "staff") {
+      throw new Error(
+        "Acceso denegado: tu cuenta no tiene rol de administrador o vendedor asignado.",
+      );
+    }
+
+    return next({
+      context: {
+        supabase,
+        userId: user.id,
+        claims: {
+          sub: user.id,
+          role,
+          email: user.email || "",
+        },
+      },
+    });
   });

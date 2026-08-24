@@ -67,15 +67,31 @@ export const listPaymentMethods = createServerFn({ method: "GET" }).handler(asyn
     return DEFAULT_PAYMENT_METHODS;
   }
   try {
-    // SECURITY: `details` holds bank/wallet account PII and is not readable by the
-    // anon/authenticated API roles. It is only read here, server-side, so the payment
-    // instructions can be rendered for the checkout step.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
+    let { data, error } = await supabaseAdmin
       .from("payment_methods")
       .select("code, name, instructions, details")
       .eq("active", true)
       .order("sort_order");
+
+    if (error && error.message?.toLowerCase().includes("details")) {
+      // If column-level permission denied on details, select the allowed columns
+      const fallbackRes = await supabaseAdmin
+        .from("payment_methods")
+        .select("code, name, instructions")
+        .eq("active", true)
+        .order("sort_order");
+      if (fallbackRes.data && fallbackRes.data.length > 0) {
+        data = fallbackRes.data.map((m: any) => ({
+          code: m.code,
+          name: m.name,
+          instructions: m.instructions,
+          details: {},
+        }));
+        error = null;
+      }
+    }
+
     if (error || !data || data.length === 0) {
       return DEFAULT_PAYMENT_METHODS;
     }
