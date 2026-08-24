@@ -33,6 +33,7 @@ export function ProductCard({
 }) {
   const stock = totalStock(product);
   const soldOut = stock <= 0;
+  const [imageFailed, setImageFailed] = useState(false);
 
   return (
     <article className="surface-card group flex flex-col overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-card">
@@ -42,7 +43,7 @@ export function ProductCard({
         preload="intent"
         className="relative block aspect-square overflow-hidden bg-surface-2"
       >
-        {product.images?.[0] ? (
+        {product.images?.[0] && !imageFailed ? (
           <img
             src={product.images[0]}
             alt={product.name}
@@ -52,6 +53,7 @@ export function ProductCard({
             fetchPriority={priority ? "high" : "auto"}
             decoding="async"
             onLoad={onImageLoad}
+            onError={() => setImageFailed(true)}
             className="size-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
         ) : (
@@ -59,6 +61,7 @@ export function ProductCard({
             <span className="text-[11px] font-semibold uppercase tracking-wider">KICKPOINT</span>
           </div>
         )}
+
         <div className="absolute left-2 top-2 flex flex-wrap gap-1">
           {product.is_new && <Tag tone="primary">Nuevo</Tag>}
           {product.is_offer && <Tag tone="warning">Oferta</Tag>}
