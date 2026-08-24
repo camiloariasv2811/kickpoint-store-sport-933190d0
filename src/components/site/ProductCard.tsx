@@ -1,9 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { ShoppingCart } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { money } from "@/lib/format";
 import { totalStock, type Product } from "@/lib/types";
+
 
 function Tag({ children, tone }: { children: string; tone: "primary" | "warning" | "dark" }) {
   const tones = {
