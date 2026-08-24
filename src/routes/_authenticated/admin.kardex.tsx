@@ -226,7 +226,6 @@ function KardexPage() {
             </div>
           ) : movements.length === 0 ? (
             <EmptyState
-              icon={History}
               title="No hay movimientos registrados"
               description="Los movimientos de inventario por ventas, recepciones o ajustes aparecerán aquí automáticamente."
             />

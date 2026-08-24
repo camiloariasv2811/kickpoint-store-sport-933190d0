@@ -370,7 +370,7 @@ export default function TestDiagnosticoPage() {
             </div>
             <div className="flex items-center gap-2">
               <Button
-                variant={deviceMode === "desktop" ? "primary" : "secondary"}
+                variant={deviceMode === "desktop" ? "default" : "secondary"}
                 size="sm"
                 className="gap-1.5 text-xs"
                 onClick={() => setDeviceMode("desktop")}
@@ -378,7 +378,7 @@ export default function TestDiagnosticoPage() {
                 <Globe className="size-3.5" /> Escritorio (Fibra / WiFi)
               </Button>
               <Button
-                variant={deviceMode === "mobile_4g" ? "primary" : "secondary"}
+                variant={deviceMode === "mobile_4g" ? "default" : "secondary"}
                 size="sm"
                 className="gap-1.5 text-xs"
                 onClick={() => setDeviceMode("mobile_4g")}
@@ -883,7 +883,7 @@ export default function TestDiagnosticoPage() {
               </div>
 
               <div className="mt-4 divide-y divide-border">
-                {benchmarkData?.map((item, idx) => (
+                {(benchmarkData?.tests ?? []).map((item, idx) => (
                   <div
                     key={item.name}
                     className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
