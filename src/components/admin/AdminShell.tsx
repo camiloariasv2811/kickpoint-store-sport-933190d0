@@ -110,10 +110,6 @@ function AdminPage({ title, subtitle, actions, children }: AdminShellProps) {
 }
 
 function AdminFrame({ children }: { children: ReactNode }) {
-  title,
-  subtitle,
-  actions,
-  children,
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
