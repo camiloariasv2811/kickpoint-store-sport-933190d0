@@ -30,6 +30,7 @@ import { Route as AuthenticatedAdminClientesRouteImport } from './routes/_authen
 import { Route as AuthenticatedAdminConfiguracionRouteImport } from './routes/_authenticated/admin.configuracion'
 import { Route as AuthenticatedAdminInventarioRouteImport } from './routes/_authenticated/admin.inventario'
 import { Route as AuthenticatedAdminKardexRouteImport } from './routes/_authenticated/admin.kardex'
+import { Route as AuthenticatedAdminOrdenCatalogoRouteImport } from './routes/_authenticated/admin.orden-catalogo'
 import { Route as AuthenticatedAdminPagosRouteImport } from './routes/_authenticated/admin.pagos'
 import { Route as AuthenticatedAdminPedidosRouteImport } from './routes/_authenticated/admin.pedidos'
 import { Route as AuthenticatedAdminPosRouteImport } from './routes/_authenticated/admin.pos'
@@ -148,6 +149,12 @@ const AuthenticatedAdminKardexRoute =
     path: '/kardex',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminOrdenCatalogoRoute =
+  AuthenticatedAdminOrdenCatalogoRouteImport.update({
+    id: '/orden-catalogo',
+    path: '/orden-catalogo',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminPagosRoute = AuthenticatedAdminPagosRouteImport.update({
   id: '/pagos',
   path: '/pagos',
@@ -215,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/admin/configuracion': typeof AuthenticatedAdminConfiguracionRoute
   '/admin/inventario': typeof AuthenticatedAdminInventarioRoute
   '/admin/kardex': typeof AuthenticatedAdminKardexRoute
+  '/admin/orden-catalogo': typeof AuthenticatedAdminOrdenCatalogoRoute
   '/admin/pagos': typeof AuthenticatedAdminPagosRoute
   '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/admin/pos': typeof AuthenticatedAdminPosRoute
@@ -244,6 +252,7 @@ export interface FileRoutesByTo {
   '/admin/configuracion': typeof AuthenticatedAdminConfiguracionRoute
   '/admin/inventario': typeof AuthenticatedAdminInventarioRoute
   '/admin/kardex': typeof AuthenticatedAdminKardexRoute
+  '/admin/orden-catalogo': typeof AuthenticatedAdminOrdenCatalogoRoute
   '/admin/pagos': typeof AuthenticatedAdminPagosRoute
   '/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/admin/pos': typeof AuthenticatedAdminPosRoute
@@ -276,6 +285,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/configuracion': typeof AuthenticatedAdminConfiguracionRoute
   '/_authenticated/admin/inventario': typeof AuthenticatedAdminInventarioRoute
   '/_authenticated/admin/kardex': typeof AuthenticatedAdminKardexRoute
+  '/_authenticated/admin/orden-catalogo': typeof AuthenticatedAdminOrdenCatalogoRoute
   '/_authenticated/admin/pagos': typeof AuthenticatedAdminPagosRoute
   '/_authenticated/admin/pedidos': typeof AuthenticatedAdminPedidosRoute
   '/_authenticated/admin/pos': typeof AuthenticatedAdminPosRoute
@@ -308,6 +318,7 @@ export interface FileRouteTypes {
     | '/admin/configuracion'
     | '/admin/inventario'
     | '/admin/kardex'
+    | '/admin/orden-catalogo'
     | '/admin/pagos'
     | '/admin/pedidos'
     | '/admin/pos'
@@ -337,6 +348,7 @@ export interface FileRouteTypes {
     | '/admin/configuracion'
     | '/admin/inventario'
     | '/admin/kardex'
+    | '/admin/orden-catalogo'
     | '/admin/pagos'
     | '/admin/pedidos'
     | '/admin/pos'
@@ -368,6 +380,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/configuracion'
     | '/_authenticated/admin/inventario'
     | '/_authenticated/admin/kardex'
+    | '/_authenticated/admin/orden-catalogo'
     | '/_authenticated/admin/pagos'
     | '/_authenticated/admin/pedidos'
     | '/_authenticated/admin/pos'
@@ -545,6 +558,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminKardexRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/orden-catalogo': {
+      id: '/_authenticated/admin/orden-catalogo'
+      path: '/orden-catalogo'
+      fullPath: '/admin/orden-catalogo'
+      preLoaderRoute: typeof AuthenticatedAdminOrdenCatalogoRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/pagos': {
       id: '/_authenticated/admin/pagos'
       path: '/pagos'
@@ -611,6 +631,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminConfiguracionRoute: typeof AuthenticatedAdminConfiguracionRoute
   AuthenticatedAdminInventarioRoute: typeof AuthenticatedAdminInventarioRoute
   AuthenticatedAdminKardexRoute: typeof AuthenticatedAdminKardexRoute
+  AuthenticatedAdminOrdenCatalogoRoute: typeof AuthenticatedAdminOrdenCatalogoRoute
   AuthenticatedAdminPagosRoute: typeof AuthenticatedAdminPagosRoute
   AuthenticatedAdminPedidosRoute: typeof AuthenticatedAdminPedidosRoute
   AuthenticatedAdminPosRoute: typeof AuthenticatedAdminPosRoute
@@ -627,6 +648,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminConfiguracionRoute: AuthenticatedAdminConfiguracionRoute,
   AuthenticatedAdminInventarioRoute: AuthenticatedAdminInventarioRoute,
   AuthenticatedAdminKardexRoute: AuthenticatedAdminKardexRoute,
+  AuthenticatedAdminOrdenCatalogoRoute: AuthenticatedAdminOrdenCatalogoRoute,
   AuthenticatedAdminPagosRoute: AuthenticatedAdminPagosRoute,
   AuthenticatedAdminPedidosRoute: AuthenticatedAdminPedidosRoute,
   AuthenticatedAdminPosRoute: AuthenticatedAdminPosRoute,
