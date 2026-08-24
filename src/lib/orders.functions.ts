@@ -474,7 +474,7 @@ export const cancelOrder = createServerFn({ method: "POST" })
     const { data: order, error } = await supabaseAdmin
       .from("orders")
       .select(
-        "id, order_number, inventory_applied, items:order_items(variant_id, quantity, unit_cost)",
+        "id, order_number, customer_id, inventory_applied, items:order_items(variant_id, quantity, unit_cost)",
       )
       .eq("id", data.orderId)
       .maybeSingle();
@@ -594,7 +594,7 @@ export const deleteOrder = createServerFn({ method: "POST" })
       const { data: order, error } = await supabaseAdmin
         .from("orders")
         .select(
-          "id, order_number, inventory_applied, items:order_items(variant_id, quantity, unit_cost)",
+          "id, order_number, customer_id, inventory_applied, items:order_items(variant_id, quantity, unit_cost)",
         )
         .eq("id", data.orderId)
         .maybeSingle();
