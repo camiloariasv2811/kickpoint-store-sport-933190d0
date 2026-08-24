@@ -18,6 +18,7 @@ import { Route as CategoriasRouteImport } from './routes/categorias'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as MayorRouteImport } from './routes/mayor'
 import { Route as PedidoRouteImport } from './routes/pedido'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as TestDiagnosticoRouteImport } from './routes/test-diagnostico'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
@@ -79,6 +80,11 @@ const MayorRoute = MayorRouteImport.update({
 const PedidoRoute = PedidoRouteImport.update({
   id: '/pedido',
   path: '/pedido',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TestDiagnosticoRoute = TestDiagnosticoRouteImport.update({
@@ -191,6 +197,7 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/mayor': typeof MayorRoute
   '/pedido': typeof PedidoRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/test-diagnostico': typeof TestDiagnosticoRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
@@ -219,6 +226,7 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/mayor': typeof MayorRoute
   '/pedido': typeof PedidoRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/test-diagnostico': typeof TestDiagnosticoRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/producto/$slug': typeof ProductoSlugRoute
@@ -248,6 +256,7 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/mayor': typeof MayorRoute
   '/pedido': typeof PedidoRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/test-diagnostico': typeof TestDiagnosticoRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
@@ -278,6 +287,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/mayor'
     | '/pedido'
+    | '/reset-password'
     | '/test-diagnostico'
     | '/admin'
     | '/auth/callback'
@@ -306,6 +316,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/mayor'
     | '/pedido'
+    | '/reset-password'
     | '/test-diagnostico'
     | '/auth/callback'
     | '/producto/$slug'
@@ -334,6 +345,7 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/mayor'
     | '/pedido'
+    | '/reset-password'
     | '/test-diagnostico'
     | '/_authenticated/admin'
     | '/auth/callback'
@@ -364,6 +376,7 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   MayorRoute: typeof MayorRoute
   PedidoRoute: typeof PedidoRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   TestDiagnosticoRoute: typeof TestDiagnosticoRoute
   ProductoSlugRoute: typeof ProductoSlugRoute
   ApiPublicProductImageSplatRoute: typeof ApiPublicProductImageSplatRoute
@@ -432,6 +445,13 @@ declare module '@tanstack/react-router' {
       path: '/pedido'
       fullPath: '/pedido'
       preLoaderRoute: typeof PedidoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/test-diagnostico': {
@@ -629,6 +649,7 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   MayorRoute: MayorRoute,
   PedidoRoute: PedidoRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   TestDiagnosticoRoute: TestDiagnosticoRoute,
   ProductoSlugRoute: ProductoSlugRoute,
   ApiPublicProductImageSplatRoute: ApiPublicProductImageSplatRoute,
