@@ -35,6 +35,7 @@ import { Route as AuthenticatedAdminPosRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAdminProductosRouteImport } from './routes/_authenticated/admin.productos'
 import { Route as AuthenticatedAdminReportesRouteImport } from './routes/_authenticated/admin.reportes'
 import { Route as AuthenticatedAdminVentasRouteImport } from './routes/_authenticated/admin.ventas'
+import { Route as ApiPublicProductImageSplatRouteImport } from './routes/api/public/product-image.$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -174,6 +175,12 @@ const AuthenticatedAdminVentasRoute =
     path: '/ventas',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const ApiPublicProductImageSplatRoute =
+  ApiPublicProductImageSplatRouteImport.update({
+    id: '/api/public/product-image/$',
+    path: '/api/public/product-image/$',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/admin/reportes': typeof AuthenticatedAdminReportesRoute
   '/admin/ventas': typeof AuthenticatedAdminVentasRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -227,6 +235,7 @@ export interface FileRoutesByTo {
   '/admin/reportes': typeof AuthenticatedAdminReportesRoute
   '/admin/ventas': typeof AuthenticatedAdminVentasRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -256,6 +265,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/reportes': typeof AuthenticatedAdminReportesRoute
   '/_authenticated/admin/ventas': typeof AuthenticatedAdminVentasRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -285,6 +295,7 @@ export interface FileRouteTypes {
     | '/admin/reportes'
     | '/admin/ventas'
     | '/admin/'
+    | '/api/public/product-image/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -311,6 +322,7 @@ export interface FileRouteTypes {
     | '/admin/reportes'
     | '/admin/ventas'
     | '/admin'
+    | '/api/public/product-image/$'
   id:
     | '__root__'
     | '/'
@@ -339,6 +351,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/reportes'
     | '/_authenticated/admin/ventas'
     | '/_authenticated/admin/'
+    | '/api/public/product-image/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -353,6 +366,7 @@ export interface RootRouteChildren {
   PedidoRoute: typeof PedidoRoute
   TestDiagnosticoRoute: typeof TestDiagnosticoRoute
   ProductoSlugRoute: typeof ProductoSlugRoute
+  ApiPublicProductImageSplatRoute: typeof ApiPublicProductImageSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -539,6 +553,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminVentasRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/api/public/product-image/$': {
+      id: '/api/public/product-image/$'
+      path: '/api/public/product-image/$'
+      fullPath: '/api/public/product-image/$'
+      preLoaderRoute: typeof ApiPublicProductImageSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -610,6 +631,7 @@ const rootRouteChildren: RootRouteChildren = {
   PedidoRoute: PedidoRoute,
   TestDiagnosticoRoute: TestDiagnosticoRoute,
   ProductoSlugRoute: ProductoSlugRoute,
+  ApiPublicProductImageSplatRoute: ApiPublicProductImageSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
