@@ -27,6 +27,7 @@ export type AdminOrder = {
   customer: {
     first_name: string;
     last_name: string | null;
+    identity_document?: string | null;
     whatsapp: string | null;
     email: string | null;
     address: string | null;
@@ -86,7 +87,9 @@ export const listOrders = createServerFn({ method: "GET" })
       customerIds.length > 0
         ? context.supabase
             .from("customers")
-            .select("id, first_name, last_name, whatsapp, email, address, city, state")
+            .select(
+              "id, first_name, last_name, identity_document, whatsapp, email, address, city, state",
+            )
             .in("id", customerIds)
         : Promise.resolve({ data: [], error: null }),
       context.supabase

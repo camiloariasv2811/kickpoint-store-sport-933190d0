@@ -52,13 +52,19 @@ export const Route = createFileRoute("/checkout")({
 });
 
 const FIELDS: readonly {
-  key: "firstName" | "lastName" | "whatsapp" | "email" | "city" | "state";
+  key: "firstName" | "lastName" | "identityDocument" | "whatsapp" | "email" | "city" | "state";
   label: string;
   placeholder: string;
   required?: boolean;
 }[] = [
   { key: "firstName", label: "Nombre", placeholder: "María", required: true },
   { key: "lastName", label: "Apellido", placeholder: "Pérez", required: false },
+  {
+    key: "identityDocument",
+    label: "Cédula / RIF",
+    placeholder: "V-12345678",
+    required: true,
+  },
   { key: "whatsapp", label: "WhatsApp", placeholder: "0412 123 4567", required: true },
   { key: "email", label: "Correo (opcional)", placeholder: "maria@correo.com", required: false },
   { key: "city", label: "Ciudad / Municipio", placeholder: "Caracas", required: true },
@@ -140,6 +146,7 @@ function CheckoutPage() {
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
+    identityDocument: "",
     whatsapp: "",
     email: "",
     address: "",
@@ -219,6 +226,11 @@ function CheckoutPage() {
 
     if (!form.firstName.trim()) {
       toast.error("Por favor ingresa tu nombre");
+      return;
+    }
+
+    if (!form.identityDocument.trim()) {
+      toast.error("Por favor ingresa tu cédula o RIF (obligatorio para el envío)");
       return;
     }
 
@@ -493,6 +505,7 @@ function CheckoutPage() {
 
   const ready =
     form.firstName.trim() &&
+    form.identityDocument.trim() &&
     form.whatsapp.trim() &&
     form.city.trim() &&
     form.address.trim() &&

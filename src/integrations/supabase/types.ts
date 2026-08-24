@@ -120,6 +120,7 @@ export type Database = {
           email: string | null
           first_name: string
           id: string
+          identity_document: string | null
           last_name: string | null
           notes: string | null
           phone: string | null
@@ -133,6 +134,7 @@ export type Database = {
           email?: string | null
           first_name: string
           id?: string
+          identity_document?: string | null
           last_name?: string | null
           notes?: string | null
           phone?: string | null
@@ -146,6 +148,7 @@ export type Database = {
           email?: string | null
           first_name?: string
           id?: string
+          identity_document?: string | null
           last_name?: string | null
           notes?: string | null
           phone?: string | null

@@ -337,7 +337,7 @@ function AdminPedidos() {
       )}
 
       {!isLoading && !isError && (
-        <div className="surface-card overflow-x-auto">
+        <div className="surface-card hidden overflow-x-auto md:block">
           <table className="w-full min-w-[880px] text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
@@ -468,6 +468,57 @@ function AdminPedidos() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Vista móvil: tarjetas con acciones visibles (incluye imprimir) */}
+      {!isLoading && !isError && (
+        <div className="space-y-3 md:hidden">
+          {filteredOrders.length === 0 && (
+            <div className="surface-card p-8 text-center text-sm text-muted-foreground">
+              <Package className="mx-auto mb-2 size-8 text-muted-foreground/50" />
+              No hay pedidos que coincidan con el filtro.
+            </div>
+          )}
+          {filteredOrders.map((o) => (
+            <div key={o.id} className="surface-card space-y-3 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="font-mono text-xs font-bold">{o.order_number}</p>
+                  <p className="mt-0.5 font-semibold text-foreground">
+                    {o.customer?.first_name} {o.customer?.last_name ?? ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {o.customer?.whatsapp ?? "—"} · {o.customer?.city ?? "—"}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-primary">{moneyExact(o.total)}</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {ORDER_STATUS_LABELS[o.status] ?? o.status}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  onClick={() => setSelectedOrder(o)}
+                >
+                  <Eye className="size-3.5" /> Detalle
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-xs"
+                  onClick={() => handlePrintDeliveryNote(o)}
+                >
+                  <Printer className="size-3.5" /> Imprimir guía
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
