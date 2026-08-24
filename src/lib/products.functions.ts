@@ -860,6 +860,11 @@ export const uploadProductImage = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertIsStaff(context);
     if (!data.dataBase64) throw new Error("Falta contenido de imagen");
+    // ~6 MB de bytes reales: evita que una foto enorme corte la petición sin aviso.
+    if (data.dataBase64.length > 8_000_000) {
+      throw new Error("La imagen es demasiado grande. Usa una foto de menor resolución.");
+    }
+
 
     const ext = String(data.contentType).includes("/")
       ? String(data.contentType).split("/")[1]
