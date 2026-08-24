@@ -8,11 +8,13 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
   tanstackStart: {
-    // Redirect TanStack Start's bundled entries to src/client.tsx and src/server.ts
-    // nitro/vite builds from this
+    // Redirect TanStack Start's bundled client entry to src/client.tsx.
+    // The server entry stays on the framework default: overriding it splits the
+    // framework's SSR runtime across chunks and creates a circular-init crash
+    // in the production Worker (works in dev, 500s when published).
     client: { entry: "client" },
-    server: { entry: "server" },
   },
+
   nitro: {
     output: {
       dir: "dist",
