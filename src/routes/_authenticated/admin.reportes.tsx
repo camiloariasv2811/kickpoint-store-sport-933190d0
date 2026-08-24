@@ -97,16 +97,16 @@ function AdminReportes() {
         <Button
           variant="outline"
           onClick={exportCSV}
-          disabled={isLoading || !metrics}
+          disabled={isLoading && !data}
           className="h-9 gap-1.5 text-xs font-semibold"
         >
           <Download className="size-4" /> Exportar a CSV
         </Button>
       }
     >
-      {isLoading && <Skeleton className="h-96 w-full rounded-xl" />}
+      {isLoading && !data && <Skeleton className="h-96 w-full rounded-xl" />}
 
-      {!isLoading && metrics && (
+      {(!isLoading || data) && (
         <div className="space-y-6">
           {/* Key Stat Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
