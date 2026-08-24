@@ -15,6 +15,8 @@ export type StoreSettings = {
   exchange_rate_bs?: number;
   exchange_rate_bcv?: number;
   exchange_rate_usdt?: number;
+  exchange_rates_updated_at?: string;
+  exchange_rates_auto_source?: string;
 };
 
 export type PaymentMethodRow = {
