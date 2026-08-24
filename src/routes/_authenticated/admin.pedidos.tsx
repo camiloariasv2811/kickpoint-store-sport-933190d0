@@ -67,6 +67,13 @@ function AdminPedidos() {
   const [resendingEmail, setResendingEmail] = useState(false);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [loadingProof, setLoadingProof] = useState(false);
+  function handlePrintDeliveryNote(order: AdminOrder) {
+    const ok = printDeliveryNote(order);
+    if (!ok) {
+      toast.error("Permite las ventanas emergentes para imprimir la nota de entrega");
+    }
+  }
+
 
   async function viewProof(path: string) {
     setLoadingProof(true);
