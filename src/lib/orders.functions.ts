@@ -78,7 +78,6 @@ export const listOrders = createServerFn({ method: "GET" })
     }
 
     const orders = ordersResult.data ?? [];
-    console.info("[listOrders] Loaded base orders:", orders.length);
     if (orders.length === 0) return [];
 
     const orderIds = orders.map((order) => order.id);

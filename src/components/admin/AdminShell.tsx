@@ -16,7 +16,7 @@ import {
   Tags,
   Users,
 } from "lucide-react";
-import { useState, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
 import { Logo } from "@/components/site/Logo";
 import { Button } from "@/components/ui/button";
@@ -79,26 +79,50 @@ function NavList({
   );
 }
 
-export function AdminShell({
-  title,
-  subtitle,
-  actions,
-  children,
-}: {
+type AdminShellProps = {
   title: string;
   subtitle?: string;
   actions?: ReactNode;
   children: ReactNode;
-}) {
+};
+
+const AdminShellContext = createContext(false);
+
+export function AdminShell(props: AdminShellProps) {
+  const isInsideAdminShell = useContext(AdminShellContext);
+  if (isInsideAdminShell) return <AdminPage {...props} />;
+  return <AdminFrame>{props.children}</AdminFrame>;
+}
+
+function AdminPage({ title, subtitle, actions, children }: AdminShellProps) {
+  return (
+    <>
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur">
+        <div className="min-w-0">
+          <h1 className="text-display truncate text-xl">{title}</h1>
+          {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
+        </div>
+        <div className="ml-auto flex items-center gap-2">{actions}</div>
+      </header>
+      <main className="flex-1 p-4 sm:p-6">{children}</main>
+    </>
+  );
+}
+
+function AdminFrame({ children }: { children: ReactNode }) {
+  title,
+  subtitle,
+  actions,
+  children,
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
 
   const { data: badges } = useQuery({
     queryKey: ["admin", "pending-badges"],
-    staleTime: 30_000,
+    staleTime: 60_000,
     refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
     refetchOnMount: false,
     queryFn: async () => {
       try {
@@ -139,6 +163,7 @@ export function AdminShell({
   }
 
   return (
+    <AdminShellContext.Provider value>
     <div className="flex min-h-screen bg-background">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
         <div className="border-b border-sidebar-border px-5 py-5">
@@ -161,7 +186,7 @@ export function AdminShell({
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/90 px-4 backdrop-blur">
+        <div className="sticky top-0 z-40 flex h-16 items-center border-b border-border bg-background px-4 lg:hidden">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="lg:hidden" aria-label="Menú">
@@ -181,16 +206,10 @@ export function AdminShell({
               </div>
             </SheetContent>
           </Sheet>
-
-          <div className="min-w-0">
-            <h1 className="text-display truncate text-xl">{title}</h1>
-            {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
-          </div>
-          <div className="ml-auto flex items-center gap-2">{actions}</div>
-        </header>
-
-        <main className="flex-1 p-4 sm:p-6">{children}</main>
+        </div>
+        {children}
       </div>
     </div>
+    </AdminShellContext.Provider>
   );
 }

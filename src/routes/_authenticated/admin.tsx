@@ -4,6 +4,7 @@ import { ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { AdminShell } from "@/components/admin/AdminShell";
 import { Skeleton } from "@/components/ui/skeleton";
 import { claimAdminIfFirst, getMyRoles } from "@/lib/admin.functions";
 
@@ -76,5 +77,9 @@ function AdminGuard() {
     );
   }
 
-  return <Outlet />;
+  return (
+    <AdminShell title="">
+      <Outlet />
+    </AdminShell>
+  );
 }
