@@ -114,14 +114,29 @@ function AdminPagos() {
   const verifiedCount = payments.filter((p) => p.status === "verificado").length;
   const rejectedCount = payments.filter((p) => p.status === "rechazado").length;
 
+  function applyLocalPaymentStatus(paymentId: string, status: string, reason?: string) {
+    queryClient.setQueryData<AdminOrder[]>(["admin", "orders"], (prev) =>
+      (prev ?? []).map((o) => ({
+        ...o,
+        payments: (o.payments ?? []).map((p) =>
+          p.id === paymentId
+            ? { ...p, status, rejection_reason: reason ?? p.rejection_reason }
+            : p,
+        ),
+      })),
+    );
+  }
+
   async function handleApprove(payment: FlatPayment) {
     setProcessing(true);
     try {
       await reviewPayment({ data: { paymentId: payment.paymentId, approve: true } });
+      applyLocalPaymentStatus(payment.paymentId, "verificado");
       toast.success("Pago verificado exitosamente", {
         description: `Pedido ${payment.orderNumber} actualizado e inventario descontado.`,
       });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       setInspectPayment(null);
     } catch (err: any) {
       console.error(err);
