@@ -36,6 +36,7 @@ import { Route as AuthenticatedAdminPosRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedAdminProductosRouteImport } from './routes/_authenticated/admin.productos'
 import { Route as AuthenticatedAdminReportesRouteImport } from './routes/_authenticated/admin.reportes'
 import { Route as AuthenticatedAdminVentasRouteImport } from './routes/_authenticated/admin.ventas'
+import { Route as ApiPublicHooksUpdateExchangeRatesRouteImport } from './routes/api/public/hooks/update-exchange-rates'
 import { Route as ApiPublicProductImageSplatRouteImport } from './routes/api/public/product-image.$'
 
 const IndexRoute = IndexRouteImport.update({
@@ -181,6 +182,12 @@ const AuthenticatedAdminVentasRoute =
     path: '/ventas',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const ApiPublicHooksUpdateExchangeRatesRoute =
+  ApiPublicHooksUpdateExchangeRatesRouteImport.update({
+    id: '/api/public/hooks/update-exchange-rates',
+    path: '/api/public/hooks/update-exchange-rates',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicProductImageSplatRoute =
   ApiPublicProductImageSplatRouteImport.update({
     id: '/api/public/product-image/$',
@@ -215,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/admin/reportes': typeof AuthenticatedAdminReportesRoute
   '/admin/ventas': typeof AuthenticatedAdminVentasRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
+  '/api/public/hooks/update-exchange-rates': typeof ApiPublicHooksUpdateExchangeRatesRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
 export interface FileRoutesByTo {
@@ -243,6 +251,7 @@ export interface FileRoutesByTo {
   '/admin/reportes': typeof AuthenticatedAdminReportesRoute
   '/admin/ventas': typeof AuthenticatedAdminVentasRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
+  '/api/public/hooks/update-exchange-rates': typeof ApiPublicHooksUpdateExchangeRatesRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
 export interface FileRoutesById {
@@ -274,6 +283,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/reportes': typeof AuthenticatedAdminReportesRoute
   '/_authenticated/admin/ventas': typeof AuthenticatedAdminVentasRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
+  '/api/public/hooks/update-exchange-rates': typeof ApiPublicHooksUpdateExchangeRatesRoute
   '/api/public/product-image/$': typeof ApiPublicProductImageSplatRoute
 }
 export interface FileRouteTypes {
@@ -305,6 +315,7 @@ export interface FileRouteTypes {
     | '/admin/reportes'
     | '/admin/ventas'
     | '/admin/'
+    | '/api/public/hooks/update-exchange-rates'
     | '/api/public/product-image/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
     | '/admin/reportes'
     | '/admin/ventas'
     | '/admin'
+    | '/api/public/hooks/update-exchange-rates'
     | '/api/public/product-image/$'
   id:
     | '__root__'
@@ -363,6 +375,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/reportes'
     | '/_authenticated/admin/ventas'
     | '/_authenticated/admin/'
+    | '/api/public/hooks/update-exchange-rates'
     | '/api/public/product-image/$'
   fileRoutesById: FileRoutesById
 }
@@ -379,6 +392,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   TestDiagnosticoRoute: typeof TestDiagnosticoRoute
   ProductoSlugRoute: typeof ProductoSlugRoute
+  ApiPublicHooksUpdateExchangeRatesRoute: typeof ApiPublicHooksUpdateExchangeRatesRoute
   ApiPublicProductImageSplatRoute: typeof ApiPublicProductImageSplatRoute
 }
 
@@ -573,6 +587,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminVentasRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/api/public/hooks/update-exchange-rates': {
+      id: '/api/public/hooks/update-exchange-rates'
+      path: '/api/public/hooks/update-exchange-rates'
+      fullPath: '/api/public/hooks/update-exchange-rates'
+      preLoaderRoute: typeof ApiPublicHooksUpdateExchangeRatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/product-image/$': {
       id: '/api/public/product-image/$'
       path: '/api/public/product-image/$'
@@ -652,6 +673,8 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   TestDiagnosticoRoute: TestDiagnosticoRoute,
   ProductoSlugRoute: ProductoSlugRoute,
+  ApiPublicHooksUpdateExchangeRatesRoute:
+    ApiPublicHooksUpdateExchangeRatesRoute,
   ApiPublicProductImageSplatRoute: ApiPublicProductImageSplatRoute,
 }
 export const routeTree = rootRouteImport
