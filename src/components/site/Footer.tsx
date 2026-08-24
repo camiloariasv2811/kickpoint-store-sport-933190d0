@@ -84,11 +84,6 @@ export function Footer() {
                   Escríbenos por WhatsApp
                 </a>
               </li>
-              <li>
-                <Link to="/auth" className="transition-colors hover:text-primary">
-                  Acceso del equipo
-                </Link>
-              </li>
             </ul>
           </div>
           <div>
