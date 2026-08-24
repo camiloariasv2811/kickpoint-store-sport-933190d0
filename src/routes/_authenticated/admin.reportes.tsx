@@ -18,19 +18,48 @@ import { StatCard } from "@/components/admin/StatCard";
 import { getReportMetrics, type ReportMetrics } from "@/lib/reports.functions";
 import { moneyExact } from "@/lib/format";
 
+const EMPTY_METRICS: ReportMetrics = {
+  totalRevenue: 0,
+  totalOrders: 0,
+  totalSales: 0,
+  totalCost: 0,
+  grossProfit: 0,
+  averageTicket: 0,
+  topProducts: [],
+  inventoryValueRetail: 0,
+  inventoryValueCost: 0,
+  totalUnitsInStock: 0,
+  salesByChannel: [],
+};
+
 export const Route = createFileRoute("/_authenticated/admin/reportes")({
   component: AdminReportes,
+  errorComponent: () => (
+    <AdminShell title="Reportes Financieros" subtitle="No se pudieron cargar los reportes">
+      <div className="surface-card p-6 text-sm text-muted-foreground">
+        Ocurrió un problema al cargar los reportes. Intenta recargar la página.
+      </div>
+    </AdminShell>
+  ),
 });
 
 function AdminReportes() {
-  const { data: metrics, isLoading } = useQuery<ReportMetrics>({
+  const { data, isLoading } = useQuery<ReportMetrics>({
     queryKey: ["admin", "reports"],
+    staleTime: 1000 * 60,
+    placeholderData: (prev) => prev,
     queryFn: async () => {
-      const res = await getReportMetrics();
-      if (!res) throw new Error("No metrics");
-      return res;
+      try {
+        const res = await getReportMetrics();
+        return { ...EMPTY_METRICS, ...(res ?? {}) };
+      } catch (err) {
+        console.warn("[AdminReportes] Error fetching metrics:", err);
+        return EMPTY_METRICS;
+      }
     },
   });
+
+  const metrics: ReportMetrics = { ...EMPTY_METRICS, ...(data ?? {}) };
 
   function exportCSV() {
     if (!metrics) return;
@@ -68,16 +97,16 @@ function AdminReportes() {
         <Button
           variant="outline"
           onClick={exportCSV}
-          disabled={isLoading || !metrics}
+          disabled={isLoading && !data}
           className="h-9 gap-1.5 text-xs font-semibold"
         >
           <Download className="size-4" /> Exportar a CSV
         </Button>
       }
     >
-      {isLoading && <Skeleton className="h-96 w-full rounded-xl" />}
+      {isLoading && !data && <Skeleton className="h-96 w-full rounded-xl" />}
 
-      {!isLoading && metrics && (
+      {(!isLoading || data) && (
         <div className="space-y-6">
           {/* Key Stat Cards */}
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

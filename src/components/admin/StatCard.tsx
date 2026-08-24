@@ -6,12 +6,14 @@ export function StatCard({
   hint,
   icon: Icon,
   tone = "default",
+  trend,
 }: {
   label: string;
   value: string;
   hint?: string;
-  icon: LucideIcon;
+  icon?: LucideIcon;
   tone?: "default" | "primary" | "warning";
+  trend?: "up" | "down";
 }) {
   const tones = {
     default: "text-foreground",
@@ -23,7 +25,15 @@ export function StatCard({
     <div className="surface-card p-4 transition-colors hover:border-primary/40">
       <div className="flex items-start justify-between gap-2">
         <p className="text-eyebrow text-[0.6rem] text-muted-foreground">{label}</p>
-        <Icon className="size-4 text-primary" />
+        {Icon ? (
+          <Icon className="size-4 text-primary" />
+        ) : trend ? (
+          <span
+            className={`text-xs font-bold ${trend === "up" ? "text-primary" : "text-destructive"}`}
+          >
+            {trend === "up" ? "↑" : "↓"}
+          </span>
+        ) : null}
       </div>
       <p className={`mt-2 text-2xl font-bold ${tones[tone]}`}>{value}</p>
       {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}

@@ -81,10 +81,10 @@ function AdminPedidos() {
 
   const { data: orders = [], isLoading } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
-    staleTime: 0,
-    refetchInterval: 5000,
+    staleTime: 1000 * 20,
+    refetchInterval: 20000,
     refetchOnWindowFocus: true,
-    refetchOnMount: "always",
+    placeholderData: (prev) => prev,
     queryFn: async () => {
       try {
         const res = await listOrders();
@@ -148,7 +148,11 @@ function AdminPedidos() {
       toast.success("Estado del pedido actualizado", {
         description: ORDER_STATUS_LABELS[newStatus] ?? newStatus,
       });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      queryClient.setQueryData<AdminOrder[]>(["admin", "orders"], (prev) =>
+        (prev ?? []).map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
       }
@@ -172,7 +176,8 @@ function AdminPedidos() {
     try {
       await cancelOrder({ data: { orderId: order.id, reason: "Cancelación desde panel admin" } });
       toast.success(`Pedido ${order.order_number} cancelado`);
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       setSelectedOrder(null);
     } catch (err: any) {
       toast.error(`Error: ${err.message}`);
@@ -193,7 +198,8 @@ function AdminPedidos() {
     try {
       await deleteOrder({ data: { orderId: order.id, restoreStock: true } });
       toast.success(`Pedido ${order.order_number} eliminado correctamente`);
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       setSelectedOrder(null);
     } catch (err: any) {
       toast.error(`Error: ${err.message}`);

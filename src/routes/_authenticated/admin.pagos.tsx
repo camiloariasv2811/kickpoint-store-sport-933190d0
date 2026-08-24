@@ -66,6 +66,8 @@ function AdminPagos() {
 
   const { data: orders = [], isLoading } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
+    staleTime: 1000 * 20,
+    placeholderData: (prev) => prev,
     queryFn: async () => {
       try {
         const res = await listOrders();
@@ -112,14 +114,29 @@ function AdminPagos() {
   const verifiedCount = payments.filter((p) => p.status === "verificado").length;
   const rejectedCount = payments.filter((p) => p.status === "rechazado").length;
 
+  function applyLocalPaymentStatus(paymentId: string, status: string, reason?: string) {
+    queryClient.setQueryData<AdminOrder[]>(["admin", "orders"], (prev) =>
+      (prev ?? []).map((o) => ({
+        ...o,
+        payments: (o.payments ?? []).map((p) =>
+          p.id === paymentId
+            ? { ...p, status, rejection_reason: reason ?? p.rejection_reason }
+            : p,
+        ),
+      })),
+    );
+  }
+
   async function handleApprove(payment: FlatPayment) {
     setProcessing(true);
     try {
       await reviewPayment({ data: { paymentId: payment.paymentId, approve: true } });
+      applyLocalPaymentStatus(payment.paymentId, "verificado");
       toast.success("Pago verificado exitosamente", {
         description: `Pedido ${payment.orderNumber} actualizado e inventario descontado.`,
       });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       setInspectPayment(null);
     } catch (err: any) {
       console.error(err);
@@ -132,18 +149,21 @@ function AdminPagos() {
   async function handleReject() {
     if (!rejectingPayment) return;
     setProcessing(true);
+    const reason = rejectReason.trim() || "Comprobante no válido o no coincide con el monto.";
     try {
       await reviewPayment({
         data: {
           paymentId: rejectingPayment.paymentId,
           approve: false,
-          reason: rejectReason.trim() || "Comprobante no válido o no coincide con el monto.",
+          reason,
         },
       });
+      applyLocalPaymentStatus(rejectingPayment.paymentId, "rechazado", reason);
       toast.success("Pago rechazado", {
         description: `Se notificó en el estado del pedido ${rejectingPayment.orderNumber}.`,
       });
-      await queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
       setRejectingPayment(null);
       setInspectPayment(null);
     } catch (err: any) {
