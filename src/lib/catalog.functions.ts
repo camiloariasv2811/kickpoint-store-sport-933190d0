@@ -80,6 +80,7 @@ export const getMinimalProducts = createServerFn({ method: "GET" }).handler(asyn
         .from("products")
         .select("id, name, slug, retail_price, images, active")
         .eq("active", true)
+        .order("sort_order", { ascending: true })
         .order("created_at", { ascending: false });
       if (!error && data) {
         rawItems = data;
@@ -425,6 +426,7 @@ export const listProducts = createServerFn({ method: "GET" }).handler(async () =
         .from("products")
         .select(PRODUCT_SELECT_CATALOG)
         .or("active.eq.true,active.is.null")
+        .order("sort_order", { ascending: true })
         .order("created_at", { ascending: false });
 
       console.log("[CLIENT_PRODUCTS_02] SUPABASE RESULT (Admin)", {
@@ -454,6 +456,7 @@ export const listProducts = createServerFn({ method: "GET" }).handler(async () =
         .from("products")
         .select(PRODUCT_SELECT_CATALOG)
         .or("active.eq.true,active.is.null")
+        .order("sort_order", { ascending: true })
         .order("created_at", { ascending: false });
 
       console.log("[CLIENT_PRODUCTS_02] SUPABASE RESULT (Public)", {
