@@ -176,7 +176,7 @@ function Home() {
     isLoading: isLoadingProducts,
     isPending: isPendingProducts,
     isFetching: isFetchingProducts,
-  } = useQuery({
+  } = useQuery<Product[]>({
     queryKey: ["products"],
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,
