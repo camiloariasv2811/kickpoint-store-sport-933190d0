@@ -124,8 +124,7 @@ function Chip({
 function Catalogo() {
   const [routeMountTime] = useState(() => {
     const t = performance.now();
-    console.log(`[CATALOG_NAVIGATION_START] 0ms`);
-    console.log(`[CATALOG_ROUTE_READY] Route mounted`);
+    devLog(`[CATALOG_ROUTE_READY] Route mounted`);
     return t;
   });
   const search = Route.useSearch();
@@ -154,15 +153,11 @@ function Catalogo() {
       : {}),
     queryFn: async () => {
       const reqStart = performance.now();
-      console.log(`[CATALOG_REQUEST_START] Requesting catalog products from server`);
+      devLog(`[CATALOG_REQUEST_START] Requesting catalog products from server`);
       try {
         const res = await listProducts();
-        const reqEnd = performance.now();
-        console.log(
-          `[CATALOG_RESPONSE_RECEIVED] Received ${res?.length ?? 0} products in ${Math.round(reqEnd - reqStart)}ms`,
-        );
-        console.log(
-          `[CATALOG_DATA_PARSED] Catalog data parsed at ${Math.round(performance.now() - routeMountTime)}ms`,
+        devLog(
+          `[CATALOG_RESPONSE_RECEIVED] Received ${res?.length ?? 0} products in ${Math.round(performance.now() - reqStart)}ms`,
         );
         return res ?? [];
       } catch (err) {
@@ -222,12 +217,14 @@ function Catalogo() {
     (!products || products.length === 0) &&
     (isLoadingProducts || isPendingProducts || isFetchingProducts);
 
-  console.log("[CATALOG_DEBUG_03] query initialData count", loaderData?.products?.length ?? 0);
-  console.log("[CATALOG_DEBUG_04] query data count", products?.length ?? 0);
-  console.log("[CATALOG_DEBUG_05] isLoading", isLoadingProducts);
-  console.log("[CATALOG_DEBUG_06] isFetching", isFetchingProducts);
-  console.log("[CATALOG_DEBUG_07] isPending", isPendingProducts);
-  console.log("[CATALOG_DEBUG_08] catalog render count", renderCount.current);
+  devLog("[CATALOG_DEBUG] render", {
+    initialData: loaderData?.products?.length ?? 0,
+    data: products?.length ?? 0,
+    isLoading: isLoadingProducts,
+    isFetching: isFetchingProducts,
+    isPending: isPendingProducts,
+    renders: renderCount.current,
+  });
 
   const sizes = useMemo(() => {
     const set = new Set<string>();
