@@ -22,7 +22,6 @@ function AuthenticatedLayout() {
       }
 
       if (!isSupabaseConfigured()) {
-
         // Entorno local sin credenciales del backend
         if (isMounted) {
           setAuthorized(true);
@@ -31,22 +30,45 @@ function AuthenticatedLayout() {
         return;
       }
 
-
+      // 1) Sesión local (sin red): permite entrar de inmediato en móvil.
       try {
-        const { data, error } = await supabase.auth.getUser();
-        if (error || !data?.user) {
-          if (isMounted) {
-            navigate({ to: "/auth", replace: true });
-          }
-        } else {
-          if (isMounted) {
-            setAuthorized(true);
-            setChecking(false);
-          }
+        const { data: local } = await supabase.auth.getSession();
+        if (local?.session && isMounted) {
+          setAuthorized(true);
+          setChecking(false);
         }
       } catch {
-        if (isMounted) {
+        // continúa con la verificación remota
+      }
+
+      // 2) Verificación remota con límite de tiempo para no quedar colgado
+      //    si la red móvil se cae a mitad de la petición.
+      try {
+        const remote = await Promise.race([
+          supabase.auth.getUser(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+        ]);
+
+        if (!isMounted) return;
+
+        if (remote === null) {
+          // Sin respuesta del servidor: no expulsamos al usuario, dejamos
+          // que la pantalla cargue con la sesión local guardada.
+          setChecking(false);
+          return;
+        }
+
+        const { data, error } = remote;
+        if (error || !data?.user) {
           navigate({ to: "/auth", replace: true });
+          return;
+        }
+
+        setAuthorized(true);
+        setChecking(false);
+      } catch {
+        if (isMounted) {
+          setChecking(false);
         }
       }
     }
