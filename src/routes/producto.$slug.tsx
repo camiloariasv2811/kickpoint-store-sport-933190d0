@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProduct } from "@/lib/catalog.functions";
 import { useCart, WHOLESALE_MIN_ORDER_UNITS } from "@/lib/cart";
+import { devLog } from "@/lib/dev-log";
 import { money, moneyExact, whatsappLink } from "@/lib/format";
 import { totalStock, type Product } from "@/lib/types";
 
