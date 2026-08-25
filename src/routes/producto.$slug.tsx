@@ -20,16 +20,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getProduct } from "@/lib/catalog.functions";
 import { useCart, WHOLESALE_MIN_ORDER_UNITS } from "@/lib/cart";
 import { devLog } from "@/lib/dev-log";
+import { withTimeout } from "@/lib/safe-loader";
 import { money, moneyExact, whatsappLink } from "@/lib/format";
 import { totalStock, type Product } from "@/lib/types";
 
 export const Route = createFileRoute("/producto/$slug")({
   loader: async ({ context, params }) => {
-    const product = await context.queryClient.ensureQueryData({
-      queryKey: ["product", params.slug],
-      queryFn: () => getProduct({ data: { slug: params.slug } }),
-      staleTime: 60 * 1000,
-    });
+    const product = await withTimeout(
+      context.queryClient.ensureQueryData({
+        queryKey: ["product", params.slug],
+        queryFn: () => getProduct({ data: { slug: params.slug } }),
+        staleTime: 60 * 1000,
+      }),
+      null,
+    );
     return { product: product ?? null };
   },
   head: () => ({
