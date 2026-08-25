@@ -187,7 +187,7 @@ function Home() {
       perf.log08({ queryKey: "products" });
       trackPerf("HOME_08", "PRODUCTS REQUEST START");
       try {
-        const res = await listProducts();
+        const res = await listProducts({ data: { fresh: true } });
         perf.log09({ count: res?.length ?? 0 });
         trackPerf("HOME_09", "PRODUCTS RECEIVED", { count: res?.length ?? 0 });
         return res ?? [];
