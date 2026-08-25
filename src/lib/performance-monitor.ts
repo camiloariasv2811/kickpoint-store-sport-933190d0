@@ -35,6 +35,8 @@ export interface PerfReport {
   };
 }
 
+const IS_DEV = Boolean(import.meta.env?.DEV);
+
 class PerformanceMonitor {
   private events: Map<string, PerfTimingEvent> = new Map();
   private startTime: number =
@@ -43,7 +45,7 @@ class PerformanceMonitor {
   private isClient = typeof window !== "undefined";
 
   constructor() {
-    if (this.isClient) {
+    if (this.isClient && IS_DEV) {
       this.initClientMonitoring();
     }
   }

@@ -150,6 +150,7 @@ class PerformanceLogger {
   }
 
   public printSummary() {
+    if (!IS_DEV) return;
     if (typeof console !== "undefined" && console.table) {
       console.group("%c🚀 KICKPOINT PERF MILESTONES SUMMARY", "color: #10b981; font-weight: bold;");
       console.table(
