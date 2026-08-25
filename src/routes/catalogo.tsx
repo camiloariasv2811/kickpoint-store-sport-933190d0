@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listBrands, listCategories, listProducts } from "@/lib/catalog.functions";
+import { devLog } from "@/lib/dev-log";
+import { withTimeout } from "@/lib/safe-loader";
 import { totalStock } from "@/lib/types";
 
 type Search = {
@@ -31,25 +33,36 @@ export const Route = createFileRoute("/catalogo")({
     orden: typeof search["orden"] === "string" ? (search["orden"] as string) : undefined,
   }),
   loader: async ({ context }) => {
-    console.log("[CATALOG_DEBUG_01] loader start");
+    devLog("[CATALOG_DEBUG_01] loader start");
+    // Nunca bloqueamos la navegación: si el backend tarda, la ruta se muestra
+    // igual y las queries del cliente completan los datos al llegar.
     const [products, categories, brands] = await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["products"],
-        queryFn: () => listProducts(),
-        staleTime: 60 * 1000,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["categories"],
-        queryFn: () => listCategories(),
-        staleTime: 5 * 60 * 1000,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["brands"],
-        queryFn: () => listBrands(),
-        staleTime: 5 * 60 * 1000,
-      }),
+      withTimeout(
+        context.queryClient.ensureQueryData({
+          queryKey: ["products"],
+          queryFn: () => listProducts(),
+          staleTime: 60 * 1000,
+        }),
+        [],
+      ),
+      withTimeout(
+        context.queryClient.ensureQueryData({
+          queryKey: ["categories"],
+          queryFn: () => listCategories(),
+          staleTime: 5 * 60 * 1000,
+        }),
+        [],
+      ),
+      withTimeout(
+        context.queryClient.ensureQueryData({
+          queryKey: ["brands"],
+          queryFn: () => listBrands(),
+          staleTime: 5 * 60 * 1000,
+        }),
+        [],
+      ),
     ]);
-    console.log("[CATALOG_DEBUG_02] loader products count", products?.length ?? 0);
+    devLog("[CATALOG_DEBUG_02] loader products count", products?.length ?? 0);
     return {
       products: products ?? [],
       categories: categories ?? [],
