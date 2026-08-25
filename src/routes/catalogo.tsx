@@ -294,11 +294,11 @@ function Catalogo() {
       firstRenderLogged.current = true;
       requestAnimationFrame(() => {
         const timeToFirst = Math.round(performance.now() - routeMountTime);
-        console.log(`[FIRST_PRODUCT_RENDERED] First product rendered at ${timeToFirst}ms (TTFP)`);
-        console.log(
+        devLog(`[FIRST_PRODUCT_RENDERED] First product rendered at ${timeToFirst}ms (TTFP)`);
+        devLog(
           `[CATALOG_INTERACTIVE] Filters, search and product grid interactive at ${timeToFirst}ms`,
         );
-        console.log(
+        devLog(
           `[CATALOG_FULLY_LOADED] Batch of ${Math.min(filtered.length, visibleLimit)} products loaded at ${timeToFirst}ms`,
         );
       });
@@ -308,7 +308,7 @@ function Catalogo() {
   const handleFirstImageLoaded = () => {
     if (!firstImageLogged.current) {
       firstImageLogged.current = true;
-      console.log(
+      devLog(
         `[FIRST_IMAGE_RENDERED] First product image loaded at ${Math.round(performance.now() - routeMountTime)}ms`,
       );
     }
