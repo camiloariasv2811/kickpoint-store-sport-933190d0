@@ -26,9 +26,9 @@ export const Route = createFileRoute("/")({
           queryFn: () => {
             perf.log02({ target: "products" });
             trackPerf("HOME_02", "SERVER REQUEST START", { target: "products" });
-            return listProducts();
+            return listProducts({ data: { fresh: true } });
           },
-          staleTime: 60 * 1000,
+          staleTime: 0,
         }),
         [] as Product[],
       ),
@@ -145,7 +145,7 @@ function useProducts() {
     gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
-        const res = await listProducts();
+        const res = await listProducts({ data: { fresh: true } });
         return res ?? [];
       } catch (err) {
         console.warn("[Home] Error loading products:", err);

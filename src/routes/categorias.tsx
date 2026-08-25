@@ -48,7 +48,7 @@ function Categorias() {
     gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
-        const res = await listProducts();
+        const res = await listProducts({ data: {} });
         return res ?? [];
       } catch (err) {
         console.warn("[Categorias] Error loading products:", err);
