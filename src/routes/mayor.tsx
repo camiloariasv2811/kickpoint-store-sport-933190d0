@@ -36,7 +36,7 @@ export const Route = createFileRoute("/mayor")({
   loader: async ({ context }) => {
     const [products, categories] = await Promise.all([
       withTimeout(
-        context.queryClient.ensureQueryData({
+        context.queryClient.fetchQuery({
           queryKey: ["products"],
           queryFn: () => listProducts({ data: { fresh: true } }),
           staleTime: 0,

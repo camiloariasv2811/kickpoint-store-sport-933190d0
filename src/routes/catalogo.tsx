@@ -38,7 +38,7 @@ export const Route = createFileRoute("/catalogo")({
     // igual y las queries del cliente completan los datos al llegar.
     const [products, categories, brands] = await Promise.all([
       withTimeout(
-        context.queryClient.ensureQueryData({
+        context.queryClient.fetchQuery({
           queryKey: ["products"],
           queryFn: () => listProducts({ data: { fresh: true } }),
           staleTime: 0,

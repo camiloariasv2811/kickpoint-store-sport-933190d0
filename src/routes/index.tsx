@@ -21,7 +21,7 @@ export const Route = createFileRoute("/")({
 
     const [products, categories] = await Promise.all([
       withTimeout(
-        context.queryClient.ensureQueryData({
+        context.queryClient.fetchQuery({
           queryKey: ["products"],
           queryFn: () => {
             perf.log02({ target: "products" });
