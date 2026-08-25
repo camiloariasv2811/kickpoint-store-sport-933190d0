@@ -13,6 +13,8 @@ export interface MilestoneLog {
   details?: Record<string, unknown>;
 }
 
+const IS_DEV = Boolean(import.meta.env?.DEV);
+
 class PerformanceLogger {
   private logs: MilestoneLog[] = [];
 
@@ -29,6 +31,9 @@ class PerformanceLogger {
       elapsedMs,
       details,
     };
+
+    // Solo se acumula/imprime en desarrollo para no gastar CPU en móvil.
+    if (!IS_DEV) return entry;
 
     this.logs.push(entry);
 
