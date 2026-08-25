@@ -21,14 +21,14 @@ export const Route = createFileRoute("/")({
 
     const [products, categories] = await Promise.all([
       withTimeout(
-        context.queryClient.ensureQueryData({
+        context.queryClient.fetchQuery({
           queryKey: ["products"],
           queryFn: () => {
             perf.log02({ target: "products" });
             trackPerf("HOME_02", "SERVER REQUEST START", { target: "products" });
-            return listProducts();
+            return listProducts({ data: { fresh: true } });
           },
-          staleTime: 60 * 1000,
+          staleTime: 0,
         }),
         [] as Product[],
       ),
@@ -145,7 +145,7 @@ function useProducts() {
     gcTime: 5 * 60 * 1000,
     queryFn: async () => {
       try {
-        const res = await listProducts();
+        const res = await listProducts({ data: { fresh: true } });
         return res ?? [];
       } catch (err) {
         console.warn("[Home] Error loading products:", err);
@@ -187,7 +187,7 @@ function Home() {
       perf.log08({ queryKey: "products" });
       trackPerf("HOME_08", "PRODUCTS REQUEST START");
       try {
-        const res = await listProducts();
+        const res = await listProducts({ data: { fresh: true } });
         perf.log09({ count: res?.length ?? 0 });
         trackPerf("HOME_09", "PRODUCTS RECEIVED", { count: res?.length ?? 0 });
         return res ?? [];

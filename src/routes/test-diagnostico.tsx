@@ -167,7 +167,7 @@ export default function TestDiagnosticoPage() {
         await new Promise((r) => setTimeout(r, 45));
       }
 
-      const res = await listProducts();
+      const res = await listProducts({ data: {} });
       const resEnd = Math.round(performance.now() - navStartTime);
 
       setTelemetry((prev) => ({

@@ -36,10 +36,10 @@ export const Route = createFileRoute("/mayor")({
   loader: async ({ context }) => {
     const [products, categories] = await Promise.all([
       withTimeout(
-        context.queryClient.ensureQueryData({
+        context.queryClient.fetchQuery({
           queryKey: ["products"],
-          queryFn: () => listProducts(),
-          staleTime: 60 * 1000,
+          queryFn: () => listProducts({ data: { fresh: true } }),
+          staleTime: 0,
         }),
         [],
       ),
@@ -107,14 +107,15 @@ function WholesaleCatalogPage() {
     isFetching: isFetchingProducts,
   } = useQuery<Product[]>({
     queryKey: ["products"],
-    staleTime: 60 * 1000,
+    staleTime: 0,
     gcTime: 10 * 60 * 1000,
+    refetchOnMount: "always",
     ...(loaderData?.products && loaderData.products.length > 0
       ? { initialData: loaderData.products }
       : {}),
     queryFn: async () => {
       try {
-        const res = await listProducts();
+        const res = await listProducts({ data: { fresh: true } });
         return (res ?? []) as Product[];
       } catch (err) {
         console.warn("[WholesaleCatalog] Error loading products:", err);
