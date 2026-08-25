@@ -31,9 +31,11 @@ function AuthenticatedLayout() {
       }
 
       // 1) Sesión local (sin red): permite entrar de inmediato en móvil.
+      let hasLocalSession = false;
       try {
         const { data: local } = await supabase.auth.getSession();
-        if (local?.session && isMounted) {
+        hasLocalSession = Boolean(local?.session);
+        if (hasLocalSession && isMounted) {
           setAuthorized(true);
           setChecking(false);
         }
@@ -52,9 +54,13 @@ function AuthenticatedLayout() {
         if (!isMounted) return;
 
         if (remote === null) {
-          // Sin respuesta del servidor: no expulsamos al usuario, dejamos
-          // que la pantalla cargue con la sesión local guardada.
-          setChecking(false);
+          // Sin respuesta del servidor: si hay sesión guardada seguimos
+          // adelante; si no, al login en vez de dejar la pantalla en blanco.
+          if (hasLocalSession) {
+            setChecking(false);
+          } else {
+            navigate({ to: "/auth", replace: true });
+          }
           return;
         }
 
@@ -67,8 +73,11 @@ function AuthenticatedLayout() {
         setAuthorized(true);
         setChecking(false);
       } catch {
-        if (isMounted) {
+        if (!isMounted) return;
+        if (hasLocalSession) {
           setChecking(false);
+        } else {
+          navigate({ to: "/auth", replace: true });
         }
       }
     }
@@ -80,7 +89,7 @@ function AuthenticatedLayout() {
     };
   }, [navigate]);
 
-  if (checking) {
+  if (checking || !authorized) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -89,10 +98,6 @@ function AuthenticatedLayout() {
         </div>
       </div>
     );
-  }
-
-  if (!authorized) {
-    return null;
   }
 
   return <Outlet />;
