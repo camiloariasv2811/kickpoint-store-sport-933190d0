@@ -29,6 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCart, WHOLESALE_MIN_ORDER_UNITS } from "@/lib/cart";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
 import { moneyExact, whatsappLink } from "@/lib/format";
+import { withTimeout } from "@/lib/safe-loader";
 import { totalStock, type Category, type Product } from "@/lib/types";
 
 export const Route = createFileRoute("/mayor")({

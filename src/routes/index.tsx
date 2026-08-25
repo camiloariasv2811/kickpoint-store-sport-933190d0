@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
 import { perf } from "@/lib/performance";
 import { perfMonitor, trackPerf } from "@/lib/performance-monitor";
+import { withTimeout } from "@/lib/safe-loader";
 import type { Category, Product } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
