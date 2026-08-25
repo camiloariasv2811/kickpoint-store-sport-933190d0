@@ -40,8 +40,8 @@ export const Route = createFileRoute("/catalogo")({
       withTimeout(
         context.queryClient.ensureQueryData({
           queryKey: ["products"],
-          queryFn: () => listProducts(),
-          staleTime: 60 * 1000,
+          queryFn: () => listProducts({ data: { fresh: true } }),
+          staleTime: 0,
         }),
         [],
       ),
@@ -146,8 +146,9 @@ function Catalogo() {
     isFetching: isFetchingProducts,
   } = useQuery({
     queryKey: ["products"],
-    staleTime: 60 * 1000,
+    staleTime: 0,
     gcTime: 10 * 60 * 1000,
+    refetchOnMount: "always",
     ...(loaderData?.products && loaderData.products.length > 0
       ? { initialData: loaderData.products }
       : {}),
@@ -155,7 +156,7 @@ function Catalogo() {
       const reqStart = performance.now();
       devLog(`[CATALOG_REQUEST_START] Requesting catalog products from server`);
       try {
-        const res = await listProducts();
+        const res = await listProducts({ data: { fresh: true } });
         devLog(
           `[CATALOG_RESPONSE_RECEIVED] Received ${res?.length ?? 0} products in ${Math.round(performance.now() - reqStart)}ms`,
         );

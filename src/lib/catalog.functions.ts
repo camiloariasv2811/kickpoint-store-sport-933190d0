@@ -394,12 +394,20 @@ function normalizeProduct(p: any): Product {
   };
 }
 
-export const listProducts = createServerFn({ method: "GET" }).handler(async () => {
+type ListProductsInput = {
+  fresh?: boolean;
+};
+
+export const listProducts = createServerFn({ method: "GET" })
+  .inputValidator((d?: ListProductsInput) => ({ fresh: Boolean(d?.fresh) }))
+  .handler(async ({ data }) => {
   const tStart = performance.now();
   console.log("[CLIENT_PRODUCTS_01] QUERY START - fetching public products catalog");
+  const mustFetchFresh = data.fresh === true;
 
   // Fast path: Server in-memory cache hit
   if (
+    !mustFetchFresh &&
     cachedProducts &&
     cachedProducts.data.length > 0 &&
     Date.now() - cachedProducts.timestamp < SERVER_CACHE_TTL_MS
