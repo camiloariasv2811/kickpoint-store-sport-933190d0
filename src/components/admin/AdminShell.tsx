@@ -152,6 +152,26 @@ function AdminFrame({ children }: { children: ReactNode }) {
     };
   }, [queryClient]);
 
+  // En móvil el navegador suspende la pestaña: al volver, reactivamos los datos
+  // y la conexión en tiempo real para que la vista no quede "pegada".
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const resume = () => {
+      if (document.visibilityState !== "visible") return;
+      supabase.realtime.connect();
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    };
+
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", resume);
+
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("online", resume);
+    };
+  }, [queryClient]);
+
   async function signOut() {
     if (typeof window !== "undefined") {
       localStorage.removeItem("kp_demo_auth");

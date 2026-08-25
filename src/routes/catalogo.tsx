@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listBrands, listCategories, listProducts } from "@/lib/catalog.functions";
+import { devLog } from "@/lib/dev-log";
+import { withTimeout } from "@/lib/safe-loader";
 import { totalStock } from "@/lib/types";
 
 type Search = {
@@ -31,25 +33,36 @@ export const Route = createFileRoute("/catalogo")({
     orden: typeof search["orden"] === "string" ? (search["orden"] as string) : undefined,
   }),
   loader: async ({ context }) => {
-    console.log("[CATALOG_DEBUG_01] loader start");
+    devLog("[CATALOG_DEBUG_01] loader start");
+    // Nunca bloqueamos la navegación: si el backend tarda, la ruta se muestra
+    // igual y las queries del cliente completan los datos al llegar.
     const [products, categories, brands] = await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["products"],
-        queryFn: () => listProducts(),
-        staleTime: 60 * 1000,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["categories"],
-        queryFn: () => listCategories(),
-        staleTime: 5 * 60 * 1000,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["brands"],
-        queryFn: () => listBrands(),
-        staleTime: 5 * 60 * 1000,
-      }),
+      withTimeout(
+        context.queryClient.ensureQueryData({
+          queryKey: ["products"],
+          queryFn: () => listProducts(),
+          staleTime: 60 * 1000,
+        }),
+        [],
+      ),
+      withTimeout(
+        context.queryClient.ensureQueryData({
+          queryKey: ["categories"],
+          queryFn: () => listCategories(),
+          staleTime: 5 * 60 * 1000,
+        }),
+        [],
+      ),
+      withTimeout(
+        context.queryClient.ensureQueryData({
+          queryKey: ["brands"],
+          queryFn: () => listBrands(),
+          staleTime: 5 * 60 * 1000,
+        }),
+        [],
+      ),
     ]);
-    console.log("[CATALOG_DEBUG_02] loader products count", products?.length ?? 0);
+    devLog("[CATALOG_DEBUG_02] loader products count", products?.length ?? 0);
     return {
       products: products ?? [],
       categories: categories ?? [],
@@ -111,8 +124,7 @@ function Chip({
 function Catalogo() {
   const [routeMountTime] = useState(() => {
     const t = performance.now();
-    console.log(`[CATALOG_NAVIGATION_START] 0ms`);
-    console.log(`[CATALOG_ROUTE_READY] Route mounted`);
+    devLog(`[CATALOG_ROUTE_READY] Route mounted`);
     return t;
   });
   const search = Route.useSearch();
@@ -141,15 +153,11 @@ function Catalogo() {
       : {}),
     queryFn: async () => {
       const reqStart = performance.now();
-      console.log(`[CATALOG_REQUEST_START] Requesting catalog products from server`);
+      devLog(`[CATALOG_REQUEST_START] Requesting catalog products from server`);
       try {
         const res = await listProducts();
-        const reqEnd = performance.now();
-        console.log(
-          `[CATALOG_RESPONSE_RECEIVED] Received ${res?.length ?? 0} products in ${Math.round(reqEnd - reqStart)}ms`,
-        );
-        console.log(
-          `[CATALOG_DATA_PARSED] Catalog data parsed at ${Math.round(performance.now() - routeMountTime)}ms`,
+        devLog(
+          `[CATALOG_RESPONSE_RECEIVED] Received ${res?.length ?? 0} products in ${Math.round(performance.now() - reqStart)}ms`,
         );
         return res ?? [];
       } catch (err) {
@@ -209,12 +217,14 @@ function Catalogo() {
     (!products || products.length === 0) &&
     (isLoadingProducts || isPendingProducts || isFetchingProducts);
 
-  console.log("[CATALOG_DEBUG_03] query initialData count", loaderData?.products?.length ?? 0);
-  console.log("[CATALOG_DEBUG_04] query data count", products?.length ?? 0);
-  console.log("[CATALOG_DEBUG_05] isLoading", isLoadingProducts);
-  console.log("[CATALOG_DEBUG_06] isFetching", isFetchingProducts);
-  console.log("[CATALOG_DEBUG_07] isPending", isPendingProducts);
-  console.log("[CATALOG_DEBUG_08] catalog render count", renderCount.current);
+  devLog("[CATALOG_DEBUG] render", {
+    initialData: loaderData?.products?.length ?? 0,
+    data: products?.length ?? 0,
+    isLoading: isLoadingProducts,
+    isFetching: isFetchingProducts,
+    isPending: isPendingProducts,
+    renders: renderCount.current,
+  });
 
   const sizes = useMemo(() => {
     const set = new Set<string>();
@@ -284,11 +294,11 @@ function Catalogo() {
       firstRenderLogged.current = true;
       requestAnimationFrame(() => {
         const timeToFirst = Math.round(performance.now() - routeMountTime);
-        console.log(`[FIRST_PRODUCT_RENDERED] First product rendered at ${timeToFirst}ms (TTFP)`);
-        console.log(
+        devLog(`[FIRST_PRODUCT_RENDERED] First product rendered at ${timeToFirst}ms (TTFP)`);
+        devLog(
           `[CATALOG_INTERACTIVE] Filters, search and product grid interactive at ${timeToFirst}ms`,
         );
-        console.log(
+        devLog(
           `[CATALOG_FULLY_LOADED] Batch of ${Math.min(filtered.length, visibleLimit)} products loaded at ${timeToFirst}ms`,
         );
       });
@@ -298,7 +308,7 @@ function Catalogo() {
   const handleFirstImageLoaded = () => {
     if (!firstImageLogged.current) {
       firstImageLogged.current = true;
-      console.log(
+      devLog(
         `[FIRST_IMAGE_RENDERED] First product image loaded at ${Math.round(performance.now() - routeMountTime)}ms`,
       );
     }

@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
 import { perf } from "@/lib/performance";
 import { perfMonitor, trackPerf } from "@/lib/performance-monitor";
+import { withTimeout } from "@/lib/safe-loader";
 import type { Category, Product } from "@/lib/types";
 
 export const Route = createFileRoute("/")({
@@ -19,20 +20,26 @@ export const Route = createFileRoute("/")({
     trackPerf("HOME_03", "ROUTE LOADER START");
 
     const [products, categories] = await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["products"],
-        queryFn: () => {
-          perf.log02({ target: "products" });
-          trackPerf("HOME_02", "SERVER REQUEST START", { target: "products" });
-          return listProducts();
-        },
-        staleTime: 60 * 1000,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["categories"],
-        queryFn: () => listCategories(),
-        staleTime: 5 * 60 * 1000,
-      }),
+      withTimeout(
+        context.queryClient.ensureQueryData({
+          queryKey: ["products"],
+          queryFn: () => {
+            perf.log02({ target: "products" });
+            trackPerf("HOME_02", "SERVER REQUEST START", { target: "products" });
+            return listProducts();
+          },
+          staleTime: 60 * 1000,
+        }),
+        [] as Product[],
+      ),
+      withTimeout(
+        context.queryClient.ensureQueryData({
+          queryKey: ["categories"],
+          queryFn: () => listCategories(),
+          staleTime: 5 * 60 * 1000,
+        }),
+        [] as Category[],
+      ),
     ]);
 
     perf.log04({
@@ -169,7 +176,7 @@ function Home() {
     isLoading: isLoadingProducts,
     isPending: isPendingProducts,
     isFetching: isFetchingProducts,
-  } = useQuery({
+  } = useQuery<Product[]>({
     queryKey: ["products"],
     staleTime: 60 * 1000,
     gcTime: 10 * 60 * 1000,

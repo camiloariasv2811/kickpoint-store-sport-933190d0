@@ -29,21 +29,28 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCart, WHOLESALE_MIN_ORDER_UNITS } from "@/lib/cart";
 import { listCategories, listProducts } from "@/lib/catalog.functions";
 import { moneyExact, whatsappLink } from "@/lib/format";
+import { withTimeout } from "@/lib/safe-loader";
 import { totalStock, type Category, type Product } from "@/lib/types";
 
 export const Route = createFileRoute("/mayor")({
   loader: async ({ context }) => {
     const [products, categories] = await Promise.all([
-      context.queryClient.ensureQueryData({
-        queryKey: ["products"],
-        queryFn: () => listProducts(),
-        staleTime: 60 * 1000,
-      }),
-      context.queryClient.ensureQueryData({
-        queryKey: ["categories"],
-        queryFn: () => listCategories(),
-        staleTime: 5 * 60 * 1000,
-      }),
+      withTimeout(
+        context.queryClient.ensureQueryData({
+          queryKey: ["products"],
+          queryFn: () => listProducts(),
+          staleTime: 60 * 1000,
+        }),
+        [],
+      ),
+      withTimeout(
+        context.queryClient.ensureQueryData({
+          queryKey: ["categories"],
+          queryFn: () => listCategories(),
+          staleTime: 5 * 60 * 1000,
+        }),
+        [],
+      ),
     ]);
     return {
       products: (products ?? []) as Product[],

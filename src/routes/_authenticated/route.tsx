@@ -22,7 +22,6 @@ function AuthenticatedLayout() {
       }
 
       if (!isSupabaseConfigured()) {
-
         // Entorno local sin credenciales del backend
         if (isMounted) {
           setAuthorized(true);
@@ -31,21 +30,53 @@ function AuthenticatedLayout() {
         return;
       }
 
-
+      // 1) Sesión local (sin red): permite entrar de inmediato en móvil.
+      let hasLocalSession = false;
       try {
-        const { data, error } = await supabase.auth.getUser();
-        if (error || !data?.user) {
-          if (isMounted) {
-            navigate({ to: "/auth", replace: true });
-          }
-        } else {
-          if (isMounted) {
-            setAuthorized(true);
-            setChecking(false);
-          }
+        const { data: local } = await supabase.auth.getSession();
+        hasLocalSession = Boolean(local?.session);
+        if (hasLocalSession && isMounted) {
+          setAuthorized(true);
+          setChecking(false);
         }
       } catch {
-        if (isMounted) {
+        // continúa con la verificación remota
+      }
+
+      // 2) Verificación remota con límite de tiempo para no quedar colgado
+      //    si la red móvil se cae a mitad de la petición.
+      try {
+        const remote = await Promise.race([
+          supabase.auth.getUser(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
+        ]);
+
+        if (!isMounted) return;
+
+        if (remote === null) {
+          // Sin respuesta del servidor: si hay sesión guardada seguimos
+          // adelante; si no, al login en vez de dejar la pantalla en blanco.
+          if (hasLocalSession) {
+            setChecking(false);
+          } else {
+            navigate({ to: "/auth", replace: true });
+          }
+          return;
+        }
+
+        const { data, error } = remote;
+        if (error || !data?.user) {
+          navigate({ to: "/auth", replace: true });
+          return;
+        }
+
+        setAuthorized(true);
+        setChecking(false);
+      } catch {
+        if (!isMounted) return;
+        if (hasLocalSession) {
+          setChecking(false);
+        } else {
           navigate({ to: "/auth", replace: true });
         }
       }
@@ -58,7 +89,7 @@ function AuthenticatedLayout() {
     };
   }, [navigate]);
 
-  if (checking) {
+  if (checking || !authorized) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
@@ -67,10 +98,6 @@ function AuthenticatedLayout() {
         </div>
       </div>
     );
-  }
-
-  if (!authorized) {
-    return null;
   }
 
   return <Outlet />;

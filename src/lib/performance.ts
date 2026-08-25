@@ -13,6 +13,8 @@ export interface MilestoneLog {
   details?: Record<string, unknown>;
 }
 
+const IS_DEV = Boolean(import.meta.env?.DEV);
+
 class PerformanceLogger {
   private logs: MilestoneLog[] = [];
 
@@ -29,6 +31,9 @@ class PerformanceLogger {
       elapsedMs,
       details,
     };
+
+    // Solo se acumula/imprime en desarrollo para no gastar CPU en móvil.
+    if (!IS_DEV) return entry;
 
     this.logs.push(entry);
 
@@ -145,6 +150,7 @@ class PerformanceLogger {
   }
 
   public printSummary() {
+    if (!IS_DEV) return;
     if (typeof console !== "undefined" && console.table) {
       console.group("%c🚀 KICKPOINT PERF MILESTONES SUMMARY", "color: #10b981; font-weight: bold;");
       console.table(

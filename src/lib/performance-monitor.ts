@@ -35,6 +35,8 @@ export interface PerfReport {
   };
 }
 
+const IS_DEV = Boolean(import.meta.env?.DEV);
+
 class PerformanceMonitor {
   private events: Map<string, PerfTimingEvent> = new Map();
   private startTime: number =
@@ -43,7 +45,7 @@ class PerformanceMonitor {
   private isClient = typeof window !== "undefined";
 
   constructor() {
-    if (this.isClient) {
+    if (this.isClient && IS_DEV) {
       this.initClientMonitoring();
     }
   }
@@ -120,6 +122,8 @@ class PerformanceMonitor {
       details,
     };
 
+    if (!IS_DEV) return event;
+
     this.events.set(id, event);
 
     if (this.isClient) {
@@ -192,7 +196,7 @@ class PerformanceMonitor {
    * Pretty print summary table to console
    */
   public printSummary() {
-    if (!this.isClient) return;
+    if (!this.isClient || !IS_DEV) return;
 
     const report = this.getReport();
     console.group(

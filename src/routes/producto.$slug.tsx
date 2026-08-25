@@ -19,16 +19,21 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getProduct } from "@/lib/catalog.functions";
 import { useCart, WHOLESALE_MIN_ORDER_UNITS } from "@/lib/cart";
+import { devLog } from "@/lib/dev-log";
+import { withTimeout } from "@/lib/safe-loader";
 import { money, moneyExact, whatsappLink } from "@/lib/format";
 import { totalStock, type Product } from "@/lib/types";
 
 export const Route = createFileRoute("/producto/$slug")({
   loader: async ({ context, params }) => {
-    const product = await context.queryClient.ensureQueryData({
-      queryKey: ["product", params.slug],
-      queryFn: () => getProduct({ data: { slug: params.slug } }),
-      staleTime: 60 * 1000,
-    });
+    const product = await withTimeout(
+      context.queryClient.ensureQueryData({
+        queryKey: ["product", params.slug],
+        queryFn: () => getProduct({ data: { slug: params.slug } }),
+        staleTime: 60 * 1000,
+      }),
+      null,
+    );
     return { product: product ?? null };
   },
   head: () => ({
@@ -139,10 +144,10 @@ function ProductPageContainer() {
       queryClient.getQueryState(["products"])?.dataUpdatedAt || Date.now(),
     queryFn: async () => {
       const t0 = performance.now();
-      console.log(`[PRODUCT_DETAIL_FETCH_START] Requesting product: ${slug}`);
+      devLog(`[PRODUCT_DETAIL_FETCH_START] Requesting product: ${slug}`);
       try {
         const res = await getProduct({ data: { slug } });
-        console.log(
+        devLog(
           `[PRODUCT_DETAIL_FETCH_END] Product received in ${Math.round(performance.now() - t0)}ms`,
         );
         if (res) return res;
@@ -184,13 +189,13 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
   const variants = useMemo(() => product.variants ?? [], [product.variants]);
 
   useEffect(() => {
-    console.log("[PRODUCT_SELECT_01] PRODUCT CARD MOUNT", product.name);
-    console.log("[PRODUCT_SELECT_02] VARIANTS AVAILABLE", variants.length);
+    devLog("[PRODUCT_SELECT_01] PRODUCT CARD MOUNT", product.name);
+    devLog("[PRODUCT_SELECT_02] VARIANTS AVAILABLE", variants.length);
     if (!hasLogged.current) {
       hasLogged.current = true;
       requestAnimationFrame(() => {
         const elapsed = Math.round(performance.now() - navStart);
-        console.log(`[PRODUCT_DETAIL_RENDERED] Time to Product Detail (TTPD): ${elapsed}ms`);
+        devLog(`[PRODUCT_DETAIL_RENDERED] Time to Product Detail (TTPD): ${elapsed}ms`);
       });
     }
   }, [navStart, product.name, variants.length]);
@@ -239,7 +244,7 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
   const stock = totalStock(product);
 
   function handleColorChange(c: string) {
-    console.log("[PRODUCT_SELECT_03] COLOR SELECTED", c);
+    devLog("[PRODUCT_SELECT_03] COLOR SELECTED", c);
     setColor(c);
     const nextVariant =
       variants.find((v) => v.color === c && v.stock > 0) ??
@@ -250,18 +255,18 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
 
   function handleSizeChange(selectedVarId: string) {
     const selectedVar = variants.find((v) => v.id === selectedVarId);
-    console.log("[PRODUCT_SELECT_04] SIZE SELECTED", selectedVar?.size, selectedVarId);
+    devLog("[PRODUCT_SELECT_04] SIZE SELECTED", selectedVar?.size, selectedVarId);
     setVariantId(selectedVarId);
     setQty(1);
   }
 
   function handleQtyChange(newQty: number) {
-    console.log("[PRODUCT_SELECT_05] QUANTITY CHANGED", newQty);
+    devLog("[PRODUCT_SELECT_05] QUANTITY CHANGED", newQty);
     setQty(newQty);
   }
 
   function handleAdd() {
-    console.log("[PRODUCT_SELECT_06] ADD TO CART START (Retail)");
+    devLog("[PRODUCT_SELECT_06] ADD TO CART START (Retail)");
     if (!variant) {
       toast.error("Selecciona una talla");
       return;
@@ -283,14 +288,14 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
       stock: safeStock,
       quantity: safeQty,
     });
-    console.log("[PRODUCT_SELECT_10] SUCCESS (Retail)");
+    devLog("[PRODUCT_SELECT_10] SUCCESS (Retail)");
     toast.success("Agregado al carrito minorista", {
       description: `${product.name} · Talla ${variant.size} × ${safeQty}`,
     });
   }
 
   function handleAddWholesale() {
-    console.log("[PRODUCT_SELECT_06] ADD TO CART START (Wholesale)");
+    devLog("[PRODUCT_SELECT_06] ADD TO CART START (Wholesale)");
     if (!variant) {
       toast.error("Selecciona una talla");
       return;
@@ -313,7 +318,7 @@ function ProductDetailView({ product, navStart }: { product: Product; navStart: 
       quantity: safeQty,
     });
 
-    console.log("[PRODUCT_SELECT_10] SUCCESS (Wholesale)");
+    devLog("[PRODUCT_SELECT_10] SUCCESS (Wholesale)");
     const newTotal = wholesaleCount + safeQty;
     if (newTotal >= WHOLESALE_MIN_ORDER_UNITS) {
       toast.success("¡Agregado al pedido mayorista!", {
