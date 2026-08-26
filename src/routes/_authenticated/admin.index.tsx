@@ -142,7 +142,8 @@ function Dashboard() {
   } = useQuery<DashboardMetrics>({
     queryKey: ["admin", "dashboard-metrics"],
     staleTime: 30_000,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const res = await getAdminDashboard();
       if (!res) {

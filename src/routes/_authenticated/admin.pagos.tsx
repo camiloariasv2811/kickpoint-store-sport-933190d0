@@ -67,6 +67,7 @@ function AdminPagos() {
   const { data: orders = [], isLoading, isError, refetch } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
     staleTime: 60_000,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     retry: 1,
     placeholderData: (prev) => prev,
@@ -131,6 +132,8 @@ function AdminPagos() {
       });
       void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
       setInspectPayment(null);
     } catch (err: any) {
       console.error(err);
@@ -158,6 +161,8 @@ function AdminPagos() {
       });
       void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
       setRejectingPayment(null);
       setInspectPayment(null);
     } catch (err: any) {

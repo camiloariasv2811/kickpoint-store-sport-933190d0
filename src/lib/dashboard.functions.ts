@@ -433,12 +433,19 @@ export const getAdminDashboard = createServerFn({ method: "GET" })
           `),
       ]);
 
-      if (productsRes.error || ordersRes.error || salesRes.error) {
+      const dashboardError =
+        productsRes.error ??
+        ordersRes.error ??
+        salesRes.error ??
+        movementsRes.error ??
+        paymentsRes.error;
+      if (dashboardError) {
         console.error("[getAdminDashboard] database query error:", {
           productsError: productsRes.error?.message,
           ordersError: ordersRes.error?.message,
           salesError: salesRes.error?.message,
         });
+        throw new Error(dashboardError.message);
       }
 
       const rawProducts = productsRes.data ?? [];
