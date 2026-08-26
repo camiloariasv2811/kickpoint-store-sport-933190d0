@@ -33,13 +33,8 @@ function Categorias() {
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     queryFn: async () => {
-      try {
-        const res = await listCategories();
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Categorias] Error loading categories:", err);
-        return [];
-      }
+      const res = await listCategories();
+      return res ?? [];
     },
   });
   const { data: products = [] } = useQuery({
@@ -47,13 +42,8 @@ function Categorias() {
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
     queryFn: async () => {
-      try {
-        const res = await listProducts({ data: {} });
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Categorias] Error loading products:", err);
-        return [];
-      }
+      const res = await listProducts({ data: {} });
+      return res ?? [];
     },
   });
 

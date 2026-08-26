@@ -84,15 +84,8 @@ function Page() {
   const inventoryQuery = useQuery({
     queryKey: ["admin", "inventory"],
     staleTime: 30 * 1000,
-    queryFn: async () => {
-      try {
-        const res = await listInventory();
-        return res ?? [];
-      } catch (err) {
-        console.warn("[AdminInventario] Error loading inventory:", err);
-        return [];
-      }
-    },
+    placeholderData: (previousData) => previousData,
+    queryFn: async () => (await listInventory()) ?? [],
   });
 
   const rows = (inventoryQuery.data ?? []).filter((r) => {
@@ -149,11 +142,20 @@ function Page() {
 
       {inventoryQuery.isLoading && <Skeleton className="h-64 w-full rounded-xl" />}
 
-      {inventoryQuery.isError && (
+      {inventoryQuery.isError && !inventoryQuery.data?.length && (
         <EmptyState
           title="No pudimos cargar el inventario"
           description="Intenta recargar la página en unos segundos."
         />
+      )}
+
+      {inventoryQuery.isError && Boolean(inventoryQuery.data?.length) && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <span>No se pudo actualizar. Se mantiene el último inventario confirmado.</span>
+          <Button variant="outline" size="sm" onClick={() => void inventoryQuery.refetch()}>
+            Volver a intentar
+          </Button>
+        </div>
       )}
 
       {!inventoryQuery.isLoading && !inventoryQuery.isError && rows.length === 0 && (
@@ -163,7 +165,7 @@ function Page() {
         />
       )}
 
-      {!inventoryQuery.isLoading && !inventoryQuery.isError && rows.length > 0 && (
+      {!inventoryQuery.isLoading && rows.length > 0 && (
         <div className="surface-card overflow-x-auto">
           <table className="w-full min-w-[860px] text-sm">
             <thead>

@@ -19,10 +19,11 @@ export const getRouter = () => {
       queries: {
         staleTime: 1000 * 60 * 2, // 2 minutes cache validity
         gcTime: 1000 * 60 * 10, // 10 minutes garbage collection
-        refetchOnWindowFocus: false,
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
         // En móvil las redes se cortan: reintenta poco y rápido en vez de
         // dejar la pantalla bloqueada esperando.
-        retry: 1,
+        retry: 2,
         retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
       },
     },

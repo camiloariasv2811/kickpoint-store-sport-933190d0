@@ -67,6 +67,7 @@ function AdminPagos() {
   const { data: orders = [], isLoading, isError, refetch } = useQuery<AdminOrder[]>({
     queryKey: ["admin", "orders"],
     staleTime: 60_000,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     retry: 1,
     placeholderData: (prev) => prev,
@@ -131,6 +132,8 @@ function AdminPagos() {
       });
       void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
       setInspectPayment(null);
     } catch (err: any) {
       console.error(err);
@@ -158,6 +161,8 @@ function AdminPagos() {
       });
       void queryClient.invalidateQueries({ queryKey: ["admin", "orders"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "pending-badges"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "dashboard-metrics"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "inventory"] });
       setRejectingPayment(null);
       setInspectPayment(null);
     } catch (err: any) {
@@ -252,7 +257,7 @@ function AdminPagos() {
 
       {isLoading && <Skeleton className="h-64 w-full rounded-xl" />}
 
-      {isError && !isLoading && (
+      {isError && !isLoading && orders.length === 0 && (
         <div className="surface-card flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-center">
           <AlertTriangle className="size-8 text-destructive" />
           <p className="text-sm text-muted-foreground">No se pudieron cargar los pagos.</p>
@@ -262,7 +267,16 @@ function AdminPagos() {
         </div>
       )}
 
-      {!isLoading && !isError && (
+      {isError && orders.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <span>No se pudo actualizar. Se mantienen los últimos pagos cargados.</span>
+          <Button variant="outline" size="sm" onClick={() => void refetch()}>
+            Volver a intentar
+          </Button>
+        </div>
+      )}
+
+      {!isLoading && (orders.length > 0 || !isError) && (
         <div className="surface-card overflow-x-auto">
           <table className="w-full min-w-[880px] text-sm">
             <thead>

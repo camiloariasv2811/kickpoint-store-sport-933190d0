@@ -138,23 +138,6 @@ function ProductRow({
   );
 }
 
-function useProducts() {
-  return useQuery({
-    queryKey: ["products"],
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      try {
-        const res = await listProducts({ data: { fresh: true } });
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Home] Error loading products:", err);
-        return [];
-      }
-    },
-  });
-}
-
 function Home() {
   const loaderData = Route.useLoaderData();
   const hasMountedRef = useRef(false);
@@ -186,15 +169,10 @@ function Home() {
     queryFn: async () => {
       perf.log08({ queryKey: "products" });
       trackPerf("HOME_08", "PRODUCTS REQUEST START");
-      try {
-        const res = await listProducts({ data: { fresh: true } });
-        perf.log09({ count: res?.length ?? 0 });
-        trackPerf("HOME_09", "PRODUCTS RECEIVED", { count: res?.length ?? 0 });
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Home] Error loading products:", err);
-        return [];
-      }
+      const res = await listProducts({ data: { fresh: true } });
+      perf.log09({ count: res?.length ?? 0 });
+      trackPerf("HOME_09", "PRODUCTS RECEIVED", { count: res?.length ?? 0 });
+      return res ?? [];
     },
   });
 
@@ -230,13 +208,8 @@ function Home() {
       ? { initialData: loaderData.categories }
       : {}),
     queryFn: async () => {
-      try {
-        const res = await listCategories();
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Home] Error loading categories:", err);
-        return [];
-      }
+      const res = await listCategories();
+      return res ?? [];
     },
   });
 
@@ -248,16 +221,12 @@ function Home() {
   const bestsellers =
     products?.filter((p) => p.is_bestseller).length > 0
       ? products.filter((p) => p.is_bestseller)
-      : products?.slice(4, 8).length > 0
-        ? products.slice(4, 8)
-        : (products ?? []);
+      : (products ?? []);
 
   const newest =
     products?.filter((p) => p.is_new).length > 0
       ? products.filter((p) => p.is_new)
-      : products?.slice(8, 12).length > 0
-        ? products.slice(8, 12)
-        : (products ?? []);
+      : (products ?? []);
 
   const roots = (categories ?? []).filter((c) => !c.parent_id);
 

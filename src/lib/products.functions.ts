@@ -272,16 +272,7 @@ export const listAdminProducts = createServerFn({ method: "GET" })
 
       const { data: rows, count, error } = productsRes;
       if (error || !rows) {
-        if (error) console.warn("[listAdminProducts] Supabase error:", error);
-        return {
-          items: [],
-          total: 0,
-          page: 1,
-          pageSize: 20,
-          totalPages: 1,
-          activeCount: 0,
-          totalUnits: 0,
-        } as AdminProductsResponse;
+        throw new Error(error?.message ?? "No se pudieron consultar los productos");
       }
 
       const activeCount =
@@ -303,15 +294,7 @@ export const listAdminProducts = createServerFn({ method: "GET" })
       } as AdminProductsResponse;
     } catch (err) {
       console.error("[listAdminProducts] Exception querying Supabase products:", err);
-      return {
-        items: [],
-        total: 0,
-        page: 1,
-        pageSize: 20,
-        totalPages: 1,
-        activeCount: 0,
-        totalUnits: 0,
-      } as AdminProductsResponse;
+      throw err instanceof Error ? err : new Error("No se pudieron consultar los productos");
     }
   });
 

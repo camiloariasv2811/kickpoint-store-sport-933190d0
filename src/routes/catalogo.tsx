@@ -144,6 +144,8 @@ function Catalogo() {
     isLoading: isLoadingProducts,
     isPending: isPendingProducts,
     isFetching: isFetchingProducts,
+    isError: isProductsError,
+    refetch: refetchProducts,
   } = useQuery({
     queryKey: ["products"],
     staleTime: 0,
@@ -155,16 +157,11 @@ function Catalogo() {
     queryFn: async () => {
       const reqStart = performance.now();
       devLog(`[CATALOG_REQUEST_START] Requesting catalog products from server`);
-      try {
-        const res = await listProducts({ data: { fresh: true } });
-        devLog(
-          `[CATALOG_RESPONSE_RECEIVED] Received ${res?.length ?? 0} products in ${Math.round(performance.now() - reqStart)}ms`,
-        );
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Catalogo] Error loading products:", err);
-        return [];
-      }
+      const res = await listProducts({ data: { fresh: true } });
+      devLog(
+        `[CATALOG_RESPONSE_RECEIVED] Received ${res?.length ?? 0} products in ${Math.round(performance.now() - reqStart)}ms`,
+      );
+      return res ?? [];
     },
   });
 
@@ -181,13 +178,8 @@ function Catalogo() {
       ? { initialData: loaderData.categories }
       : {}),
     queryFn: async () => {
-      try {
-        const res = await listCategories();
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Catalogo] Error loading categories:", err);
-        return [];
-      }
+      const res = await listCategories();
+      return res ?? [];
     },
   });
 
@@ -204,13 +196,8 @@ function Catalogo() {
       ? { initialData: loaderData.brands }
       : {}),
     queryFn: async () => {
-      try {
-        const res = await listBrands();
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Catalogo] Error loading brands:", err);
-        return [];
-      }
+      const res = await listBrands();
+      return res ?? [];
     },
   });
 
@@ -325,6 +312,18 @@ function Catalogo() {
 
   return (
     <SiteLayout>
+      {isProductsError && (
+        <div className="border-b border-destructive/40 bg-destructive/10">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+            <span>
+              No se pudo actualizar el catálogo. Conservamos los últimos productos disponibles.
+            </span>
+            <Button variant="outline" size="sm" onClick={() => void refetchProducts()}>
+              Volver a intentar
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>

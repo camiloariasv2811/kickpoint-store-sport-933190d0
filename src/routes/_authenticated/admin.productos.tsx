@@ -85,50 +85,39 @@ function AdminProductos() {
     data: response,
     isLoading,
     isFetching,
+    isError,
+    refetch,
   } = useQuery<AdminProductsResponse>({
     queryKey: ["admin", "products", { page, search: debouncedQ }],
     staleTime: 30 * 1000,
     placeholderData: (previousData) => previousData,
     queryFn: async () => {
-      try {
-        const res = await listAdminProducts({
-          data: {
-            page,
-            pageSize: PAGE_SIZE,
-            search: debouncedQ.trim() || undefined,
-          },
-        });
-        if (Array.isArray(res)) {
-          return {
-            items: res as any,
-            total: res.length,
-            page: 1,
-            pageSize: PAGE_SIZE,
-            totalPages: Math.ceil(res.length / PAGE_SIZE) || 1,
-            activeCount: res.filter((p: any) => p.active !== false).length,
-            totalUnits: res.reduce(
-              (acc: number, p: any) =>
-                acc +
-                (p.variants ?? [])
-                  .filter((v: any) => v.active !== false)
-                  .reduce((va: number, v: any) => va + Number(v.stock || 0), 0),
-              0,
-            ),
-          };
-        }
-        return res;
-      } catch (err) {
-        console.warn("[AdminProductos] Error loading products:", err);
+      const res = await listAdminProducts({
+        data: {
+          page,
+          pageSize: PAGE_SIZE,
+          search: debouncedQ.trim() || undefined,
+        },
+      });
+      if (Array.isArray(res)) {
         return {
-          items: [],
-          total: 0,
+          items: res as any,
+          total: res.length,
           page: 1,
           pageSize: PAGE_SIZE,
-          totalPages: 1,
-          activeCount: 0,
-          totalUnits: 0,
+          totalPages: Math.ceil(res.length / PAGE_SIZE) || 1,
+          activeCount: res.filter((p: any) => p.active !== false).length,
+          totalUnits: res.reduce(
+            (acc: number, p: any) =>
+              acc +
+              (p.variants ?? [])
+                .filter((v: any) => v.active !== false)
+                .reduce((va: number, v: any) => va + Number(v.stock || 0), 0),
+            0,
+          ),
         };
       }
+      return res;
     },
   });
 
@@ -224,6 +213,14 @@ function AdminProductos() {
         </div>
       }
     >
+      {isError && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <span>No se pudo sincronizar. Se mantienen los últimos productos cargados.</span>
+          <Button variant="outline" size="sm" onClick={() => void refetch()}>
+            Volver a intentar
+          </Button>
+        </div>
+      )}
       <div className="mb-3 flex items-center justify-between text-xs text-muted-foreground sm:hidden">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

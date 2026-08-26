@@ -128,14 +128,10 @@ function AdminFrame({ children }: { children: ReactNode }) {
     refetchInterval: 30_000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    placeholderData: (previousData) => previousData,
     queryFn: async () => {
-      try {
-        const res = await getPendingAdminBadges();
-        return res ?? { pendingOrders: 0, pendingPayments: 0 };
-      } catch (err) {
-        console.warn("[AdminShell] Error fetching badges:", err);
-        return { pendingOrders: 0, pendingPayments: 0 };
-      }
+      const res = await getPendingAdminBadges();
+      return res ?? { pendingOrders: 0, pendingPayments: 0 };
     },
   });
 

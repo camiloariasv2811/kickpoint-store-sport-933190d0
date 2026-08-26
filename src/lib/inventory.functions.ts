@@ -78,7 +78,7 @@ export const listInventory = createServerFn({ method: "GET" })
 
       if (error || !data) {
         console.error("[listInventory] Supabase error:", error);
-        return [];
+        throw new Error(error?.message ?? "No se pudo consultar el inventario");
       }
 
       const rows: InventoryRow[] = [];
@@ -128,7 +128,7 @@ export const listInventory = createServerFn({ method: "GET" })
       return rows;
     } catch (err) {
       console.error("[listInventory] Fatal catch:", err);
-      return [];
+      throw err instanceof Error ? err : new Error("No se pudo consultar el inventario");
     }
   });
 

@@ -114,13 +114,8 @@ function WholesaleCatalogPage() {
       ? { initialData: loaderData.products }
       : {}),
     queryFn: async () => {
-      try {
-        const res = await listProducts({ data: { fresh: true } });
-        return (res ?? []) as Product[];
-      } catch (err) {
-        console.warn("[WholesaleCatalog] Error loading products:", err);
-        return [];
-      }
+      const res = await listProducts({ data: { fresh: true } });
+      return (res ?? []) as Product[];
     },
   });
 
@@ -141,12 +136,8 @@ function WholesaleCatalogPage() {
       ? { initialData: loaderData.categories }
       : {}),
     queryFn: async () => {
-      try {
-        const res = await listCategories();
-        return (res ?? []) as Category[];
-      } catch (err) {
-        return [];
-      }
+      const res = await listCategories();
+      return (res ?? []) as Category[];
     },
   });
 

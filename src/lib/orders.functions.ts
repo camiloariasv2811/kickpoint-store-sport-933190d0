@@ -763,7 +763,7 @@ export const getPendingAdminBadges = createServerFn({ method: "GET" })
         pendingOrders,
         pendingPayments,
       };
-    } catch {
-      return getInMemoryBadges();
+    } catch (error) {
+      throw error instanceof Error ? error : new Error("No se pudieron consultar los pendientes");
     }
   });
