@@ -854,7 +854,8 @@ export async function sendEmailNotification(
     order_code: payload.orderCode ?? null,
     status,
     provider_message_id: providerMessageId,
-    error_message: isSuccess ? null : lastError,
+    error_message: isSuccess && !lastError ? null : lastError,
+
     attempts,
     idempotency_key: idempotencyKey,
     created_at: new Date().toISOString(),
@@ -877,10 +878,11 @@ export async function sendEmailNotification(
           body_html: html,
           status,
           provider_message_id: providerMessageId,
-          error_message: isSuccess ? null : lastError,
+          error_message: isSuccess && !lastError ? null : lastError,
           attempts,
           idempotency_key: idempotencyKey,
-          metadata: payload.metadata || {},
+          metadata: { ...(payload.metadata || {}), deliveryEvent: deliveryEvent ?? "queued" },
+
           created_at: new Date().toISOString(),
           sent_at: sentAt,
         },
