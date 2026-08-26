@@ -125,6 +125,46 @@ export function logRuntimeEmailConfig(): void {
   );
 }
 
+/** Reads the real delivery state of a dispatched message from the provider. */
+export async function fetchEmailDeliveryStatus(messageId: string): Promise<{
+  ok: boolean;
+  lastEvent: string | null;
+  raw?: any;
+  error?: string | null;
+}> {
+  if (!messageId) return { ok: false, lastEvent: null, error: "missing message id" };
+  const apiKey = getResendApiKey();
+  if (!apiKey) return { ok: false, lastEvent: null, error: "RESEND_API_KEY missing" };
+
+  const url = isDirectResendKey()
+    ? `https://api.resend.com/emails/${messageId}`
+    : `${RESEND_GATEWAY_URL}/emails/${messageId}`;
+  const headers: Record<string, string> = isDirectResendKey()
+    ? { Authorization: `Bearer ${apiKey}` }
+    : {
+        Authorization: `Bearer ${getLovableApiKey()}`,
+        "X-Connection-Api-Key": apiKey,
+      };
+
+  try {
+    const res = await fetch(url, { headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        ok: false,
+        lastEvent: null,
+        raw: data,
+        error: data?.message || data?.error?.message || `HTTP ${res.status}`,
+      };
+    }
+    const body = data?.data ?? data;
+    return { ok: true, lastEvent: body?.last_event ?? null, raw: body };
+  } catch (err: any) {
+    return { ok: false, lastEvent: null, error: err?.message || "network error" };
+  }
+}
+
+
 function formatPaymentMethodLabel(code?: string | null): string {
   if (!code) return "No especificado";
   const clean = code.trim().toLowerCase();
