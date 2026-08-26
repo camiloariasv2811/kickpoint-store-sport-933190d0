@@ -810,15 +810,38 @@ export async function sendEmailNotification(
   const status: "sent" | "failed" = isSuccess ? "sent" : "failed";
   const sentAt = isSuccess ? new Date().toISOString() : null;
 
+  // 3.5 Verify the REAL delivery state with the provider (accepted !== delivered).
+  let deliveryEvent: string | null = null;
+  if (isSuccess && providerMessageId) {
+    for (let poll = 1; poll <= 2; poll++) {
+      const check = await fetchEmailDeliveryStatus(providerMessageId);
+      deliveryEvent = check.lastEvent;
+      if (
+        deliveryEvent &&
+        ["delivered", "opened", "clicked", "bounced", "complained", "failed"].includes(deliveryEvent)
+      ) {
+        break;
+      }
+      if (poll < 2) await new Promise((r) => setTimeout(r, 1500));
+    }
+    console.log(
+      `[ORDER_EMAIL_07] DELIVERY CHECK - ProviderMsgId: ${providerMessageId}, LastEvent: ${deliveryEvent || "unknown"}`,
+    );
+    if (deliveryEvent && ["bounced", "complained", "failed"].includes(deliveryEvent)) {
+      lastError = `El proveedor reportó "${deliveryEvent}" para ${recipientEmail}. Revisa la dirección o configura un dominio verificado.`;
+    }
+  }
+
   if (isSuccess) {
     console.log(
-      `[ORDER_EMAIL_06] EMAIL SENT - OrderId: ${payload.orderId || payload.orderCode}, NotificationId: ${notificationId}, Recipient: ${recipientEmail}, ProviderMsgId: ${providerMessageId}, Timestamp: ${sentAt}`,
+      `[ORDER_EMAIL_06] EMAIL SENT - OrderId: ${payload.orderId || payload.orderCode}, NotificationId: ${notificationId}, Recipient: ${recipientEmail}, ProviderMsgId: ${providerMessageId}, DeliveryEvent: ${deliveryEvent || "queued"}, Timestamp: ${sentAt}`,
     );
   } else {
     console.warn(
       `[ORDER_EMAIL_ERROR] - OrderId: ${payload.orderId || payload.orderCode}, NotificationId: ${notificationId}, Recipient: ${recipientEmail}, HTTPStatus: ${lastHttpStatus}, Error: ${lastError}, Timestamp: ${new Date().toISOString()}, IdempotencyKey: ${idempotencyKey}`,
     );
   }
+
 
   // 4. Log in In-Memory / Supabase
   const logRecord: InMemoryEmailNotification = {
