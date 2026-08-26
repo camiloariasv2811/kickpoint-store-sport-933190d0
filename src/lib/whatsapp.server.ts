@@ -422,16 +422,22 @@ export async function sendWhatsAppNotification(
     }
   }
 
-  // 3. Meta Credentials Check
+  // 3. Provider credentials check (Wati preferido, Meta Cloud API como respaldo)
+  const watiToken = process.env["WATI_ACCESS_TOKEN"];
+  const watiTenant = process.env["WATI_TENANT_ID"];
+  const watiEndpoint = (process.env["WATI_API_ENDPOINT"] || "https://live-mt-server.wati.io").replace(/\/+$/, "");
+  const useWati = Boolean(watiToken && watiTenant);
+
   const accessToken = process.env["WHATSAPP_ACCESS_TOKEN"];
   const phoneNumberId = process.env["WHATSAPP_PHONE_NUMBER_ID"];
   const apiVersion = process.env["WHATSAPP_API_VERSION"] || "v21.0";
 
-  if (!accessToken || !phoneNumberId) {
+  if (!useWati && (!accessToken || !phoneNumberId)) {
     const missingSecrets: string[] = [];
     if (!accessToken) missingSecrets.push("WHATSAPP_ACCESS_TOKEN");
     if (!phoneNumberId) missingSecrets.push("WHATSAPP_PHONE_NUMBER_ID");
-    const infoMsg = `WhatsApp no configurado. Faltan credenciales de Meta Cloud API: ${missingSecrets.join(", ")}`;
+    const infoMsg = `WhatsApp no configurado. Faltan credenciales del proveedor: ${missingSecrets.join(", ")}`;
+
     console.warn(`[WhatsApp] ${infoMsg} (evento: ${payload.eventType})`);
 
     const notifRecord: InMemoryWhatsAppNotification = {
