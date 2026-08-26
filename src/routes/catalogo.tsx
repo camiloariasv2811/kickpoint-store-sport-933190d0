@@ -144,6 +144,8 @@ function Catalogo() {
     isLoading: isLoadingProducts,
     isPending: isPendingProducts,
     isFetching: isFetchingProducts,
+    isError: isProductsError,
+    refetch: refetchProducts,
   } = useQuery({
     queryKey: ["products"],
     staleTime: 0,
@@ -155,16 +157,11 @@ function Catalogo() {
     queryFn: async () => {
       const reqStart = performance.now();
       devLog(`[CATALOG_REQUEST_START] Requesting catalog products from server`);
-      try {
-        const res = await listProducts({ data: { fresh: true } });
-        devLog(
-          `[CATALOG_RESPONSE_RECEIVED] Received ${res?.length ?? 0} products in ${Math.round(performance.now() - reqStart)}ms`,
-        );
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Catalogo] Error loading products:", err);
-        return [];
-      }
+      const res = await listProducts({ data: { fresh: true } });
+      devLog(
+        `[CATALOG_RESPONSE_RECEIVED] Received ${res?.length ?? 0} products in ${Math.round(performance.now() - reqStart)}ms`,
+      );
+      return res ?? [];
     },
   });
 

@@ -44,19 +44,11 @@ export const Route = createFileRoute("/_authenticated/admin/reportes")({
 });
 
 function AdminReportes() {
-  const { data, isLoading } = useQuery<ReportMetrics>({
+  const { data, isLoading, isError, refetch } = useQuery<ReportMetrics>({
     queryKey: ["admin", "reports"],
     staleTime: 1000 * 60,
     placeholderData: (prev) => prev,
-    queryFn: async () => {
-      try {
-        const res = await getReportMetrics();
-        return { ...EMPTY_METRICS, ...(res ?? {}) };
-      } catch (err) {
-        console.warn("[AdminReportes] Error fetching metrics:", err);
-        return EMPTY_METRICS;
-      }
-    },
+    queryFn: async () => ({ ...EMPTY_METRICS, ...((await getReportMetrics()) ?? {}) }),
   });
 
   const metrics: ReportMetrics = { ...EMPTY_METRICS, ...(data ?? {}) };
@@ -104,6 +96,14 @@ function AdminReportes() {
         </Button>
       }
     >
+      {isError && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">
+          <span>No se pudo actualizar el reporte. Los últimos valores confirmados siguen visibles.</span>
+          <Button variant="outline" size="sm" onClick={() => void refetch()}>
+            Volver a intentar
+          </Button>
+        </div>
+      )}
       {isLoading && !data && <Skeleton className="h-96 w-full rounded-xl" />}
 
       {(!isLoading || data) && (

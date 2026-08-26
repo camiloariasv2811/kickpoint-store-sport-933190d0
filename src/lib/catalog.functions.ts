@@ -485,9 +485,14 @@ export const listProducts = createServerFn({ method: "GET" })
     }
   }
 
-  // If Supabase is configured but returned empty or errored, return empty array (do not fabricate products)
+  // A temporary backend failure must never look like a valid empty catalog.
+  // Keep serving the last confirmed snapshot while the client retries.
   if (isSupabasePublicConfigured()) {
-    return [];
+    if (cachedProducts) {
+      console.warn("[listProducts] Serving last confirmed catalog after a read failure");
+      return cachedProducts.data;
+    }
+    throw new Error("No se pudo sincronizar el catálogo");
   }
 
   // Fallback: In-memory fallback products ONLY when Supabase is completely unconfigured
