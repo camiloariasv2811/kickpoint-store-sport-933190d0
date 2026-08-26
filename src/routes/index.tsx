@@ -138,23 +138,6 @@ function ProductRow({
   );
 }
 
-function useProducts() {
-  return useQuery({
-    queryKey: ["products"],
-    staleTime: 60 * 1000,
-    gcTime: 5 * 60 * 1000,
-    queryFn: async () => {
-      try {
-        const res = await listProducts({ data: { fresh: true } });
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Home] Error loading products:", err);
-        return [];
-      }
-    },
-  });
-}
-
 function Home() {
   const loaderData = Route.useLoaderData();
   const hasMountedRef = useRef(false);

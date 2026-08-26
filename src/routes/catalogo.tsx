@@ -178,13 +178,8 @@ function Catalogo() {
       ? { initialData: loaderData.categories }
       : {}),
     queryFn: async () => {
-      try {
-        const res = await listCategories();
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Catalogo] Error loading categories:", err);
-        return [];
-      }
+      const res = await listCategories();
+      return res ?? [];
     },
   });
 
@@ -201,13 +196,8 @@ function Catalogo() {
       ? { initialData: loaderData.brands }
       : {}),
     queryFn: async () => {
-      try {
-        const res = await listBrands();
-        return res ?? [];
-      } catch (err) {
-        console.warn("[Catalogo] Error loading brands:", err);
-        return [];
-      }
+      const res = await listBrands();
+      return res ?? [];
     },
   });
 

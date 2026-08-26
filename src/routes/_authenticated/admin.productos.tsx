@@ -93,29 +93,29 @@ function AdminProductos() {
     placeholderData: (previousData) => previousData,
     queryFn: async () => {
       const res = await listAdminProducts({
-          data: {
-            page,
-            pageSize: PAGE_SIZE,
-            search: debouncedQ.trim() || undefined,
-          },
-        });
+        data: {
+          page,
+          pageSize: PAGE_SIZE,
+          search: debouncedQ.trim() || undefined,
+        },
+      });
       if (Array.isArray(res)) {
-          return {
-            items: res as any,
-            total: res.length,
-            page: 1,
-            pageSize: PAGE_SIZE,
-            totalPages: Math.ceil(res.length / PAGE_SIZE) || 1,
-            activeCount: res.filter((p: any) => p.active !== false).length,
-            totalUnits: res.reduce(
-              (acc: number, p: any) =>
-                acc +
-                (p.variants ?? [])
-                  .filter((v: any) => v.active !== false)
-                  .reduce((va: number, v: any) => va + Number(v.stock || 0), 0),
-              0,
-            ),
-          };
+        return {
+          items: res as any,
+          total: res.length,
+          page: 1,
+          pageSize: PAGE_SIZE,
+          totalPages: Math.ceil(res.length / PAGE_SIZE) || 1,
+          activeCount: res.filter((p: any) => p.active !== false).length,
+          totalUnits: res.reduce(
+            (acc: number, p: any) =>
+              acc +
+              (p.variants ?? [])
+                .filter((v: any) => v.active !== false)
+                .reduce((va: number, v: any) => va + Number(v.stock || 0), 0),
+            0,
+          ),
+        };
       }
       return res;
     },

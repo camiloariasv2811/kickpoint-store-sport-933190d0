@@ -136,12 +136,8 @@ function WholesaleCatalogPage() {
       ? { initialData: loaderData.categories }
       : {}),
     queryFn: async () => {
-      try {
-        const res = await listCategories();
-        return (res ?? []) as Category[];
-      } catch (err) {
-        return [];
-      }
+      const res = await listCategories();
+      return (res ?? []) as Category[];
     },
   });
 
