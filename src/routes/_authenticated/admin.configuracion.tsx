@@ -1069,6 +1069,14 @@ function AdminConfiguracion() {
                 </form>
               </div>
 
+              {/* Alertas de entrega: rebotes y spam */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                  Alertas de entrega (rebotes / spam)
+                </h3>
+                <EmailDeliveryAlerts />
+              </div>
+
               {/* Registro Reciente de Correos */}
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
