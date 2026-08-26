@@ -88,7 +88,7 @@ async function notifyByWhatsApp(row: any, problem: string): Promise<boolean> {
     recipientPhone: getAdminWhatsAppNumber(),
     recipientType: "admin",
     orderId: row.order_id ?? null,
-    orderCode: row.order_code ?? null,
+    orderCode: row.order_code ?? `EMAIL-${row.id}`,
     customMessage: message,
     metadata: { emailNotificationId: row.id, problem },
   });
