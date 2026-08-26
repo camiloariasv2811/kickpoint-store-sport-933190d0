@@ -25,6 +25,7 @@ import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as ProductoSlugRouteImport } from './routes/producto.$slug'
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as AuthenticatedAdminCajaRouteImport } from './routes/_authenticated/admin.caja'
+import { Route as AuthenticatedAdminCatalogoPdfRouteImport } from './routes/_authenticated/admin.catalogo-pdf'
 import { Route as AuthenticatedAdminCategoriasRouteImport } from './routes/_authenticated/admin.categorias'
 import { Route as AuthenticatedAdminClientesRouteImport } from './routes/_authenticated/admin.clientes'
 import { Route as AuthenticatedAdminConfiguracionRouteImport } from './routes/_authenticated/admin.configuracion'
@@ -119,6 +120,12 @@ const AuthenticatedAdminCajaRoute = AuthenticatedAdminCajaRouteImport.update({
   path: '/caja',
   getParentRoute: () => AuthenticatedAdminRoute,
 } as any)
+const AuthenticatedAdminCatalogoPdfRoute =
+  AuthenticatedAdminCatalogoPdfRouteImport.update({
+    id: '/catalogo-pdf',
+    path: '/catalogo-pdf',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminCategoriasRoute =
   AuthenticatedAdminCategoriasRouteImport.update({
     id: '/categorias',
@@ -217,6 +224,7 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/producto/$slug': typeof ProductoSlugRoute
   '/admin/caja': typeof AuthenticatedAdminCajaRoute
+  '/admin/catalogo-pdf': typeof AuthenticatedAdminCatalogoPdfRoute
   '/admin/categorias': typeof AuthenticatedAdminCategoriasRoute
   '/admin/clientes': typeof AuthenticatedAdminClientesRoute
   '/admin/configuracion': typeof AuthenticatedAdminConfiguracionRoute
@@ -247,6 +255,7 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/producto/$slug': typeof ProductoSlugRoute
   '/admin/caja': typeof AuthenticatedAdminCajaRoute
+  '/admin/catalogo-pdf': typeof AuthenticatedAdminCatalogoPdfRoute
   '/admin/categorias': typeof AuthenticatedAdminCategoriasRoute
   '/admin/clientes': typeof AuthenticatedAdminClientesRoute
   '/admin/configuracion': typeof AuthenticatedAdminConfiguracionRoute
@@ -280,6 +289,7 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/producto/$slug': typeof ProductoSlugRoute
   '/_authenticated/admin/caja': typeof AuthenticatedAdminCajaRoute
+  '/_authenticated/admin/catalogo-pdf': typeof AuthenticatedAdminCatalogoPdfRoute
   '/_authenticated/admin/categorias': typeof AuthenticatedAdminCategoriasRoute
   '/_authenticated/admin/clientes': typeof AuthenticatedAdminClientesRoute
   '/_authenticated/admin/configuracion': typeof AuthenticatedAdminConfiguracionRoute
@@ -313,6 +323,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/producto/$slug'
     | '/admin/caja'
+    | '/admin/catalogo-pdf'
     | '/admin/categorias'
     | '/admin/clientes'
     | '/admin/configuracion'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/producto/$slug'
     | '/admin/caja'
+    | '/admin/catalogo-pdf'
     | '/admin/categorias'
     | '/admin/clientes'
     | '/admin/configuracion'
@@ -375,6 +387,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/producto/$slug'
     | '/_authenticated/admin/caja'
+    | '/_authenticated/admin/catalogo-pdf'
     | '/_authenticated/admin/categorias'
     | '/_authenticated/admin/clientes'
     | '/_authenticated/admin/configuracion'
@@ -523,6 +536,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminCajaRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/catalogo-pdf': {
+      id: '/_authenticated/admin/catalogo-pdf'
+      path: '/catalogo-pdf'
+      fullPath: '/admin/catalogo-pdf'
+      preLoaderRoute: typeof AuthenticatedAdminCatalogoPdfRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/categorias': {
       id: '/_authenticated/admin/categorias'
       path: '/categorias'
@@ -626,6 +646,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminCajaRoute: typeof AuthenticatedAdminCajaRoute
+  AuthenticatedAdminCatalogoPdfRoute: typeof AuthenticatedAdminCatalogoPdfRoute
   AuthenticatedAdminCategoriasRoute: typeof AuthenticatedAdminCategoriasRoute
   AuthenticatedAdminClientesRoute: typeof AuthenticatedAdminClientesRoute
   AuthenticatedAdminConfiguracionRoute: typeof AuthenticatedAdminConfiguracionRoute
@@ -643,6 +664,7 @@ interface AuthenticatedAdminRouteChildren {
 
 const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminCajaRoute: AuthenticatedAdminCajaRoute,
+  AuthenticatedAdminCatalogoPdfRoute: AuthenticatedAdminCatalogoPdfRoute,
   AuthenticatedAdminCategoriasRoute: AuthenticatedAdminCategoriasRoute,
   AuthenticatedAdminClientesRoute: AuthenticatedAdminClientesRoute,
   AuthenticatedAdminConfiguracionRoute: AuthenticatedAdminConfiguracionRoute,

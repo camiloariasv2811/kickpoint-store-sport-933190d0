@@ -8,6 +8,7 @@ import {
   ClipboardList,
   CreditCard,
   FileBarChart,
+  FileDown,
   History,
   LayoutDashboard,
   LogOut,
@@ -35,6 +36,7 @@ const NAV = [
   { to: "/admin/kardex", label: "Kárdex", icon: History, badgeKey: null },
   { to: "/admin/productos", label: "Productos", icon: ShoppingBag, badgeKey: null },
   { to: "/admin/orden-catalogo", label: "Orden catálogo", icon: ArrowUpDown, badgeKey: null },
+  { to: "/admin/catalogo-pdf", label: "Catálogo PDF", icon: FileDown, badgeKey: null },
 
   { to: "/admin/categorias", label: "Categorías", icon: Tags, badgeKey: null },
   { to: "/admin/clientes", label: "Clientes", icon: Users, badgeKey: null },
