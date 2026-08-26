@@ -425,8 +425,13 @@ export async function sendWhatsAppNotification(
   // 3. Provider credentials check (Wati preferido, Meta Cloud API como respaldo)
   const watiToken = process.env["WATI_ACCESS_TOKEN"];
   const watiTenant = process.env["WATI_TENANT_ID"];
-  const watiEndpoint = (process.env["WATI_API_ENDPOINT"] || "https://live-mt-server.wati.io").replace(/\/+$/, "");
-  const useWati = Boolean(watiToken && watiTenant);
+  // WATI_API_ENDPOINT es el "API Endpoint" que muestra Wati (incluye el tenant).
+  const watiRaw = (process.env["WATI_API_ENDPOINT"] || "").replace(/\/+$/, "");
+  const watiBase = watiRaw
+    ? watiRaw.replace(/\/api\/v\d+$/, "")
+    : `https://live-mt-server.wati.io/${watiTenant}`;
+  const useWati = Boolean(watiToken && (watiRaw || watiTenant));
+
 
   const accessToken = process.env["WHATSAPP_ACCESS_TOKEN"];
   const phoneNumberId = process.env["WHATSAPP_PHONE_NUMBER_ID"];
