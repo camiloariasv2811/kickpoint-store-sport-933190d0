@@ -64,6 +64,7 @@ export type WhatsAppEventType =
   | "pedido_enviado"
   | "pedido_entregado"
   | "pedido_cancelado"
+  | "email_delivery_alert"
   | "test_message";
 
 export interface WhatsAppNotificationPayload {
