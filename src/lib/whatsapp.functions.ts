@@ -49,7 +49,9 @@ export const getWhatsAppDashboardStatus = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<WhatsAppDashboardStatus> => {
     const hasToken = Boolean(process.env["WHATSAPP_ACCESS_TOKEN"]);
     const hasPhoneId = Boolean(process.env["WHATSAPP_PHONE_NUMBER_ID"]);
-    const isConfigured = hasToken && hasPhoneId;
+    const hasWati = Boolean(process.env["WATI_ACCESS_TOKEN"] && process.env["WATI_TENANT_ID"]);
+    const isConfigured = hasWati || (hasToken && hasPhoneId);
+
     const officialNumber = "+58 412 1546698";
     const adminRecipientNumber = getAdminWhatsAppNumber();
 
