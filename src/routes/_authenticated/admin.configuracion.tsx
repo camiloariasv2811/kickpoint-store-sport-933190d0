@@ -53,6 +53,7 @@ import {
   updateWhatsAppNotificationSettings,
   type WhatsAppDashboardStatus,
 } from "@/lib/whatsapp.functions";
+import { EmailDeliveryAlerts } from "@/components/admin/EmailDeliveryAlerts";
 import {
   getEmailDashboardStatus,
   sendEmailTest,
