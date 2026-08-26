@@ -900,7 +900,8 @@ export async function sendEmailNotification(
     ok: isSuccess,
     status,
     providerMessageId,
-    errorMessage: isSuccess ? null : lastError,
+    errorMessage: isSuccess && !lastError ? null : lastError,
     idempotencyKey,
+
   };
 }
