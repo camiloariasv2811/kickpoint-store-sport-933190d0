@@ -53,6 +53,7 @@ import {
   updateWhatsAppNotificationSettings,
   type WhatsAppDashboardStatus,
 } from "@/lib/whatsapp.functions";
+import { EmailDeliveryAlerts } from "@/components/admin/EmailDeliveryAlerts";
 import {
   getEmailDashboardStatus,
   sendEmailTest,
@@ -1067,6 +1068,14 @@ function AdminConfiguracion() {
                     </Button>
                   </div>
                 </form>
+              </div>
+
+              {/* Alertas de entrega: rebotes y spam */}
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
+                  Alertas de entrega (rebotes / spam)
+                </h3>
+                <EmailDeliveryAlerts />
               </div>
 
               {/* Registro Reciente de Correos */}
