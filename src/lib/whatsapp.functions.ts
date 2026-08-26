@@ -103,11 +103,14 @@ export const getWhatsAppDashboardStatus = createServerFn({ method: "GET" })
 
     return {
       isConfigured,
-      missingSecrets: [
-        ...(hasToken ? [] : ["WHATSAPP_ACCESS_TOKEN"]),
-        ...(hasPhoneId ? [] : ["WHATSAPP_PHONE_NUMBER_ID"]),
-        ...(process.env["WHATSAPP_VERIFY_TOKEN"] ? [] : ["WHATSAPP_VERIFY_TOKEN"]),
-      ],
+      missingSecrets: hasWati
+        ? []
+        : [
+            ...(hasToken ? [] : ["WHATSAPP_ACCESS_TOKEN"]),
+            ...(hasPhoneId ? [] : ["WHATSAPP_PHONE_NUMBER_ID"]),
+            ...(process.env["WHATSAPP_VERIFY_TOKEN"] ? [] : ["WHATSAPP_VERIFY_TOKEN"]),
+          ],
+
       officialNumber,
       adminRecipientNumber,
       stats: {
