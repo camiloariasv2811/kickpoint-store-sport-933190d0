@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
+import { EmailDeliveryAlerts } from "@/components/admin/EmailDeliveryAlerts";
 import { Logo } from "@/components/site/Logo";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -108,7 +109,10 @@ function AdminPage({ title, subtitle, actions, children }: AdminShellProps) {
         </div>
         <div className="ml-auto flex items-center gap-2">{actions}</div>
       </header>
-      <main className="flex-1 p-4 sm:p-6">{children}</main>
+      <main className="flex-1 space-y-4 p-4 sm:p-6">
+        <EmailDeliveryAlerts compact />
+        {children}
+      </main>
     </>
   );
 }
