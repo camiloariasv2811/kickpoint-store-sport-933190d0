@@ -125,6 +125,46 @@ export function logRuntimeEmailConfig(): void {
   );
 }
 
+/** Reads the real delivery state of a dispatched message from the provider. */
+export async function fetchEmailDeliveryStatus(messageId: string): Promise<{
+  ok: boolean;
+  lastEvent: string | null;
+  raw?: any;
+  error?: string | null;
+}> {
+  if (!messageId) return { ok: false, lastEvent: null, error: "missing message id" };
+  const apiKey = getResendApiKey();
+  if (!apiKey) return { ok: false, lastEvent: null, error: "RESEND_API_KEY missing" };
+
+  const url = isDirectResendKey()
+    ? `https://api.resend.com/emails/${messageId}`
+    : `${RESEND_GATEWAY_URL}/emails/${messageId}`;
+  const headers: Record<string, string> = isDirectResendKey()
+    ? { Authorization: `Bearer ${apiKey}` }
+    : {
+        Authorization: `Bearer ${getLovableApiKey()}`,
+        "X-Connection-Api-Key": apiKey,
+      };
+
+  try {
+    const res = await fetch(url, { headers });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return {
+        ok: false,
+        lastEvent: null,
+        raw: data,
+        error: data?.message || data?.error?.message || `HTTP ${res.status}`,
+      };
+    }
+    const body = data?.data ?? data;
+    return { ok: true, lastEvent: body?.last_event ?? null, raw: body };
+  } catch (err: any) {
+    return { ok: false, lastEvent: null, error: err?.message || "network error" };
+  }
+}
+
+
 function formatPaymentMethodLabel(code?: string | null): string {
   if (!code) return "No especificado";
   const clean = code.trim().toLowerCase();
@@ -770,15 +810,38 @@ export async function sendEmailNotification(
   const status: "sent" | "failed" = isSuccess ? "sent" : "failed";
   const sentAt = isSuccess ? new Date().toISOString() : null;
 
+  // 3.5 Verify the REAL delivery state with the provider (accepted !== delivered).
+  let deliveryEvent: string | null = null;
+  if (isSuccess && providerMessageId) {
+    for (let poll = 1; poll <= 2; poll++) {
+      const check = await fetchEmailDeliveryStatus(providerMessageId);
+      deliveryEvent = check.lastEvent;
+      if (
+        deliveryEvent &&
+        ["delivered", "opened", "clicked", "bounced", "complained", "failed"].includes(deliveryEvent)
+      ) {
+        break;
+      }
+      if (poll < 2) await new Promise((r) => setTimeout(r, 1500));
+    }
+    console.log(
+      `[ORDER_EMAIL_07] DELIVERY CHECK - ProviderMsgId: ${providerMessageId}, LastEvent: ${deliveryEvent || "unknown"}`,
+    );
+    if (deliveryEvent && ["bounced", "complained", "failed"].includes(deliveryEvent)) {
+      lastError = `El proveedor reportó "${deliveryEvent}" para ${recipientEmail}. Revisa la dirección o configura un dominio verificado.`;
+    }
+  }
+
   if (isSuccess) {
     console.log(
-      `[ORDER_EMAIL_06] EMAIL SENT - OrderId: ${payload.orderId || payload.orderCode}, NotificationId: ${notificationId}, Recipient: ${recipientEmail}, ProviderMsgId: ${providerMessageId}, Timestamp: ${sentAt}`,
+      `[ORDER_EMAIL_06] EMAIL SENT - OrderId: ${payload.orderId || payload.orderCode}, NotificationId: ${notificationId}, Recipient: ${recipientEmail}, ProviderMsgId: ${providerMessageId}, DeliveryEvent: ${deliveryEvent || "queued"}, Timestamp: ${sentAt}`,
     );
   } else {
     console.warn(
       `[ORDER_EMAIL_ERROR] - OrderId: ${payload.orderId || payload.orderCode}, NotificationId: ${notificationId}, Recipient: ${recipientEmail}, HTTPStatus: ${lastHttpStatus}, Error: ${lastError}, Timestamp: ${new Date().toISOString()}, IdempotencyKey: ${idempotencyKey}`,
     );
   }
+
 
   // 4. Log in In-Memory / Supabase
   const logRecord: InMemoryEmailNotification = {
@@ -791,7 +854,8 @@ export async function sendEmailNotification(
     order_code: payload.orderCode ?? null,
     status,
     provider_message_id: providerMessageId,
-    error_message: isSuccess ? null : lastError,
+    error_message: isSuccess && !lastError ? null : lastError,
+
     attempts,
     idempotency_key: idempotencyKey,
     created_at: new Date().toISOString(),
@@ -814,10 +878,11 @@ export async function sendEmailNotification(
           body_html: html,
           status,
           provider_message_id: providerMessageId,
-          error_message: isSuccess ? null : lastError,
+          error_message: isSuccess && !lastError ? null : lastError,
           attempts,
           idempotency_key: idempotencyKey,
-          metadata: payload.metadata || {},
+          metadata: { ...(payload.metadata || {}), deliveryEvent: deliveryEvent ?? "queued" },
+
           created_at: new Date().toISOString(),
           sent_at: sentAt,
         },
@@ -835,7 +900,8 @@ export async function sendEmailNotification(
     ok: isSuccess,
     status,
     providerMessageId,
-    errorMessage: isSuccess ? null : lastError,
+    errorMessage: isSuccess && !lastError ? null : lastError,
     idempotencyKey,
+
   };
 }

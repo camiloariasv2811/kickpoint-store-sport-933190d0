@@ -242,3 +242,17 @@ export const resendOrderEmailNotification = createServerFn({ method: "POST" })
       };
     },
   );
+
+export const checkEmailDeliveryStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input: { messageId: string }) => input)
+  .handler(async ({ data }) => {
+    const { fetchEmailDeliveryStatus } = await import("./email.server");
+    const result = await fetchEmailDeliveryStatus(data.messageId);
+    return {
+      ok: result.ok,
+      lastEvent: result.lastEvent,
+      error: result.error ?? null,
+      raw: result.raw ?? null,
+    };
+  });
