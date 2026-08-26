@@ -496,7 +496,7 @@ export async function sendWhatsAppNotification(
     };
   }
 
-  // 4. Meta Cloud API Request with 3-Attempt Retry
+  // 4. Envío con 3 intentos (Wati si está configurado, si no Meta Cloud API)
   const metaUrl = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
   const metaBody = {
     messaging_product: "whatsapp",
@@ -509,40 +509,65 @@ export async function sendWhatsAppNotification(
     },
   };
 
+  // Wati espera el número sin "+" en la ruta y el texto como query param.
+  const watiPhone = normalizedPhone.replace(/^\+/, "");
+  const watiUrl = `${watiEndpoint}/${watiTenant}/api/v1/sendSessionMessage/${watiPhone}?messageText=${encodeURIComponent(messageText)}`;
+
   let providerMessageId: string | null = null;
   let lastError: string | null = null;
   const maxRetries = 3;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const res = await fetch(metaUrl, {
+      const res = await fetch(useWati ? watiUrl : metaUrl, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(metaBody),
+        headers: useWati
+          ? {
+              Authorization: watiToken!.startsWith("Bearer ") ? watiToken! : `Bearer ${watiToken}`,
+              "Content-Type": "application/json-patch+json",
+            }
+          : {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+        ...(useWati ? {} : { body: JSON.stringify(metaBody) }),
       });
 
-      const data = await res.json();
-      if (res.ok && data.messages?.[0]?.id) {
+      const data: any = await res.json().catch(() => ({}));
+
+      if (useWati) {
+        const ok = res.ok && data?.result !== false && data?.ok !== false;
+        if (ok) {
+          providerMessageId =
+            data?.message?.id || data?.messageId || data?.id || `wati-${Date.now()}`;
+          lastError = null;
+          break;
+        }
+        lastError =
+          data?.info ||
+          data?.message ||
+          data?.error ||
+          `Wati HTTP ${res.status}. Verifica que el número tenga una conversación activa (ventana de 24 h) o usa una plantilla aprobada.`;
+      } else if (res.ok && data.messages?.[0]?.id) {
         providerMessageId = data.messages[0].id;
         lastError = null;
         break;
       } else {
         lastError = data.error?.message || `Meta Cloud API HTTP ${res.status}`;
-        console.warn(`[WhatsApp] Delivery attempt ${attempt} failed: ${lastError}`);
-        if (attempt < maxRetries) {
-          await new Promise((r) => setTimeout(r, attempt * 600));
-        }
+      }
+
+      console.warn(`[WhatsApp] Delivery attempt ${attempt} failed: ${lastError}`);
+      if (attempt < maxRetries) {
+        await new Promise((r) => setTimeout(r, attempt * 600));
       }
     } catch (err: any) {
-      lastError = err.message || "Network timeout contacting Meta Cloud API";
+      lastError = err.message || "Error de red contactando al proveedor de WhatsApp";
       if (attempt < maxRetries) {
         await new Promise((r) => setTimeout(r, attempt * 600));
       }
     }
   }
+
 
   const finalStatus = providerMessageId ? "sent" : "failed";
 
