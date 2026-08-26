@@ -516,7 +516,7 @@ export async function sendWhatsAppNotification(
 
   // Wati espera el número sin "+" en la ruta y el texto como query param.
   const watiPhone = normalizedPhone.replace(/^\+/, "");
-  const watiUrl = `${watiEndpoint}/${watiTenant}/api/v1/sendSessionMessage/${watiPhone}?messageText=${encodeURIComponent(messageText)}`;
+  const watiUrl = `${watiBase}/api/v1/sendSessionMessage/${watiPhone}?messageText=${encodeURIComponent(messageText)}`;
 
   let providerMessageId: string | null = null;
   let lastError: string | null = null;
