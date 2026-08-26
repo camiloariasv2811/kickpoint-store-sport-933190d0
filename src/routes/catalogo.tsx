@@ -322,6 +322,18 @@ function Catalogo() {
 
   return (
     <SiteLayout>
+      {isProductsError && (
+        <div className="border-b border-destructive/40 bg-destructive/10">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 text-sm">
+            <span>
+              No se pudo actualizar el catálogo. Conservamos los últimos productos disponibles.
+            </span>
+            <Button variant="outline" size="sm" onClick={() => void refetchProducts()}>
+              Volver a intentar
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-7xl px-4 py-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
