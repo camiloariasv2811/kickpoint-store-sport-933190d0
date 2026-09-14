@@ -625,6 +625,42 @@ export type Database = {
         }
         Relationships: []
       }
+      prospects: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          notes: string | null
+          phone: string
+          registered_at: string
+          seq: number
+          state: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          notes?: string | null
+          phone: string
+          registered_at?: string
+          seq?: number
+          state?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          phone?: string
+          registered_at?: string
+          seq?: number
+          state?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       sale_items: {
         Row: {
           color: string | null
