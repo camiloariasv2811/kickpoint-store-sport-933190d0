@@ -29,6 +29,7 @@ import { Route as AuthenticatedAdminCatalogoPdfRouteImport } from './routes/_aut
 import { Route as AuthenticatedAdminCategoriasRouteImport } from './routes/_authenticated/admin.categorias'
 import { Route as AuthenticatedAdminClientesRouteImport } from './routes/_authenticated/admin.clientes'
 import { Route as AuthenticatedAdminConfiguracionRouteImport } from './routes/_authenticated/admin.configuracion'
+import { Route as AuthenticatedAdminFuturosClientesRouteImport } from './routes/_authenticated/admin.futuros-clientes'
 import { Route as AuthenticatedAdminInventarioRouteImport } from './routes/_authenticated/admin.inventario'
 import { Route as AuthenticatedAdminKardexRouteImport } from './routes/_authenticated/admin.kardex'
 import { Route as AuthenticatedAdminOrdenCatalogoRouteImport } from './routes/_authenticated/admin.orden-catalogo'
@@ -144,6 +145,12 @@ const AuthenticatedAdminConfiguracionRoute =
     path: '/configuracion',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
+const AuthenticatedAdminFuturosClientesRoute =
+  AuthenticatedAdminFuturosClientesRouteImport.update({
+    id: '/futuros-clientes',
+    path: '/futuros-clientes',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
 const AuthenticatedAdminInventarioRoute =
   AuthenticatedAdminInventarioRouteImport.update({
     id: '/inventario',
@@ -228,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/admin/categorias': typeof AuthenticatedAdminCategoriasRoute
   '/admin/clientes': typeof AuthenticatedAdminClientesRoute
   '/admin/configuracion': typeof AuthenticatedAdminConfiguracionRoute
+  '/admin/futuros-clientes': typeof AuthenticatedAdminFuturosClientesRoute
   '/admin/inventario': typeof AuthenticatedAdminInventarioRoute
   '/admin/kardex': typeof AuthenticatedAdminKardexRoute
   '/admin/orden-catalogo': typeof AuthenticatedAdminOrdenCatalogoRoute
@@ -259,6 +267,7 @@ export interface FileRoutesByTo {
   '/admin/categorias': typeof AuthenticatedAdminCategoriasRoute
   '/admin/clientes': typeof AuthenticatedAdminClientesRoute
   '/admin/configuracion': typeof AuthenticatedAdminConfiguracionRoute
+  '/admin/futuros-clientes': typeof AuthenticatedAdminFuturosClientesRoute
   '/admin/inventario': typeof AuthenticatedAdminInventarioRoute
   '/admin/kardex': typeof AuthenticatedAdminKardexRoute
   '/admin/orden-catalogo': typeof AuthenticatedAdminOrdenCatalogoRoute
@@ -293,6 +302,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/categorias': typeof AuthenticatedAdminCategoriasRoute
   '/_authenticated/admin/clientes': typeof AuthenticatedAdminClientesRoute
   '/_authenticated/admin/configuracion': typeof AuthenticatedAdminConfiguracionRoute
+  '/_authenticated/admin/futuros-clientes': typeof AuthenticatedAdminFuturosClientesRoute
   '/_authenticated/admin/inventario': typeof AuthenticatedAdminInventarioRoute
   '/_authenticated/admin/kardex': typeof AuthenticatedAdminKardexRoute
   '/_authenticated/admin/orden-catalogo': typeof AuthenticatedAdminOrdenCatalogoRoute
@@ -327,6 +337,7 @@ export interface FileRouteTypes {
     | '/admin/categorias'
     | '/admin/clientes'
     | '/admin/configuracion'
+    | '/admin/futuros-clientes'
     | '/admin/inventario'
     | '/admin/kardex'
     | '/admin/orden-catalogo'
@@ -358,6 +369,7 @@ export interface FileRouteTypes {
     | '/admin/categorias'
     | '/admin/clientes'
     | '/admin/configuracion'
+    | '/admin/futuros-clientes'
     | '/admin/inventario'
     | '/admin/kardex'
     | '/admin/orden-catalogo'
@@ -391,6 +403,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/categorias'
     | '/_authenticated/admin/clientes'
     | '/_authenticated/admin/configuracion'
+    | '/_authenticated/admin/futuros-clientes'
     | '/_authenticated/admin/inventario'
     | '/_authenticated/admin/kardex'
     | '/_authenticated/admin/orden-catalogo'
@@ -564,6 +577,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminConfiguracionRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
+    '/_authenticated/admin/futuros-clientes': {
+      id: '/_authenticated/admin/futuros-clientes'
+      path: '/futuros-clientes'
+      fullPath: '/admin/futuros-clientes'
+      preLoaderRoute: typeof AuthenticatedAdminFuturosClientesRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
     '/_authenticated/admin/inventario': {
       id: '/_authenticated/admin/inventario'
       path: '/inventario'
@@ -650,6 +670,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminCategoriasRoute: typeof AuthenticatedAdminCategoriasRoute
   AuthenticatedAdminClientesRoute: typeof AuthenticatedAdminClientesRoute
   AuthenticatedAdminConfiguracionRoute: typeof AuthenticatedAdminConfiguracionRoute
+  AuthenticatedAdminFuturosClientesRoute: typeof AuthenticatedAdminFuturosClientesRoute
   AuthenticatedAdminInventarioRoute: typeof AuthenticatedAdminInventarioRoute
   AuthenticatedAdminKardexRoute: typeof AuthenticatedAdminKardexRoute
   AuthenticatedAdminOrdenCatalogoRoute: typeof AuthenticatedAdminOrdenCatalogoRoute
@@ -668,6 +689,8 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminCategoriasRoute: AuthenticatedAdminCategoriasRoute,
   AuthenticatedAdminClientesRoute: AuthenticatedAdminClientesRoute,
   AuthenticatedAdminConfiguracionRoute: AuthenticatedAdminConfiguracionRoute,
+  AuthenticatedAdminFuturosClientesRoute:
+    AuthenticatedAdminFuturosClientesRoute,
   AuthenticatedAdminInventarioRoute: AuthenticatedAdminInventarioRoute,
   AuthenticatedAdminKardexRoute: AuthenticatedAdminKardexRoute,
   AuthenticatedAdminOrdenCatalogoRoute: AuthenticatedAdminOrdenCatalogoRoute,
