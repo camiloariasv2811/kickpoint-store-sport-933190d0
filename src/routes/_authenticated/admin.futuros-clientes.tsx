@@ -226,7 +226,10 @@ function AdminFuturosClientes() {
   }
 
   async function exportExcel() {
-    if (filtered.length === 0) return toast.error("No hay futuros clientes para exportar");
+    if (filtered.length === 0) {
+      toast.error("No hay futuros clientes para exportar");
+      return;
+    }
     const XLSX = await import("xlsx");
     const rows = filtered
       .slice()
