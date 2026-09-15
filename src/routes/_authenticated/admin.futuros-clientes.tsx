@@ -127,8 +127,15 @@ function AdminFuturosClientes() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin", "prospects"] });
 
   const importMutation = useMutation({
-    mutationFn: (rows: Parameters<typeof importProspects>[0] extends never ? never : any) =>
-      importProspects({ data: { rows } }),
+    mutationFn: (
+      rows: Array<{
+        name: string;
+        phone: string;
+        state: string;
+        notes: string;
+        registered_at: string;
+      }>,
+    ) => importProspects({ data: { rows } }),
     onSuccess: (res) => {
       invalidate();
       toast.success(
@@ -182,8 +189,14 @@ function AdminFuturosClientes() {
   }
 
   async function submitForm() {
-    if (!form.name.trim()) return toast.error("Escribe el nombre del futuro cliente");
-    if (!form.phone.replace(/\D/g, "")) return toast.error("Escribe el número de teléfono");
+    if (!form.name.trim()) {
+      toast.error("Escribe el nombre del futuro cliente");
+      return;
+    }
+    if (!form.phone.replace(/\D/g, "")) {
+      toast.error("Escribe el número de teléfono");
+      return;
+    }
     setBusy(true);
     try {
       if (editing) {
@@ -220,7 +233,10 @@ function AdminFuturosClientes() {
   }
 
   async function exportExcel() {
-    if (filtered.length === 0) return toast.error("No hay futuros clientes para exportar");
+    if (filtered.length === 0) {
+      toast.error("No hay futuros clientes para exportar");
+      return;
+    }
     const XLSX = await import("xlsx");
     const rows = filtered
       .slice()
@@ -235,6 +251,15 @@ function AdminFuturosClientes() {
       }));
     const sheet = XLSX.utils.json_to_sheet(rows, { header: [...HEADERS] });
     sheet["!cols"] = [{ wch: 6 }, { wch: 28 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 40 }];
+    // El teléfono se guarda como texto para no perder el 0 inicial.
+    for (let i = 0; i < rows.length; i++) {
+      const ref = XLSX.utils.encode_cell({ c: 2, r: i + 1 });
+      const cell = sheet[ref];
+      if (cell) {
+        cell.t = "s";
+        cell.z = "@";
+      }
+    }
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, "Futuros clientes");
     XLSX.writeFile(book, `futuros-clientes-${today}.xlsx`);

@@ -17,6 +17,7 @@ import {
   ShoppingBag,
   Store,
   Tags,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
@@ -40,6 +41,7 @@ const NAV = [
 
   { to: "/admin/categorias", label: "Categorías", icon: Tags, badgeKey: null },
   { to: "/admin/clientes", label: "Clientes", icon: Users, badgeKey: null },
+  { to: "/admin/futuros-clientes", label: "Futuros clientes", icon: UserPlus, badgeKey: null },
   { to: "/admin/pagos", label: "Pagos", icon: CreditCard, badgeKey: "pendingPayments" },
   { to: "/admin/reportes", label: "Reportes", icon: FileBarChart, badgeKey: null },
   { to: "/admin/configuracion", label: "Configuración", icon: Settings, badgeKey: null },
