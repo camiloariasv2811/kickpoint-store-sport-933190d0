@@ -47,38 +47,11 @@ export const Route = createFileRoute("/_authenticated/admin/futuros-clientes")({
   component: AdminFuturosClientes,
 });
 
-const VE_STATES = [
-  "Amazonas",
-  "Anzoátegui",
-  "Apure",
-  "Aragua",
-  "Barinas",
-  "Bolívar",
-  "Carabobo",
-  "Cojedes",
-  "Delta Amacuro",
-  "Distrito Capital",
-  "Falcón",
-  "Guárico",
-  "La Guaira",
-  "Lara",
-  "Mérida",
-  "Miranda",
-  "Monagas",
-  "Nueva Esparta",
-  "Portuguesa",
-  "Sucre",
-  "Táchira",
-  "Trujillo",
-  "Yaracuy",
-  "Zulia",
-];
-
 const HEADERS = [
   "N.º",
   "Nombre",
   "Número de teléfono",
-  "Estado",
+  "Ciudad",
   "Fecha de registro",
   "Observaciones",
 ] as const;
@@ -594,20 +567,13 @@ function AdminFuturosClientes() {
               />
             </div>
             <div>
-              <Label htmlFor="fc-state">Estado</Label>
-              <select
+              <Label htmlFor="fc-state">Ciudad</Label>
+              <Input
                 id="fc-state"
                 value={form.state}
                 onChange={(e) => setForm({ ...form, state: e.target.value })}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="">Selecciona un estado</option>
-                {VE_STATES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+                placeholder="Ej. Maracay"
+              />
             </div>
             <div>
               <Label htmlFor="fc-notes">Observaciones</Label>
