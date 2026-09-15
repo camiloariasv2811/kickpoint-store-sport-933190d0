@@ -182,8 +182,14 @@ function AdminFuturosClientes() {
   }
 
   async function submitForm() {
-    if (!form.name.trim()) return toast.error("Escribe el nombre del futuro cliente");
-    if (!form.phone.replace(/\D/g, "")) return toast.error("Escribe el número de teléfono");
+    if (!form.name.trim()) {
+      toast.error("Escribe el nombre del futuro cliente");
+      return;
+    }
+    if (!form.phone.replace(/\D/g, "")) {
+      toast.error("Escribe el número de teléfono");
+      return;
+    }
     setBusy(true);
     try {
       if (editing) {
