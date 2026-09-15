@@ -127,8 +127,15 @@ function AdminFuturosClientes() {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["admin", "prospects"] });
 
   const importMutation = useMutation({
-    mutationFn: (rows: Parameters<typeof importProspects>[0] extends never ? never : any) =>
-      importProspects({ data: { rows } }),
+    mutationFn: (
+      rows: Array<{
+        name: string;
+        phone: string;
+        state: string;
+        notes: string;
+        registered_at: string;
+      }>,
+    ) => importProspects({ data: { rows } }),
     onSuccess: (res) => {
       invalidate();
       toast.success(
