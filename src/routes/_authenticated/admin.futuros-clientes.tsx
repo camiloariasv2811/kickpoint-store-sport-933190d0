@@ -47,38 +47,11 @@ export const Route = createFileRoute("/_authenticated/admin/futuros-clientes")({
   component: AdminFuturosClientes,
 });
 
-const VE_STATES = [
-  "Amazonas",
-  "Anzoátegui",
-  "Apure",
-  "Aragua",
-  "Barinas",
-  "Bolívar",
-  "Carabobo",
-  "Cojedes",
-  "Delta Amacuro",
-  "Distrito Capital",
-  "Falcón",
-  "Guárico",
-  "La Guaira",
-  "Lara",
-  "Mérida",
-  "Miranda",
-  "Monagas",
-  "Nueva Esparta",
-  "Portuguesa",
-  "Sucre",
-  "Táchira",
-  "Trujillo",
-  "Yaracuy",
-  "Zulia",
-];
-
 const HEADERS = [
   "N.º",
   "Nombre",
   "Número de teléfono",
-  "Estado",
+  "Ciudad",
   "Fecha de registro",
   "Observaciones",
 ] as const;
@@ -296,7 +269,7 @@ function AdminFuturosClientes() {
       const rows = raw.map((row) => ({
         name: pick(row, ["nombre", "name"]),
         phone: pick(row, ["telefono", "phone", "whatsapp", "celular", "numero"]),
-        state: pick(row, ["estado", "state"]),
+        state: pick(row, ["ciudad", "estado", "state"]),
         notes: pick(row, ["observacion", "nota", "notes", "comentario"]),
         registered_at: pick(row, ["fecha", "date"]),
       }));
@@ -326,7 +299,7 @@ function AdminFuturosClientes() {
           icon={CalendarDays}
           tone="primary"
         />
-        <StatCard label="Estados registrados" value={String(states.length)} icon={MapPin} />
+        <StatCard label="Ciudades registradas" value={String(states.length)} icon={MapPin} />
       </div>
 
       <div className="surface-card space-y-3 p-4">
@@ -342,13 +315,13 @@ function AdminFuturosClientes() {
 
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <Label className="text-xs text-muted-foreground">Estado</Label>
+            <Label className="text-xs text-muted-foreground">Ciudad</Label>
             <select
               value={stateFilter}
               onChange={(e) => setStateFilter(e.target.value)}
               className="mt-1 h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
             >
-              <option value="">Todos los estados</option>
+              <option value="">Todas las ciudades</option>
               {states.map((s) => (
                 <option key={s} value={s}>
                   {s}
@@ -459,7 +432,7 @@ function AdminFuturosClientes() {
                   <th className="px-3 py-3 font-semibold">N.º</th>
                   <th className="px-3 py-3 font-semibold">Nombre</th>
                   <th className="px-3 py-3 font-semibold">Teléfono</th>
-                  <th className="px-3 py-3 font-semibold">Estado</th>
+                  <th className="px-3 py-3 font-semibold">Ciudad</th>
                   <th className="px-3 py-3 font-semibold">Fecha de registro</th>
                   <th className="px-3 py-3 font-semibold">Observaciones</th>
                   <th className="px-3 py-3 text-right font-semibold">Acciones</th>
@@ -544,7 +517,7 @@ function AdminFuturosClientes() {
                 </a>
                 <p className="text-sm text-muted-foreground">
                   <MapPin className="mr-1 inline size-3.5" />
-                  {p.state ?? "Sin estado"}
+                  {p.state ?? "Sin ciudad"}
                 </p>
                 {p.notes && <p className="text-sm text-muted-foreground">{p.notes}</p>}
                 <div className="flex gap-2 pt-1">
@@ -594,20 +567,13 @@ function AdminFuturosClientes() {
               />
             </div>
             <div>
-              <Label htmlFor="fc-state">Estado</Label>
-              <select
+              <Label htmlFor="fc-state">Ciudad</Label>
+              <Input
                 id="fc-state"
                 value={form.state}
                 onChange={(e) => setForm({ ...form, state: e.target.value })}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-              >
-                <option value="">Selecciona un estado</option>
-                {VE_STATES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+                placeholder="Ej. Maracay"
+              />
             </div>
             <div>
               <Label htmlFor="fc-notes">Observaciones</Label>
@@ -646,7 +612,7 @@ function AdminFuturosClientes() {
                 <dd className="font-medium">{viewing.phone}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">Estado</dt>
+                <dt className="text-muted-foreground">Ciudad</dt>
                 <dd className="font-medium">{viewing.state ?? "—"}</dd>
               </div>
               <div className="flex justify-between gap-3">
