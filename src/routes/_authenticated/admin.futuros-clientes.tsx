@@ -251,6 +251,15 @@ function AdminFuturosClientes() {
       }));
     const sheet = XLSX.utils.json_to_sheet(rows, { header: [...HEADERS] });
     sheet["!cols"] = [{ wch: 6 }, { wch: 28 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 40 }];
+    // El teléfono se guarda como texto para no perder el 0 inicial.
+    for (let i = 0; i < rows.length; i++) {
+      const ref = XLSX.utils.encode_cell({ c: 2, r: i + 1 });
+      const cell = sheet[ref];
+      if (cell) {
+        cell.t = "s";
+        cell.z = "@";
+      }
+    }
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, "Futuros clientes");
     XLSX.writeFile(book, `futuros-clientes-${today}.xlsx`);
