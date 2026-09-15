@@ -17,6 +17,7 @@ import {
   ShoppingBag,
   Store,
   Tags,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
